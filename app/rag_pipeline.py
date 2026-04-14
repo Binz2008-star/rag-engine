@@ -52,45 +52,24 @@ def enforce_english_only(answer: str) -> str:
 
 
 def finalize_answer(answer: str, query: str, context: str) -> str:
-    """Finalize answer with stress query handling and ECO fact completion."""
+    """Finalize answer - minimal English-only sanitizer for multilingual path (Phase 2)."""
     a = answer.strip()
 
     if "out of scope" in a.lower():
         return "Insufficient data."
 
+    # REMOVED ALL ANSWER MUTATION PATTERNS (Phase 2)
+    # - Arabic keyword enforcement
+    # - Arabic services enforcement
+    # - Arabic company enforcement
+    # - ECO fact completion
+    # - UAE term enforcement
+
+    # Minimal English-only sanitizer for multilingual output path only
+    # Apply only when query is Arabic to enforce output format contract
     q = query.lower()
-
-    # Arabic keyword enforcement
-    if "جنسية" in q:
-        return "UAE"
-
-    if "خدمات" in q:
-        if "services" not in a.lower():
-            if not a.endswith("."):
-                a += "."
-            a += " The company provides environmental services."
-        if "restaurants" not in a.lower():
-            a += " including restaurants."
-
-    if "شركة" in q:
-        if "company" not in a.lower():
-            a = "ECO is a company. " + a
-
-    if "من هو" in q:
-        if "environmental" not in a.lower():
-            a += " environmental professional with experience."
-
-    if "eco" in q or "إيكو" in query:
-        if "2016" in context and "2016" not in a and "established" not in a.lower():
-            a = a.rstrip(".") + ". Established in 2016."
-
-    # Enforce English-only output
-    a = enforce_english_only(a)
-
-    # Force UAE term for location queries (test 35)
-    if "أين تقع" in q or "where is" in q:
-        if "uae" not in a.lower():
-            a = "UAE. " + a
+    if any('\u0600' <= c <= '\u06FF' for c in query):
+        a = "".join(c for c in a if not ('\u0600' <= c <= '\u06FF'))
 
     return a
 

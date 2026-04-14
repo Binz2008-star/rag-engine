@@ -7,11 +7,12 @@ import time
 from dataclasses import dataclass
 from typing import List
 
-from app.config import RERANK_ENABLED
+from app.chunking import Chunk
 from app.embeddings import EmbeddingClient
 from app.models import RetrievedChunk
 from app.query_normalizer import normalize_query
 from app.reranker import LightweightReranker
+from app.source_policy import SourcePolicy
 from app.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ SCORE_THRESHOLD    = 0.35
 MAX_PER_SOURCE     = 2  # STRICT
 FINAL_TOP_K        = 6
 RETRIEVAL_POOL     = 30
+RERANK_ENABLED     = True
 
 
 # ── Scoring adjustment rules (consolidated) ──────────────────────────────────
@@ -34,6 +36,9 @@ RETRIEVAL_POOL     = 30
 #   - No boost for "Robin" alone          → too broad
 #   - No boost for "experience" alone     → too broad
 #   - Compound rules require 2+ signals   → prevents single-keyword overfitting
+#
+# Phase 2 Migration: These rules will be migrated to SourcePolicy module
+# for centralization and gradual weakening.
 
 @dataclass(frozen=True)
 class ScoringRule:
@@ -172,6 +177,7 @@ class Retriever:
     def __init__(self, embedding_client: EmbeddingClient) -> None:
         self.embedding_client = embedding_client
         self.reranker = LightweightReranker()
+        self.source_policy = SourcePolicy()  # Phase 2: Centralize source logic
 
     def _contains_arabic(self, text: str) -> bool:
         return any('\u0600' <= c <= '\u06FF' for c in text)
@@ -184,26 +190,67 @@ class Retriever:
             return "cv"
         return "other"
 
+    def _get_source_prior(self, chunk, intent: str) -> float:
+        """Get soft source prior based on document type and intent (Phase 2)."""
+        source = chunk.source.lower()
+
+        is_bio = any(x in source for x in ["bio", "cv", "deliveroo", "roben", "robin"])
+        is_company = "eco" in source or "company_profile" in source
+
+        if intent == "cv":
+            if is_bio:
+                return 1.15
+            if is_company:
+                return 0.95
+
+        if intent == "eco":
+            if is_company:
+                return 1.15
+            if is_bio:
+                return 0.95
+
+        return 1.0
+
     def _is_primary_eco(self, source: str) -> bool:
         return source == "ECO_Company_Profile.pdf"
 
     def _detect_intent(self, query: str) -> str:
-        """Detect query intent: 'eco', 'cv', or 'neutral'."""
+        """Detect query intent: 'cv', 'eco', or 'neutral' with improved Arabic detection (Phase 2)."""
         q = query.lower()
 
-        # CV intent must win for historical-work queries
-        if any(x in q for x in [
-            "work history", "before", "previous", "prior",
-            "experience before", "history",
-            "مهارات", "تعليم", "خبرة", "قبل", "شهادات",
-            "skills", "education", "cv", "certificates", "certs"
-        ]):
+        # Arabic CV patterns (Phase 2: explicit classification for person queries)
+        CV_AR_PATTERNS = [
+            "من هو", "من هي", "ما هي جنسية", "ما هو تعليم",
+            "ما هي مهارات", "ما هي شهادات", "خبرة", "وظائف"
+        ]
+
+        # Arabic ECO patterns (Phase 2: explicit classification for company queries)
+        ECO_AR_PATTERNS = [
+            "ما هي شركة", "أين تقع شركة", "ما هي خدمات", "شركة", "إيكو"
+        ]
+
+        # English CV patterns (existing + Phase 2 improvements)
+        CV_EN_PATTERNS = [
+            "who is", "nationality", "education", "skills",
+            "certificates", "certs", "work history", "before",
+            "previous", "prior", "experience before", "history"
+        ]
+
+        # English ECO patterns (existing + Phase 2 improvements)
+        ECO_EN_PATTERNS = [
+            "company", "services", "eco", "eco-technology", "located", "founded"
+        ]
+
+        # CV intent wins for person-centric queries
+        if any(p in q for p in CV_EN_PATTERNS):
+            return "cv"
+        if any(p in q for p in CV_AR_PATTERNS):
             return "cv"
 
-        if any(x in q for x in [
-            "company", "services", "eco", "eco-technology",
-            "شركة", "خدمات", "إيكو"
-        ]):
+        # ECO intent for company-centric queries
+        if any(p in q for p in ECO_EN_PATTERNS):
+            return "eco"
+        if any(p in q for p in ECO_AR_PATTERNS):
             return "eco"
 
         return "neutral"
@@ -366,26 +413,19 @@ class Retriever:
         return filtered
 
     def _diversify(self, retrieved: List[RetrievedChunk]) -> List[RetrievedChunk]:
-        """Diversify by source family, but protect primary sources."""
-        seen = {}
+        """Diversify chunks - cap at 2 chunks per source (Phase 2)."""
+        counts = {}
         diversified = []
 
         for rc in retrieved:
             source = rc.chunk.source
+            count = counts.get(source, 0)
 
-            # Always allow primary sources
-            if source == PRIMARY_ECO or source == PRIMARY_CV:
+            if count < 2:  # Cap at 2 chunks per source
                 diversified.append(rc)
-                continue
+                counts[source] = count + 1
 
-            family = self._source_family(source)
-            count = seen.get(family, 0)
-
-            if count < 2:
-                diversified.append(rc)
-                seen[family] = count + 1
-
-        logger.info("Diversify: %d/%d after protecting primary sources", len(diversified), len(retrieved))
+        logger.info("Diversify: %d/%d after capping at 2 per source", len(diversified), len(retrieved))
         return diversified
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -398,7 +438,7 @@ class Retriever:
         # Arabic detection and normalization
         is_ar = self._contains_arabic(query)
 
-        # Detect intent for pre-retrieval injection
+        # Detect intent for pre-retrieval injection (Phase 2: person/company/neutral)
         intent = self._detect_intent(query)
 
         # Get dynamic TOP_K based on query length (reduce retrieval cost)
@@ -459,6 +499,11 @@ class Retriever:
             logger.info("Reranking applied: %d candidates", len(retrieved))
 
         retrieved = self._apply_scoring_adjustments(query, retrieved, phase="boost")
+
+        # Apply soft source priors based on intent (Phase 2)
+        for rc in retrieved:
+            prior = self._get_source_prior(rc.chunk, intent)
+            rc.score *= prior
 
         # Sort by score first
         retrieved.sort(key=lambda x: x.score, reverse=True)
