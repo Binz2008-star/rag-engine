@@ -1,0 +1,429 @@
+{
+  "metrics": {
+    "total": 21,
+    "passed": 21,
+    "failed": 0,
+    "errors": 0,
+    "pass_rate": 1.0,
+    "source_match_accuracy": 1.0,
+    "refusal_accuracy": 1.0,
+    "failure_buckets": {},
+    "avg_elapsed_s": 3.01
+  },
+  "results": [
+    {
+      "test_id": 1,
+      "question": "What is the GDP of Japan?",
+      "answer": "Insufficient data.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 5.774349500000426,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "Insufficient data.",
+      "has_expected_source": false,
+      "has_expected_exact": true
+    },
+    {
+      "test_id": 2,
+      "question": "What is the capital of France?",
+      "answer": "Insufficient data.",
+      "sources": [
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf",
+        "Robin_Edwan_CV_Professional.pdf",
+        "Robin_Edwan_CV.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 2.2245005999993737,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "Insufficient data.",
+      "has_expected_source": false,
+      "has_expected_exact": true
+    },
+    {
+      "test_id": 3,
+      "question": "What is the current population of China?",
+      "answer": "Insufficient data.",
+      "sources": [
+        "Robin_Edwan_CV.pdf",
+        "Robin_Edwan_CV_Professional.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 2.1880460999991556,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "Insufficient data.",
+      "has_expected_source": false,
+      "has_expected_exact": true
+    },
+    {
+      "test_id": 4,
+      "question": "Who won the 2022 World Cup?",
+      "answer": "Insufficient data.",
+      "sources": [
+        "Robin_Edwan_Executive_Bio_.pdf",
+        "Robin_Edwan_CV_Professional.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 0.9007354999994277,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "Insufficient data.",
+      "has_expected_source": false,
+      "has_expected_exact": true
+    },
+    {
+      "test_id": 5,
+      "question": "What company is Eco-Technology Environmental Protection Services LLC?",
+      "answer": "Eco Technology Environment Protection Services L.L.C. is a municipality-approved environmental services company specializing in grease management systems, environmental compliance services, and operational solutions for restaurants and commercial facilities across the UAE.\n\nSources:\n* ECO_Company_Profile.pdf\n* Robin_Edwan_Executive_Bio.pdf\n* Robin_Edwan_Executive_Bio_.pdf",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf",
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 3.5824345000000903,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 6,
+      "question": "What year was Eco-Technology founded?",
+      "answer": "2016 [pdf_ECO_Company_Profile.pdf_0000]\n\nSources:\n* ECO_Company_Profile.pdf",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 2.27338250000048,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 7,
+      "question": "Where is Eco-Technology located?",
+      "answer": "Ajman. Sources: ECO_Company_Profile.pdf, Robin_Edwan_Executive_Bio.pdf",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 2.1127317000000403,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 8,
+      "question": "What services does Eco-Technology provide?",
+      "answer": "Scheduled waste management pickup routes, proper disposal and recycling, Waste Management Consulting, Environmental compliance guidance, Waste reduction strategies implementation, Sustainability reporting and certification, Green practices training and support, Pressure Washing Services, Hot Water Pressure Washing, Grease Trap Installation & Supply, Used Cooking Oil (UCO) Collection.\n\nSources\nECO_Company_Profile.pdf",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 3.4885825999999724,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 9,
+      "question": "What is Robin's role at Eco-Technology?",
+      "answer": "Robin Edwan is the Founder and Managing Director of Eco Technology Environment Protection Services L.L.C. in Ajman. Sources: ECO_Company_Profile.pdf, Robin_Edwan_Executive_Bio.pdf, Robin_Edwan_Executive_Bio_.pdf",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 3.2788727000006475,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 10,
+      "question": "What is Robin's experience in environmental services?",
+      "answer": "Robin Edwan has over a decade of experience in environmental services, business development, and client relationship management. He specializes in grease management systems, environmental compliance services, and operational solutions for restaurants and commercial facilities across the UAE.\n\nSources:\n[Rank 1 | Score 0.9107 | Source ECO_Company_Profile.pdf | Chunk pdf_ECO_Company_Profile.pdf_0000]\n[Rank 2 | Score 0.7785 | Source Robin_Edwan_Executive_Bio.pdf | Chunk pdf_Robin_Edwan_Executive_Bio.pdf_0000]\n[Rank 3 | Score 0.7586 | Source Robin_Edwan_Executive_Bio_.pdf | Chunk pdf_Robin_Edwan_Executive_Bio.pdf_0000]",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf",
+        "Robin_Edwan_CV.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 6.64967230000002,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 11,
+      "question": "What company profile is included in the documents?",
+      "answer": "ECO Environmental Protection Services LLC is a leading UAE-based company specializing in comprehensive environmental and marine services. (pdf_ECO_Company_Profile.pdf_0000) (pdf_ECO_Company_Profile.pdf_0003)\n\nSources:\nECO_Company_Profile.pdf",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+        "Robin_Edwan_Executive_Bio.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 3.435193700000127,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 12,
+      "question": "What environmental certifications does Eco-Technology hold?",
+      "answer": "Insufficient data.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 1.4845097999996142,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 13,
+      "question": "What role is the CV tailored for?",
+      "answer": "Deliveroo",
+      "sources": [
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 1.1703778000000966,
+      "error": "",
+      "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 14,
+      "question": "What is Robin's educational background?",
+      "answer": "MBA – Business & IT, Bachelor of Business Administration BA Sales & Commerce. Certifications - ISO 14001 Environmental Management - AI for Business – MIT - Hugging Face NLP - ElevenLabs Voice Technology - Process Automation Tools (Jobber, Power Automate)\n\nSources:\ntxt_Roben_Edwan_Deliveroo_Tailored_CV.txt_0004\npdf_Roben_Edwan_CV.pdf_0002\npdf_Robin_Edwan_Executive_Bio.pdf_0000",
+      "sources": [
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+        "Roben_Edwan_CV.pdf",
+        "Robin_Edwan_Executive_Bio.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 4.5852820000000065,
+      "error": "",
+      "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 15,
+      "question": "What are Robin's main technical skills?",
+      "answer": "KPI tracking, cross-functional coordination, and process improvement using Jobber, Google Sheets, and Power Automate.\n\nSources\nRoben_Edwan_Deliveroo_Tailored_CV.txt\nRobin_Edwan_Executive_Bio.pdf\nRobin_Edwan_Executive_Bio_.pdf",
+      "sources": [
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 2.936326299999564,
+      "error": "",
+      "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 16,
+      "question": "What certificates does Robin have?",
+      "answer": "Insufficient data.",
+      "sources": [
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf",
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+        "ECO_Company_Profile.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 5.7413502999997945,
+      "error": "",
+      "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 17,
+      "question": "List the top 5 skills mentioned in the CV",
+      "answer": "KPI tracking, cross-functional coordination, process improvement, stakeholder management and issue escalation, operational systems development.\n\nSources:\n* Roben_Edwan_Deliveroo_Tailored_CV.txt\n* Robin_Edwan_CV_Professional.pdf\n* Robin_Edwan_Executive_Bio.pdf",
+      "sources": [
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_CV_Professional.pdf",
+        "Robin_Edwan_Executive_Bio.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 3.112196999999469,
+      "error": "",
+      "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 18,
+      "question": "What is Robin's work history before Eco-Technology?",
+      "answer": "Insufficient data.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 1.571163499999784,
+      "error": "",
+      "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 19,
+      "question": "What languages does Robin speak?",
+      "answer": "Insufficient data.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "ECO_Company_Profile.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 2.5717329999997673,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "Insufficient data.",
+      "has_expected_source": false,
+      "has_expected_exact": true
+    },
+    {
+      "test_id": 20,
+      "question": "What is Robin's nationality?",
+      "answer": "UAII",
+      "sources": [
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf",
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 1.062045699999544,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "",
+      "has_expected_source": false,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 21,
+      "question": "Who is Robin Edwan?",
+      "answer": "Robin Edwan is a UAEIbased business and operations professional with over a decade of experience in environmental services, business development, and client relationship management. He is the Founder and Managing Director of Eco Technology Environment Protection Services L.L.C. in Ajman. [Source: Robin_Edwan_Executive_Bio.pdf]\n\nSources:\nRobin_Edwan_Executive_Bio.pdf",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 3.077920400000039,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "",
+      "has_expected_source": false,
+      "has_expected_exact": false
+    }
+  ]
+}

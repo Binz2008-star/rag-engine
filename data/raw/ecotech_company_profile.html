@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ECO Technology Tier-1 Tender Master Profile</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 14mm 14mm 16mm 14mm;
+    }
+
+    :root {
+      --green-dark: #0f5b45;
+      --green: #18866a;
+      --green-soft: #edf7f3;
+      --green-soft-2: #f5fbf8;
+      --text: #243235;
+      --muted: #627377;
+      --line: #d9e4de;
+      --line-strong: #bfd2c7;
+      --bg: #ffffff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "DejaVu Sans", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      font-size: 11.4pt;
+      line-height: 1.48;
+    }
+
+    h1, h2, h3, h4 { margin: 0; }
+    p { margin: 0 0 10px 0; text-align: justify; }
+    img { max-width: 100%; display: block; }
+
+    .page-break { page-break-before: always; }
+    .avoid-break { page-break-inside: avoid; }
+    .muted { color: var(--muted); }
+    .small { font-size: 9.4pt; }
+
+    .cover {
+      min-height: 241mm;
+      padding: 16mm;
+      border: 1px solid var(--line);
+      background:
+        radial-gradient(circle at top right, rgba(24,134,106,0.12), transparent 28%),
+        linear-gradient(145deg, #f4fbf8 0%, #ffffff 58%, #eef8f4 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 6px 11px;
+      border: 1px solid var(--line-strong);
+      background: rgba(255,255,255,0.72);
+      color: var(--green-dark);
+      font-weight: 700;
+      letter-spacing: 1.6px;
+      font-size: 10.4pt;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .cover h1 {
+      color: var(--green-dark);
+      font-size: 22pt;
+      line-height: 1.1;
+      max-width: 150mm;
+      margin-bottom: 6px;
+    }
+
+    .cover .service-line {
+      font-size: 13pt;
+      font-weight: 700;
+      color: var(--green);
+      max-width: 150mm;
+      margin-bottom: 10px;
+    }
+
+    .cover .subtitle {
+      font-size: 11pt;
+      color: var(--muted);
+      max-width: 138mm;
+      margin-bottom: 12px;
+    }
+
+    .quick-nav {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin: 12px 0 14px 0;
+    }
+
+    .quick-nav div {
+      background: rgba(255,255,255,0.88);
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--green);
+      border-radius: 9px;
+      padding: 8px 9px;
+      font-size: 9.1pt;
+      color: var(--green-dark);
+      font-weight: 700;
+      min-height: 46px;
+    }
+
+    .cover-grid {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 8mm;
+      margin-top: 6px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 11px;
+      box-shadow: 0 3px 10px rgba(16, 62, 49, 0.04);
+    }
+
+    .card h3 {
+      color: var(--green-dark);
+      font-size: 12.6pt;
+      margin-bottom: 8px;
+    }
+
+    .card p:last-child { margin-bottom: 0; }
+
+    .metric-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 6mm;
+    }
+
+    .metric-box {
+      background: rgba(255,255,255,0.94);
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--green);
+      border-radius: 10px;
+      padding: 8px 10px;
+      min-height: 56px;
+    }
+
+    .metric-box .value {
+      font-size: 16.5pt;
+      line-height: 1;
+      font-weight: 800;
+      color: var(--green);
+      margin-bottom: 4px;
+    }
+
+    .metric-box .label {
+      font-size: 8.9pt;
+      line-height: 1.2;
+      color: var(--muted);
+    }
+
+    .cover-footer {
+      position: absolute;
+      left: 16mm;
+      right: 16mm;
+      bottom: 8mm;
+      border-top: 1px solid var(--line);
+      padding-top: 3mm;
+      font-size: 8.4pt;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .cover .card h3 {
+      font-size: 11.8pt;
+      margin-bottom: 6px;
+    }
+
+    .cover .card p {
+      font-size: 10.3pt;
+      line-height: 1.36;
+      margin-bottom: 8px;
+    }
+
+    .section {
+      page-break-inside: avoid;
+      margin-bottom: 14px;
+    }
+
+    .section h2 {
+      color: var(--green-dark);
+      font-size: 23pt;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+
+    .section-intro {
+      margin-bottom: 10px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid #edf2ef;
+      color: var(--muted);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.18fr 0.82fr;
+      gap: 10mm;
+      align-items: start;
+    }
+
+    .grid-2-equal {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8mm;
+      align-items: start;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      page-break-inside: avoid;
+    }
+
+    th {
+      background: var(--green-dark);
+      color: white;
+      text-align: left;
+      font-size: 11pt;
+      padding: 10px 10px;
+      border: 1px solid var(--green-dark);
+      vertical-align: top;
+    }
+
+    td {
+      border: 1px solid var(--line);
+      padding: 10px 10px;
+      vertical-align: top;
+      background: #fff;
+    }
+
+    .snapshot-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .snapshot-item {
+      border: 1px solid var(--line);
+      background: var(--green-soft-2);
+      border-radius: 10px;
+      padding: 10px;
+      min-height: 68px;
+    }
+
+    .snapshot-item .k {
+      font-size: 9pt;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .snapshot-item .v {
+      font-size: 12.5pt;
+      color: var(--green-dark);
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      border: 1px solid var(--line-strong);
+      background: var(--green-soft);
+      color: var(--green-dark);
+      font-weight: 700;
+      font-size: 9.2pt;
+      padding: 6px 9px;
+      border-radius: 999px;
+    }
+
+    .visual-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .visual-card img {
+      width: 100%;
+      border-radius: 8px;
+    }
+
+    .visual-caption {
+      font-size: 8.8pt;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .case-banner {
+      background: linear-gradient(135deg, #0f5b45 0%, #208d72 100%);
+      color: #fff;
+      border-radius: 12px 12px 0 0;
+      padding: 16px 18px;
+    }
+
+    .case-banner h3 {
+      font-size: 17pt;
+      margin-bottom: 6px;
+    }
+
+    .case-body {
+      border: 1px solid var(--line);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      padding: 14px 16px;
+      background: #fff;
+    }
+
+    .metric-row-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 10px 0 8px 0;
+    }
+
+    .metric-row-4 .mini {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: var(--green-soft-2);
+      min-height: 72px;
+    }
+
+    .metric-row-4 .mini .value {
+      font-size: 16pt;
+      font-weight: 800;
+      color: var(--green);
+      margin-bottom: 5px;
+      line-height: 1;
+    }
+
+    .metric-row-4 .mini .label {
+      font-size: 9.5pt;
+      color: var(--muted);
+      line-height: 1.25;
+    }
+
+    .footer-note {
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #edf2ef;
+      color: var(--muted);
+      font-size: 9.6pt;
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <div class="eyebrow">Tier-1 Tender Master Profile</div>
+    <h1>ECO Technology Environmental Protection Services L.L.C.</h1>
+    <div class="service-line">Wastewater AMC, Sewage Infrastructure Maintenance, and Environmental Compliance Services</div>
+    <div class="subtitle">Wastewater AMC, sewage tank cleaning, desludging, grease control, and compliance-oriented environmental services for UAE facilities.</div>
+
+    <div class="quick-nav">
+      <div>Credentials Snapshot</div>
+      <div>Performance &amp; Evidence</div>
+      <div>Case Study &amp; Methodology</div>
+      <div>Compliance, Reporting &amp; Commercial Fit</div>
+    </div>
+
+    <div class="cover-grid">
+      <div class="card">
+        <h3>Procurement positioning</h3>
+        <p><strong>ECO Technology</strong> is presented as a practical wastewater and environmental services contractor rather than a generic capability-led vendor. The document is structured for tenders, prequalification files, capability submissions, and proposal appendices where buyers need fast evidence of operational scope, response readiness, documentation discipline, and compliant waste handling.</p>
+        <p>The company supports one-off interventions, recurring maintenance, and annual maintenance contract structures for facilities where wastewater continuity and controlled service execution are operationally important.</p>
+      </div>
+      <div class="card">
+        <h3>Core delivery scope</h3>
+        <p>Sewage tank cleaning, sludge extraction, high-pressure jetting, grease trap maintenance, drainage support, compliant waste movement, and reporting-oriented environmental services.</p>
+        <h3 style="margin-top:10px;">Strategic value</h3>
+        <p>Lower overflow risk, faster response, stronger contractor governance, municipality-conscious disposal, and better visibility for facility managers and procurement teams.</p>
+      </div>
+    </div>
+
+    <div class="metric-strip">
+      <div class="metric-box"><div class="value">80+</div><div class="label">Active B2B clients</div></div>
+      <div class="metric-box"><div class="value">50+ m³</div><div class="label">Monthly sludge handled</div></div>
+      <div class="metric-box"><div class="value">500+</div><div class="label">Environmental service operations</div></div>
+      <div class="metric-box"><div class="value">24/7</div><div class="label">Emergency support capability</div></div>
+    </div>
+
+    <div class="cover-footer">
+      <div>Ajman, United Arab Emirates | www.ecotech-eps.com | robenedwan@gmail.com</div>
+      <div>VAT/TRN: 100619240300003</div>
+    </div>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section">
+    <h2>Credentials Snapshot</h2>
+    <p class="section-intro">A procurement-facing document should make the company’s operating profile visible immediately. The summary below is designed for fast review by procurement managers, consultants, and FM stakeholders.</p>
+
+    <div class="snapshot-grid avoid-break">
+      <div class="snapshot-item"><div class="k">Established</div><div class="v">2016</div></div>
+      <div class="snapshot-item"><div class="k">Base</div><div class="v">Ajman, UAE</div></div>
+      <div class="snapshot-item"><div class="k">Active clients</div><div class="v">80+ B2B clients</div></div>
+      <div class="snapshot-item"><div class="k">Operations completed</div><div class="v">500+ service operations</div></div>
+      <div class="snapshot-item"><div class="k">Monthly sludge handled</div><div class="v">50+ m³</div></div>
+      <div class="snapshot-item"><div class="k">Emergency support</div><div class="v">24/7 capability</div></div>
+      <div class="snapshot-item"><div class="k">Service model</div><div class="v">One-off / AMC / emergency</div></div>
+      <div class="snapshot-item"><div class="k">Disposal standard</div><div class="v">Municipality-compliant disposal</div></div>
+      <div class="snapshot-item"><div class="k">VAT / TRN</div><div class="v">100619240300003</div></div>
+    </div>
+
+    <div class="card" style="margin-top:10px;">
+      <h3>Why this matters in tender review</h3>
+      <p>The profile shows a contractor already aligned with recurring wastewater maintenance requirements, response readiness expectations, waste handling accountability, and governance-sensitive service delivery. This makes the company suitable for prequalification, client appendices, technical capability sections, and annual maintenance procurement submissions.</p>
+      <p class="small muted">Metrics reflect consolidated operating history, recurring service activity, and internal service records used for tender positioning.</p>
+    </div>
+
+    <div class="tag-row">
+      <div class="tag">Wastewater AMC</div>
+      <div class="tag">Sewage tank cleaning</div>
+      <div class="tag">Desludging</div>
+      <div class="tag">Grease control</div>
+      <div class="tag">High-pressure jetting</div>
+      <div class="tag">Compliance-oriented services</div>
+    </div>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section">
+    <h2>Executive Overview</h2>
+    <p class="section-intro">ECO Technology Environmental Protection Services L.L.C. is an Ajman-based environmental services company established in <strong>2016</strong> to deliver wastewater management, sewage infrastructure maintenance, grease control, high-pressure cleaning, and compliance-oriented environmental services across the UAE.</p>
+
+    <div class="grid-2">
+      <div>
+        <p>In procurement terms, the company should be understood as a practical wastewater and environmental services contractor supporting operational continuity, preventive maintenance logic, emergency readiness, and disciplined waste movement. Clients are not simply purchasing a cleaning intervention; they are purchasing better wastewater continuity, lower overflow risk, structured service documentation, and stronger contractor accountability.</p>
+        <p>ECO Technology is relevant to buyers seeking support for occupied, public-facing, high-usage, or compliance-sensitive environments where contractor response, reporting, and disposal control matter directly to site operations.</p>
+
+        <h2 style="font-size:20pt; margin-top:18px;">Corporate Positioning</h2>
+        <p class="section-intro">The company’s value proposition is built around wastewater continuity, compliance control, and operational sustainability.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Strategic pillar</th>
+              <th>Value for clients</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Wastewater continuity</td>
+              <td>Lower disruption risk, improved drainage reliability, and stronger preventive maintenance coverage.</td>
+            </tr>
+            <tr>
+              <td>Compliance control</td>
+              <td>Safer contractor performance, disposal accountability, and clearer service traceability.</td>
+            </tr>
+            <tr>
+              <td>Operational sustainability</td>
+              <td>Responsible waste handling and structured service practices that support client environmental governance.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="card">
+          <h3>Tender-grade proposition</h3>
+          <p>ECO Technology is positioned as a contractor capable of supporting one-off interventions, recurring maintenance frameworks, and annual maintenance contract structures through controlled wastewater service delivery and documentation discipline.</p>
+        </div>
+
+        <div class="visual-card" style="margin-top:10px;">
+          <img src="performance_metrics.png" alt="Operational performance metrics visual" />
+          <div class="visual-caption">Operational proof points presented as a procurement-facing summary visual.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section">
+    <h2>Operational Performance Metrics</h2>
+    <p class="section-intro">A Tier-1 contractor profile should show measurable operating indicators connected to service history and delivery control.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Performance indicator</th>
+          <th>Tender-facing metric</th>
+          <th>Operational relevance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Active client base</td>
+          <td>80+ active B2B clients</td>
+          <td>Demonstrates repeat business confidence and operating traction.</td>
+        </tr>
+        <tr>
+          <td>Sludge handling activity</td>
+          <td>50+ m³ handled per month</td>
+          <td>Confirms regular wastewater maintenance capability.</td>
+        </tr>
+        <tr>
+          <td>Completed operations</td>
+          <td>500+ environmental service operations</td>
+          <td>Shows depth of execution history.</td>
+        </tr>
+        <tr>
+          <td>Response readiness</td>
+          <td>24/7 emergency support capability</td>
+          <td>Supports high-risk, occupied, and public-facing facilities.</td>
+        </tr>
+        <tr>
+          <td>Safety performance</td>
+          <td>0 major safety incidents</td>
+          <td>Reinforces controlled delivery and contractor reliability.</td>
+        </tr>
+        <tr>
+          <td>Disposal discipline</td>
+          <td>100% municipality-compliant disposal</td>
+          <td>Strengthens governance and environmental compliance confidence.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="small muted" style="margin-top:8px;">Metrics reflect consolidated operating history, recurring service activity, and internal service records used for tender positioning.</p>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section">
+    <h2>Core Service Portfolio</h2>
+    <p class="section-intro">ECO Technology delivers an integrated service platform designed to reduce wastewater-related operational risk across the lifecycle of environmental maintenance activity.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Service line</th>
+          <th>Capability summary</th>
+          <th>Procurement relevance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Wastewater and sewage management</td>
+          <td>Scheduled tank cleaning, desludging, vacuum tanker extraction, deep cleaning, transport, and disposal.</td>
+          <td>Protects uptime and supports recurring AMC-based maintenance programs.</td>
+        </tr>
+        <tr>
+          <td>Grease trap and FOG management</td>
+          <td>Grease trap cleaning, maintenance scheduling, and food-service environmental support.</td>
+          <td>Reduces drainage failures and supports hygiene-sensitive operations.</td>
+        </tr>
+        <tr>
+          <td>High-pressure jetting and drainage maintenance</td>
+          <td>Industrial-grade jetting, blockage removal, and hydraulic performance restoration.</td>
+          <td>Improves drainage reliability and reduces emergency disruption.</td>
+        </tr>
+        <tr>
+          <td>Waste collection and circular economy support</td>
+          <td>Used cooking oil collection and movement through responsible recovery pathways.</td>
+          <td>Strengthens structured waste management and sustainability positioning.</td>
+        </tr>
+        <tr>
+          <td>Compliance and reporting support</td>
+          <td>Service records, operational close-out visibility, and reporting-oriented workflows.</td>
+          <td>Supports audit readiness and contractor accountability.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section">
+    <h2>Competitive Advantage</h2>
+    <p class="section-intro">Procurement teams need clear reasons to select one technically capable contractor over another. ECO Technology differentiates itself through local response speed, integrated scope, preventive maintenance logic, and governance-oriented delivery.</p>
+    <div class="grid-2-equal">
+      <div class="card"><h3>Ajman-based operating presence</h3><p>Supports faster response and stronger local mobilization for clients in Ajman and nearby service corridors.</p></div>
+      <div class="card"><h3>Integrated service model</h3><p>Combines sewage, grease, jetting, cleaning, and waste handling into a single-vendor delivery platform.</p></div>
+      <div class="card"><h3>AMC-first philosophy</h3><p>Shifts clients from reactive intervention toward preventive maintenance and lower failure risk.</p></div>
+      <div class="card"><h3>Compliance familiarity</h3><p>Reinforces municipality-conscious disposal, reporting discipline, and procurement-grade accountability.</p></div>
+    </div>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section avoid-break">
+    <h2>Illustrative Wastewater AMC Delivery Model</h2>
+    <p class="section-intro">A professionally framed use case aligned to the Marsa proposal scope and retail-asset wastewater requirements.</p>
+
+    <div class="case-banner">
+      <h3>Wastewater AMC Support for a Large-Scale Retail Asset</h3>
+      <div>Structured as a recurring operational support model rather than a reactive call-out arrangement.</div>
+    </div>
+    <div class="case-body">
+      <p>A major retail and mixed-use environment in Ajman required recurring sewage tank cleaning, desludging, emergency response readiness, and service visibility to maintain uninterrupted operations in a public-facing asset. ECO Technology structured the support model as an annual maintenance framework with scheduled intervention, controlled extraction, compliance-oriented disposal, and documented close-out.</p>
+
+      <div class="metric-row-4">
+        <div class="mini"><div class="value">AMC</div><div class="label">Contract model for recurring wastewater support</div></div>
+        <div class="mini"><div class="value">2–3</div><div class="label">Routine visits per month</div></div>
+        <div class="mini"><div class="value">50+ m³</div><div class="label">Monthly sludge handling under recurring service</div></div>
+        <div class="mini"><div class="value">0</div><div class="label">Major overflow incidents targeted through preventive maintenance</div></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Case content</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Scope</td>
+            <td>Sewage tank cleaning, sludge extraction, high-pressure jetting, transport, and municipality-compliant disposal.</td>
+          </tr>
+          <tr>
+            <td>Delivery logic</td>
+            <td>Scheduled service plus emergency readiness, supported by reporting continuity.</td>
+          </tr>
+          <tr>
+            <td>Client value</td>
+            <td>Reduced overflow risk, improved wastewater hygiene, better drainage performance, and stronger accountability.</td>
+          </tr>
+          <tr>
+            <td>Tender significance</td>
+            <td>Demonstrates the company’s ability to manage wastewater infrastructure as an operational reliability function.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section">
+    <h2>Operating Methodology</h2>
+    <div class="grid-2">
+      <div>
+        <p class="section-intro">ECO Technology follows a five-stage operating methodology designed to make wastewater service delivery repeatable, transparent, and procurement-ready.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Stage</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Site assessment</td><td>Review access, tank condition, and operational constraints before mobilization.</td></tr>
+            <tr><td>Vacuum extraction</td><td>Perform controlled sludge pumping using suitable tanker systems.</td></tr>
+            <tr><td>High-pressure jetting</td><td>Remove residue and restore cleanliness and hydraulic function.</td></tr>
+            <tr><td>Inspection and verification</td><td>Confirm service completion and close-out quality.</td></tr>
+            <tr><td>Municipality-compliant disposal</td><td>Transfer collected waste through appropriate disposal channels.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="visual-card">
+          <img src="service_workflow.png" alt="Service workflow diagram" />
+          <div class="visual-caption">Process visual showing the service workflow from assessment through compliant disposal and reporting.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section">
+    <h2>Documentation and Reporting Outputs</h2>
+    <p class="section-intro">This section signals contractor governance maturity. ECO Technology supports procurement and FM oversight through structured documentation linked to service execution.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Documentation output</th>
+          <th>Governance relevance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Service completion reports</td><td>Confirm scope delivered and operational close-out status.</td></tr>
+        <tr><td>Maintenance visit records</td><td>Support continuity across recurring and AMC-based service programs.</td></tr>
+        <tr><td>Disposal traceability documentation</td><td>Reinforce compliant waste handling and movement visibility.</td></tr>
+        <tr><td>Quarterly service summaries</td><td>Support client review, procurement oversight, and maintenance governance.</td></tr>
+        <tr><td>Issue escalation logs</td><td>Record non-routine events and response actions.</td></tr>
+        <tr><td>Operational close-out records</td><td>Improve contractor accountability and audit readiness.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 style="font-size:20pt; margin-top:18px;">Health, Safety, Quality, and Compliance</h2>
+    <p class="section-intro">For wastewater and confined-space-related work, technical execution is only credible when paired with disciplined safety and compliance controls.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Compliance area</th>
+          <th>Approach</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Worker protection</td><td>PPE discipline, task control, and supervised field practice.</td></tr>
+        <tr><td>Confined-space awareness</td><td>Controlled procedures and gas monitoring awareness where operationally applicable.</td></tr>
+        <tr><td>Waste handling</td><td>Safe pumping, movement, and compliant disposal pathways.</td></tr>
+        <tr><td>Service traceability</td><td>Reporting, maintenance records, and structured operational close-out.</td></tr>
+        <tr><td>Client assurance</td><td>Transparent communication and professional site conduct.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section">
+    <h2>ESG and Operational Governance</h2>
+    <p class="section-intro">ECO Technology’s ESG value is operational rather than rhetorical. The company contributes through disposal discipline, wastewater protection, emergency readiness, preventive maintenance, and structured reporting.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>ESG dimension</th>
+          <th>Contribution</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Environmental</td><td>Waste control, compliant disposal, wastewater system protection, and circular recovery support.</td></tr>
+        <tr><td>Operational ESG</td><td>Preventive maintenance and emergency readiness that reduce asset-level risk.</td></tr>
+        <tr><td>Governance</td><td>Traceable service execution, disposal accountability, and reporting discipline.</td></tr>
+        <tr><td>Client sustainability support</td><td>Better inputs for audits, facility reporting, and procurement review.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 style="font-size:20pt; margin-top:18px;">Commercial Fit</h2>
+    <p class="section-intro">The delivery model is commercially suited to facilities and portfolios that require wastewater continuity and controlled contractor performance.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Suitable client environment</th>
+          <th>Commercial fit</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Malls and retail assets</td><td>Supports public-facing facilities with continuous wastewater demand.</td></tr>
+        <tr><td>FM operators</td><td>Suitable for managed portfolios requiring recurring service visibility.</td></tr>
+        <tr><td>Mixed-use developments</td><td>Supports multi-tenant environments with maintenance coordination needs.</td></tr>
+        <tr><td>Labor accommodation</td><td>Addresses high-usage wastewater and hygiene-sensitive conditions.</td></tr>
+        <tr><td>Hospitality portfolios</td><td>Supports grease, drainage, and sewage-related reliability requirements.</td></tr>
+        <tr><td>Public facilities</td><td>Matches governance-sensitive and reporting-conscious environments.</td></tr>
+        <tr><td>Industrial sites</td><td>Supports drainage, waste handling, and operational risk reduction.</td></tr>
+      </tbody>
+    </table>
+    <p class="small muted" style="margin-top:8px;">Suitable for one-off intervention, scheduled maintenance, and annual maintenance contract structures.</p>
+  </section>
+
+  <div class="page-break"></div>
+  <section class="section">
+    <h2>PPP and Institutional Collaboration Positioning</h2>
+    <p class="section-intro">ECO Technology is evolving toward a PPP-ready and institutionally credible environmental operations model.</p>
+    <p>Because it already operates at the intersection of recurring service delivery, environmental maintenance, waste handling, and compliance-oriented reporting, the company is well placed to support more structured collaboration frameworks involving developers, municipalities, institutional asset owners, and public-facing facilities.</p>
+
+    <h2 style="font-size:20pt; margin-top:18px;">Sectors Served</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Sector</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Large-scale retail and mixed-use developments</td><td>Assets requiring continuous wastewater reliability, emergency responsiveness, and contractor accountability.</td></tr>
+        <tr><td>High-density hospitality and food-service environments</td><td>Facilities requiring grease management, FOG control, and clean public-facing operations.</td></tr>
+        <tr><td>Commercial and residential communities</td><td>Developments requiring preventive environmental maintenance and drainage continuity.</td></tr>
+        <tr><td>Industrial and logistics environments</td><td>Sites requiring wastewater handling, drainage cleaning, and operational risk reduction.</td></tr>
+        <tr><td>Healthcare, education, and institutional facilities</td><td>Compliance-sensitive environments requiring disciplined service execution and reporting.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="footer-note">Prepared as a Tier-1 tender master company profile for client-facing proposals, capability statements, and prequalification submissions.</div>
+  </section>
+</body>
+</html>

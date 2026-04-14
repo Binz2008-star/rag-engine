@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robin Edwan - Environmental Sustainability Specialist CV</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+
+        .cv-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+        }
+
+        .header .title {
+            font-size: 1.2em;
+            font-weight: 300;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .contact-info {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 0.9em;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 0;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            padding: 30px;
+            border-right: 1px solid #e9ecef;
+        }
+
+        .main {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2ecc71;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #2ecc71;
+        }
+
+        .skills-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .skill-tag {
+            background: #e8f8f5;
+            color: #27ae60;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .experience-item, .education-item {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .experience-item:last-child, .education-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .item-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        .item-company {
+            color: #2ecc71;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .item-date {
+            color: #6c757d;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+
+        .item-description {
+            color: #495057;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        .highlight-box {
+            background: #e8f8f5;
+            border-left: 4px solid #2ecc71;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .highlight-box h3 {
+            color: #27ae60;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .language-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .language-level {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid #e9ecef;
+            }
+            
+            .contact-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .item-header {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                background: white;
+            }
+            
+            .cv-container {
+                box-shadow: none;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="cv-container">
+        <header class="header">
+            <h1>Robin Edwan</h1>
+            <div class="title">Environmental Sustainability & Compliance Specialist</div>
+            <div class="contact-info">
+                <div class="contact-item">
+                    <span>Email: robenedwan@gmail.com</span>
+                </div>
+                <div class="contact-item">
+                    <span>Phone: +971 52 223 3989</span>
+                </div>
+                <div class="contact-item">
+                    <span>Location: Ajman, United Arab Emirates</span>
+                </div>
+                <div class="contact-item">
+                    <span>LinkedIn: linkedin.com/in/robin-edwan-environmental</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <section class="section">
+                    <h2>Core Competencies</h2>
+                    <div class="skills-list">
+                        <span class="skill-tag">Environmental Compliance</span>
+                        <span class="skill-tag">Sustainability Implementation</span>
+                        <span class="skill-tag">Environmental Monitoring</span>
+                        <span class="skill-tag">ESG Compliance</span>
+                        <span class="skill-tag">Wastewater Protection</span>
+                        <span class="skill-tag">Grease Management</span>
+                        <span class="skill-tag">Environmental Risk Assessment</span>
+                        <span class="skill-tag">ISO 14001 Principles</span>
+                        <span class="skill-tag">Municipality Coordination</span>
+                        <span class="skill-tag">Operational Optimization</span>
+                        <span class="skill-tag">Stakeholder Management</span>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Technical Skills</h2>
+                    <div class="skills-list">
+                        <span class="skill-tag">Environmental Management Systems</span>
+                        <span class="skill-tag">Data Analysis</span>
+                        <span class="skill-tag">Environmental Impact Assessment</span>
+                        <span class="skill-tag">Sustainability Frameworks</span>
+                        <span class="skill-tag">Project Management</span>
+                        <span class="skill-tag">Regulatory Reporting</span>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Professional Knowledge</h2>
+                    <div class="experience-item">
+                        <div class="item-description">
+                            • Environmental management systems aligned with ISO 14001 principles<br>
+                            • Environmental compliance procedures<br>
+                            • Environmental monitoring and reporting practices<br>
+                            • Wastewater protection and pollution prevention systems
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Languages</h2>
+                    <div class="language-item">
+                        <span>Arabic</span>
+                        <span class="language-level">Native</span>
+                    </div>
+                    <div class="language-item">
+                        <span>English</span>
+                        <span class="language-level">Professional</span>
+                    </div>
+                </section>
+            </aside>
+
+            <main class="main">
+                <div class="highlight-box">
+                    <h3>Professional Summary</h3>
+                    <p>Environmental operations and sustainability professional with more than ten years of UAE experience in environmental services, regulatory coordination, and sustainability aligned operational programs. Founder and Managing Director of a municipality-approved environmental services company delivering wastewater protection systems, grease management infrastructure, and environmental compliance programs for commercial facilities.</p>
+                    <p>Experienced in regulatory coordination, environmental monitoring, operational sustainability improvements, and environmental risk mitigation. Combines entrepreneurial leadership with practical environmental operations expertise supporting sustainable development, environmental governance, and compliance with environmental management principles aligned with ISO 14001.</p>
+                </div>
+
+                <section class="section">
+                    <h2>Professional Experience</h2>
+                    <div class="experience-item">
+                        <div class="item-header">
+                            <div>
+                                <div class="item-title">Founder and Managing Director</div>
+                                <div class="item-company">Eco Technology Environment Protection Services L.L.C.</div>
+                            </div>
+                            <div class="item-date">2016 – Present</div>
+                        </div>
+                        <div class="item-description">
+                            • Founded and developed a municipality-approved environmental services company specializing in wastewater protection and environmental compliance solutions for commercial facilities.<br>
+                            • Delivered grease management and wastewater protection systems for 40+ commercial kitchens and restaurants, reducing risk of grease contamination in municipal drainage networks and supporting environmental regulations.<br>
+                            • Coordinated directly with municipal authorities to support regulatory compliance and environmental protection standards.<br>
+                            • Developed operational procedures and documentation systems supporting environmental monitoring and audit readiness.<br>
+                            • Supported environmental risk reduction by implementing systems that prevent contamination of municipal drainage networks.<br>
+                            • Led sustainability-aligned operational practices including waste reduction initiatives and environmental performance monitoring.<br>
+                            • Implemented operational automation that improved administrative efficiency and reporting processes by approximately 40 percent.
+                        </div>
+                    </div>
+
+                    <div class="experience-item">
+                        <div class="item-header">
+                            <div>
+                                <div class="item-title">VIP Relationship Manager</div>
+                                <div class="item-company">Ajman Bank</div>
+                            </div>
+                            <div class="item-date">2010 – 2016</div>
+                        </div>
+                        <div class="item-description">
+                            • Managed high-value client portfolios exceeding AED 200 million while ensuring strong governance, service quality, and risk-aware portfolio performance.<br>
+                            • Developed structured financial strategies supporting portfolio growth and client retention.<br>
+                            • Coordinated complex financial transactions and advisory services for high-net-worth clients.<br>
+                            • Built long-term professional relationships and maintained high standards of stakeholder communication and service delivery.
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Environmental Projects & Regulatory Engagement</h2>
+                    <div class="experience-item">
+                        <div class="item-title">Wastewater Protection Systems Implementation</div>
+                        <div class="item-description">
+                            Delivered grease management and wastewater protection solutions for commercial kitchens and restaurants, preventing fats, oils, and grease contamination in municipal drainage systems and supporting environmental compliance requirements.
+                        </div>
+                    </div>
+                    <div class="experience-item">
+                        <div class="item-title">Municipality Environmental Coordination</div>
+                        <div class="item-description">
+                            Worked with municipal authorities to support regulatory alignment for wastewater protection and facility environmental compliance.
+                        </div>
+                    </div>
+                    <div class="experience-item">
+                        <div class="item-title">Environmental Risk Reduction Initiatives</div>
+                        <div class="item-description">
+                            Implemented operational procedures that reduce environmental risks associated with commercial food operations, improving pollution prevention and compliance.
+                        </div>
+                    </div>
+                    <div class="experience-item">
+                        <div class="item-title">Environmental Monitoring and Compliance Support</div>
+                        <div class="item-description">
+                            Developed operational documentation and monitoring processes that support environmental performance tracking and regulatory compliance.
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Environmental & Sustainability Expertise</h2>
+                    <div class="experience-item">
+                        <div class="item-description">
+                            • Environmental compliance operations<br>
+                            • Wastewater protection and FOG management systems<br>
+                            • Environmental risk reduction and mitigation<br>
+                            • Sustainable facility operations<br>
+                            • Environmental monitoring and KPI tracking<br>
+                            • Operational systems development<br>
+                            • Municipality and regulatory coordination<br>
+                            • Stakeholder engagement and project support
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Education</h2>
+                    <div class="education-item">
+                        <div class="item-header">
+                            <div>
+                                <div class="item-title">Business and Finance Studies</div>
+                                <div class="item-company">Professional Development</div>
+                            </div>
+                            <div class="item-date">Continuous</div>
+                        </div>
+                        <div class="item-description">
+                            Professional background supported by extensive leadership experience in environmental operations, regulatory coordination, and commercial facility compliance across UAE.
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

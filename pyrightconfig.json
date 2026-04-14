@@ -1,0 +1,29 @@
+{
+  "include": ["."],
+  "exclude": [
+    "**/__pycache__",
+    "**/.venv",
+    "**/venv",
+    "**/build",
+    "**/dist",
+    "**/node_modules",
+    "**/.git",
+    "**/*.pyc",
+    "**/.pytest_cache",
+    "**/.mypy_cache",
+    "**/site-packages",
+    "**/Lib/site-packages",
+    "**/.tox",
+    "**/.eggs",
+    "**/.coverage",
+    "**/htmlcov",
+    "**/.idea",
+    "**/.vscode",
+    "**/target",
+    "**/out",
+    "**/bin",
+    "**/obj",
+    "**/tmp",
+    "**/temp"
+  ]
+}

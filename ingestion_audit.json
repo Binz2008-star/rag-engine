@@ -1,0 +1,2022 @@
+[
+  {
+    "filename": "552606065_10213813984020684_1301967540742599162_n.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\552606065_10213813984020684_1301967540742599162_n.jpg",
+    "size_bytes": 64387,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "553474242_10213815768385292_2208048759125883368_n.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\553474242_10213815768385292_2208048759125883368_n.jpg",
+    "size_bytes": 169778,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "554100401_10213813628251790_8645915351143936753_n.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\554100401_10213813628251790_8645915351143936753_n.jpg",
+    "size_bytes": 54342,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "554797102_10213815768505295_7159016178537058589_n.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\554797102_10213815768505295_7159016178537058589_n.jpg",
+    "size_bytes": 46255,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "555021892_10213828579185554_3433328202324584324_n.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\555021892_10213828579185554_3433328202324584324_n.jpg",
+    "size_bytes": 38277,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "555428345_10213813985620724_2167006175978968974_n.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\555428345_10213813985620724_2167006175978968974_n.jpg",
+    "size_bytes": 73203,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "1000035438.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\adam case\\1000035438.jpg",
+    "size_bytes": 323486,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "1000035438.PDF",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\adam case\\1000035438.PDF",
+    "size_bytes": 4338084,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "adam birth cirtificat 1.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\adam case\\adam birth cirtificat 1.jpg",
+    "size_bytes": 595903,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "adam birth cirtificat.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\adam case\\adam birth cirtificat.jpg",
+    "size_bytes": 613626,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Codex Installer.exe",
+    "extension": ".exe",
+    "path": "D:\\AI\\data\\adam case\\Codex Installer.exe",
+    "size_bytes": 1140768,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "convert to pdf_.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\adam case\\convert to pdf_.pdf",
+    "size_bytes": 6295156,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "fpp_2026-2-5_45_27.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\adam case\\fpp_2026-2-5_45_27.pdf",
+    "size_bytes": 612425,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Microsoft.Services.Store.winmd",
+    "extension": ".winmd",
+    "path": "D:\\AI\\data\\adam case\\Microsoft.Services.Store.winmd",
+    "size_bytes": 4608,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "ola new passport.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\adam case\\ola new passport.pdf",
+    "size_bytes": 1886380,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "Screenshot 2026-04-03 045835.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\adam case\\Screenshot 2026-04-03 045835.png",
+    "size_bytes": 455702,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "\u0639\u0642\u062f \u0627\u0644\u0632\u0648\u0627\u062c \u0645\u0635\u062f\u0642.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\adam case\\\u0639\u0642\u062f \u0627\u0644\u0632\u0648\u0627\u062c \u0645\u0635\u062f\u0642.pdf",
+    "size_bytes": 3764728,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "AR_Report.xlsx",
+    "extension": ".xlsx",
+    "path": "D:\\AI\\data\\AR_Report.xlsx",
+    "size_bytes": 5586,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "arithmetic_test-2026-03-30T03-03-01-486Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\arithmetic_test-2026-03-30T03-03-01-486Z.png",
+    "size_bytes": 97062,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "backend_fixed_working-2026-03-29T21-55-44-576Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\backend_fixed_working-2026-03-29T21-55-44-576Z.png",
+    "size_bytes": 81505,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "bill.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\bill.png",
+    "size_bytes": 183158,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Cert_246176.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Cert_246176.pdf",
+    "size_bytes": 113650,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "Cert_26725.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Cert_26725.pdf",
+    "size_bytes": 113794,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "chat_working-2026-03-30T03-02-51-428Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\chat_working-2026-03-30T03-02-51-428Z.png",
+    "size_bytes": 90695,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "chat_working_fixed-2026-03-29T21-56-19-336Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\chat_working_fixed-2026-03-29T21-56-19-336Z.png",
+    "size_bytes": 82765,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "complete_fix_result-2026-03-29T22-03-26-534Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\complete_fix_result-2026-03-29T22-03-26-534Z.png",
+    "size_bytes": 81183,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "current_ui_state-2026-03-29T21-43-00-115Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\current_ui_state-2026-03-29T21-43-00-115Z.png",
+    "size_bytes": 78091,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "current_ui_state_final-2026-03-29T22-02-25-685Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\current_ui_state_final-2026-03-29T22-02-25-685Z.png",
+    "size_bytes": 77937,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "database_logging_active-2026-03-29T22-35-54-320Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\database_logging_active-2026-03-29T22-35-54-320Z.png",
+    "size_bytes": 95933,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "database_logging_complete-2026-03-29T22-36-21-513Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\database_logging_complete-2026-03-29T22-36-21-513Z.png",
+    "size_bytes": 97450,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "database_logging_complete_test-2026-03-29T22-38-26-489Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\database_logging_complete_test-2026-03-29T22-38-26-489Z.png",
+    "size_bytes": 100009,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "database_logging_test-2026-03-29T22-35-34-452Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\database_logging_test-2026-03-29T22-35-34-452Z.png",
+    "size_bytes": 89637,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "database_logging_working-2026-03-29T22-37-46-692Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\database_logging_working-2026-03-29T22-37-46-692Z.png",
+    "size_bytes": 80482,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "1531-2022.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\dr case\\1531-2022.pdf",
+    "size_bytes": 212378,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "MOI2e33fb828d4f46928b4907b20aecdc95.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\dr case\\MOI2e33fb828d4f46928b4907b20aecdc95.pdf",
+    "size_bytes": 141877,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Scan2026-02-12_091942(11).pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\dr case\\Scan2026-02-12_091942(11).pdf",
+    "size_bytes": 253442,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "Screenshot 2026-03-31 142819.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\dr case\\Screenshot 2026-03-31 142819.png",
+    "size_bytes": 466995,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "\u0623\u0645\u0631 \u0627\u0641\u0631\u0627\u062c \u0648 \u0625\u0644\u063a\u0627\u0621 \u0623\u0645\u0631 \u0627\u0644\u0642\u0628\u0636 \u0645\u0639 \u0645\u0646\u0639\u0647 \u0645\u0646 \u0627\u0644\u0633\u0641\u0631.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\dr case\\\u0623\u0645\u0631 \u0627\u0641\u0631\u0627\u062c \u0648 \u0625\u0644\u063a\u0627\u0621 \u0623\u0645\u0631 \u0627\u0644\u0642\u0628\u0636 \u0645\u0639 \u0645\u0646\u0639\u0647 \u0645\u0646 \u0627\u0644\u0633\u0641\u0631.pdf",
+    "size_bytes": 110825,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "\u0634\u064a\u0643.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\dr case\\\u0634\u064a\u0643.pdf",
+    "size_bytes": 139544,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "\u0635\u0648\u0631\u0629 \u0636\u0648\u064a\u0629 \u0645\u0646 \u0627\u0644\u0634\u064a\u0643 \u0627\u0644\u0630\u064a \u062a\u0645 \u062a\u0633\u0644\u064a\u0645\u0647  \u0642\u0633\u0645  \u0627\u0644\u062d\u0633\u0627\u0628\u0627\u062a \u0648\u0627\u0644\u0631\u0627\u062f \u062a\u063a\u064a\u064a\u0631\u0647.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\dr case\\\u0635\u0648\u0631\u0629 \u0636\u0648\u064a\u0629 \u0645\u0646 \u0627\u0644\u0634\u064a\u0643 \u0627\u0644\u0630\u064a \u062a\u0645 \u062a\u0633\u0644\u064a\u0645\u0647  \u0642\u0633\u0645  \u0627\u0644\u062d\u0633\u0627\u0628\u0627\u062a \u0648\u0627\u0644\u0631\u0627\u062f \u062a\u063a\u064a\u064a\u0631\u0647.pdf",
+    "size_bytes": 108543,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "\u0645\u062d\u0636\u0631 \u0627\u0644\u062c\u0644\u0633\u0629(\u0645\u062d\u0643\u0645\u0629 \u0627\u0644\u062a\u0646\u0641\u064a\u0630 \u0627\u0644\u0645\u062f\u0646\u064a\u0629 - \u0627\u0644\u0634\u064a\u0643\u0627\u062a \u0627\u0644\u0645\u0631\u062a\u062c\u0639\u0629 - \u0627\u063a\u0644\u0627\u0642 \u0644\u0644\u0633\u062f\u0627\u062f).pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\dr case\\\u0645\u062d\u0636\u0631 \u0627\u0644\u062c\u0644\u0633\u0629(\u0645\u062d\u0643\u0645\u0629 \u0627\u0644\u062a\u0646\u0641\u064a\u0630 \u0627\u0644\u0645\u062f\u0646\u064a\u0629 - \u0627\u0644\u0634\u064a\u0643\u0627\u062a \u0627\u0644\u0645\u0631\u062a\u062c\u0639\u0629 - \u0627\u063a\u0644\u0627\u0642 \u0644\u0644\u0633\u062f\u0627\u062f).pdf",
+    "size_bytes": 856677,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "\u0645\u0633\u062a\u0646\u062f \u0627\u0644\u0637\u0644\u0628 (\u0637\u0644\u0628 \u0635\u0631\u0641 \u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u0648\u062f\u0639 \u0641\u064a \u0627\u0644\u062a\u0646\u0641\u064a\u0630_2920522) .pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\dr case\\\u0645\u0633\u062a\u0646\u062f \u0627\u0644\u0637\u0644\u0628 (\u0637\u0644\u0628 \u0635\u0631\u0641 \u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u0648\u062f\u0639 \u0641\u064a \u0627\u0644\u062a\u0646\u0641\u064a\u0630_2920522) .pdf",
+    "size_bytes": 759665,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "ebill.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ebill.png",
+    "size_bytes": 121268,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Eco-Technology-Environmental-Protection-Services-LLC-qsm-msaed-alshhwm.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Eco-Technology-Environmental-Protection-Services-LLC-qsm-msaed-alshhwm.pdf",
+    "size_bytes": 1168854,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "ECO-TECHNOLOGY-ENVIRONMENTAL-PROTECTION-SERVICES-LLC.pptx",
+    "extension": ".pptx",
+    "path": "D:\\AI\\data\\ECO-TECHNOLOGY-ENVIRONMENTAL-PROTECTION-SERVICES-LLC.pptx",
+    "size_bytes": 8797041,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "ECO_Company_Profile.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\ECO_Company_Profile.pdf",
+    "size_bytes": 439651,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "ECO_ENVIRONMENTAL_MANIFESTO.pptx",
+    "extension": ".pptx",
+    "path": "D:\\AI\\data\\ECO_ENVIRONMENTAL_MANIFESTO.pptx",
+    "size_bytes": 6075531,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "ECO_GTD_Quotation_Gelato_Julia.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\ECO_GTD_Quotation_Gelato_Julia.pdf",
+    "size_bytes": 4615,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "ECO_GTD_Quotation_Gelato_Julia_TEMPLATE_STYLE.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\ECO_GTD_Quotation_Gelato_Julia_TEMPLATE_STYLE.pdf",
+    "size_bytes": 4793,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "eco_profile.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\eco_profile.pdf",
+    "size_bytes": 1883918,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "EcoTech_GreaseTrap_Profile.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\EcoTech_GreaseTrap_Profile.pdf",
+    "size_bytes": 3802,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "EcoTech_GreaseTrap_Profile_Municipality.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\EcoTech_GreaseTrap_Profile_Municipality.pdf",
+    "size_bytes": 3735,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "enhanced_market_analysis-2026-03-29T22-32-24-503Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\enhanced_market_analysis-2026-03-29T22-32-24-503Z.png",
+    "size_bytes": 104232,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "enhanced_system_health-2026-03-29T22-32-11-241Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\enhanced_system_health-2026-03-29T22-32-11-241Z.png",
+    "size_bytes": 89982,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "final_fix_result-2026-03-29T22-00-55-565Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\final_fix_result-2026-03-29T22-00-55-565Z.png",
+    "size_bytes": 77894,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "final_stabilization_result-2026-03-29T22-26-39-783Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\final_stabilization_result-2026-03-29T22-26-39-783Z.png",
+    "size_bytes": 89268,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "final_working_result-2026-03-29T22-04-28-703Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\final_working_result-2026-03-29T22-04-28-703Z.png",
+    "size_bytes": 80800,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "1.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\1.png",
+    "size_bytes": 160266,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "10.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\10.png",
+    "size_bytes": 30075,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "2.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\2.png",
+    "size_bytes": 41812,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "3.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\3.png",
+    "size_bytes": 45333,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "4.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\4.png",
+    "size_bytes": 45266,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "5.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\5.png",
+    "size_bytes": 36592,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "6.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\6.png",
+    "size_bytes": 32637,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "7.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\7.png",
+    "size_bytes": 22196,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "8.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\8.png",
+    "size_bytes": 38874,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "9.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\9.png",
+    "size_bytes": 36781,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "fuj-pres.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\fuj-pres.pdf",
+    "size_bytes": 3258995,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Fujairah_Smart_Environmental_Initiative_Plan.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\Fujairah_Smart_Environmental_Initiative_Plan.pdf",
+    "size_bytes": 6966,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Presentation - \u0645\u0628\u0627\u062f\u0631\u0629 \u0627\u0644\u062a\u0643\u0627\u0645\u0644 \u0627\u0644\u0628\u064a\u0626\u064a \u0627\u0644\u0630\u0643\u064a .pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\fujerah municipaklty\\Presentation - \u0645\u0628\u0627\u062f\u0631\u0629 \u0627\u0644\u062a\u0643\u0627\u0645\u0644 \u0627\u0644\u0628\u064a\u0626\u064a \u0627\u0644\u0630\u0643\u064a .pdf",
+    "size_bytes": 623035,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "full_integration_test-2026-03-29T22-32-45-733Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\full_integration_test-2026-03-29T22-32-45-733Z.png",
+    "size_bytes": 106650,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "generated-image.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\generated-image.png",
+    "size_bytes": 1811661,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "handi-app-53094-2026-03-19T09-40-00-471Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\handi-app-53094-2026-03-19T09-40-00-471Z.png",
+    "size_bytes": 5252,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "handi-app-check-2026-03-19T09-38-38-169Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\handi-app-check-2026-03-19T09-38-38-169Z.png",
+    "size_bytes": 5731,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "id b.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\id b.png",
+    "size_bytes": 596949,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "id f.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\id f.png",
+    "size_bytes": 737718,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "intent_router_complete-2026-03-29T22-16-43-137Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\intent_router_complete-2026-03-29T22-16-43-137Z.png",
+    "size_bytes": 89624,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "intent_router_logs-2026-03-29T22-14-36-328Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\intent_router_logs-2026-03-29T22-14-36-328Z.png",
+    "size_bytes": 80634,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "intent_router_success-2026-03-29T22-16-05-533Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\intent_router_success-2026-03-29T22-16-05-533Z.png",
+    "size_bytes": 93788,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "intent_router_working-2026-03-29T22-13-12-053Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\intent_router_working-2026-03-29T22-13-12-053Z.png",
+    "size_bytes": 93056,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Invoice_INV-20250827-001.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Invoice_INV-20250827-001.pdf",
+    "size_bytes": 3158,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "make it.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\make it.pdf",
+    "size_bytes": 276536,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Mercedes_Cover_Letter_Roben_Edwan.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Mercedes_Cover_Letter_Roben_Edwan.pdf",
+    "size_bytes": 2901,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "MSIAfterburnerInstaller466.exe",
+    "extension": ".exe",
+    "path": "D:\\AI\\data\\MSIAfterburnerSetup\\MSIAfterburnerInstaller466.exe",
+    "size_bytes": 45962904,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "cover_letter_wood.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\121\\last\\erp\\lootah\\cover_letter_wood.pdf",
+    "size_bytes": 2849,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_CV.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\121\\last\\erp\\lootah\\Roben_Edwan_CV.pdf",
+    "size_bytes": 407443,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_CV_final.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\121\\last\\erp\\lootah\\Roben_Edwan_CV_final.pdf",
+    "size_bytes": 407901,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_Cover_Letter_Emirates.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\121\\last\\erp\\Roben_Edwan_Cover_Letter_Emirates.pdf",
+    "size_bytes": 2907,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_ERP_Optimized_CV.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\121\\last\\erp\\Roben_Edwan_ERP_Optimized_CV.pdf",
+    "size_bytes": 3985,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "image (1).jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\New folder\\121\\last\\image (1).jpg",
+    "size_bytes": 190507,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "image.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\New folder\\121\\last\\image.jpg",
+    "size_bytes": 185572,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Roben_Edwan_CV.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\121\\last\\Roben_Edwan_CV.pdf",
+    "size_bytes": 88638,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_CV_Clean_Final.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\121\\Roben_Edwan_CV_Clean_Final.pdf",
+    "size_bytes": 51990,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_CV_Enhanced_with_Photo.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\121\\Roben_Edwan_CV_Enhanced_with_Photo.pdf",
+    "size_bytes": 51813,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_CV_Formatted.rtf",
+    "extension": ".rtf",
+    "path": "D:\\AI\\data\\New folder\\121\\Roben_Edwan_CV_Formatted.rtf",
+    "size_bytes": 3682,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Roben_Edwan_CV_Perfect.docx",
+    "extension": ".docx",
+    "path": "D:\\AI\\data\\New folder\\121\\Roben_Edwan_CV_Perfect.docx",
+    "size_bytes": 38031,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_CV_Perfect_with_Photo.docx",
+    "extension": ".docx",
+    "path": "D:\\AI\\data\\New folder\\121\\Roben_Edwan_CV_Perfect_with_Photo.docx",
+    "size_bytes": 74830,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_CV_Professional.docx",
+    "extension": ".docx",
+    "path": "D:\\AI\\data\\New folder\\121\\Roben_Edwan_CV_Professional.docx",
+    "size_bytes": 3465,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_Professional_CV.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\121\\Roben_Edwan_Professional_CV.pdf",
+    "size_bytes": 4067,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "roben_Original.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\New folder\\121\\roben_Original.jpg",
+    "size_bytes": 37776,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Gmail - ESG Leadership Opportunity \u2013 Immediate Hiring.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\Gmail - ESG Leadership Opportunity \u2013 Immediate Hiring.pdf",
+    "size_bytes": 222221,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Registration Card-6G1EK54H97L890385.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\Registration Card-6G1EK54H97L890385.pdf",
+    "size_bytes": 382033,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin Edwan - Environmental Sustainability Specialist CV (1).pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\Robin Edwan - Environmental Sustainability Specialist CV (1).pdf",
+    "size_bytes": 266263,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin Edwan - Environmental Sustainability Specialist CV.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\Robin Edwan - Environmental Sustainability Specialist CV.pdf",
+    "size_bytes": 266263,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin Edwan - Executive Bio (1).pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\Robin Edwan - Executive Bio (1).pdf",
+    "size_bytes": 104482,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin Edwan - Executive Bio.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\Robin Edwan - Executive Bio.pdf",
+    "size_bytes": 104482,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin_Edwan_Environmental_Sustainability_Specialist_CV.html",
+    "extension": ".html",
+    "path": "D:\\AI\\data\\New folder\\Robin_Edwan_Environmental_Sustainability_Specialist_CV.html",
+    "size_bytes": 16450,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Robin_Edwan_Executive_Bio.html",
+    "extension": ".html",
+    "path": "D:\\AI\\data\\New folder\\Robin_Edwan_Executive_Bio.html",
+    "size_bytes": 8156,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Robin_Edwan_Executive_Bio.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\Robin_Edwan_Executive_Bio.pdf",
+    "size_bytes": 2567,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin_Edwan_Final_CV.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\New folder\\Robin_Edwan_Final_CV.pdf",
+    "size_bytes": 4802,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Screenshot 2026-03-05 183044.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\New folder\\Screenshot 2026-03-05 183044.png",
+    "size_bytes": 73773,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "28.Years.Later.2025.Proper.1080p.WEB-DL.DDP5.1.x265-NeoNoir.mkv",
+    "extension": ".mkv",
+    "path": "D:\\AI\\data\\PopcornTime\\28.Years.Later.2025.Proper.1080p.WEB-DL.DDP5.1.x265-NeoNoir.mkv",
+    "size_bytes": 2045361167,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Crime 101 2026 1080p WEB Line HEVC x265 BONE.mkv",
+    "extension": ".mkv",
+    "path": "D:\\AI\\data\\PopcornTime\\Crime 101 2026 1080p WEB Line HEVC x265 BONE.mkv",
+    "size_bytes": 2093949160,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "PROTECTING_UAE_WATERS_SINCE_2016.pptx",
+    "extension": ".pptx",
+    "path": "D:\\AI\\data\\PROTECTING_UAE_WATERS_SINCE_2016.pptx",
+    "size_bytes": 8592032,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Quotation-ardh-sar.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Quotation-ardh-sar.pdf",
+    "size_bytes": 3194774,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Quotation_QUO-20250827-001.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Quotation_QUO-20250827-001.pdf",
+    "size_bytes": 3163,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "rapid_messaging_test-2026-03-29T22-26-24-198Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\rapid_messaging_test-2026-03-29T22-26-24-198Z.png",
+    "size_bytes": 88830,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "response_field_fixed-2026-03-29T21-58-27-553Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\response_field_fixed-2026-03-29T21-58-27-553Z.png",
+    "size_bytes": 82324,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "roben ID 2024.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\roben ID 2024.pdf",
+    "size_bytes": 2038115,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "Roben_Edwan_CV.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Roben_Edwan_CV.pdf",
+    "size_bytes": 88638,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_CV_Final.docx",
+    "extension": ".docx",
+    "path": "D:\\AI\\data\\Roben_Edwan_CV_Final.docx",
+    "size_bytes": 98378,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+    "extension": ".txt",
+    "path": "D:\\AI\\data\\Roben_Edwan_Deliveroo_Tailored_CV.txt",
+    "size_bytes": 3249,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "robin_edwan_cv.html",
+    "extension": ".html",
+    "path": "D:\\AI\\data\\robin_edwan_cv.html",
+    "size_bytes": 12961,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Robin_Edwan_CV.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Robin_Edwan_CV.pdf",
+    "size_bytes": 3674,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin_Edwan_CV_.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Robin_Edwan_CV_.pdf",
+    "size_bytes": 2712,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin_Edwan_CV_Professional.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Robin_Edwan_CV_Professional.pdf",
+    "size_bytes": 3766,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin_Edwan_Environmental_Sustainability_Specialist_CV_Final.html",
+    "extension": ".html",
+    "path": "D:\\AI\\data\\Robin_Edwan_Environmental_Sustainability_Specialist_CV_Final.html",
+    "size_bytes": 16631,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Robin_Edwan_Executive_Bio.html",
+    "extension": ".html",
+    "path": "D:\\AI\\data\\Robin_Edwan_Executive_Bio.html",
+    "size_bytes": 5156,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Robin_Edwan_Executive_Bio.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Robin_Edwan_Executive_Bio.pdf",
+    "size_bytes": 2896,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin_Edwan_Executive_Bio_.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Robin_Edwan_Executive_Bio_.pdf",
+    "size_bytes": 2691,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin_Edwan_Sustainability_CV.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Robin_Edwan_Sustainability_CV.pdf",
+    "size_bytes": 3943,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Robin_Edwan_Sustainability_CV_Final.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Robin_Edwan_Sustainability_CV_Final.pdf",
+    "size_bytes": 3545,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "__Payment_Records..pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\sammorgan\\__Payment_Records..pdf",
+    "size_bytes": 13356,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "__Payment_Records.csv",
+    "extension": ".csv",
+    "path": "D:\\AI\\data\\sammorgan\\__Payment_Records.csv",
+    "size_bytes": 236660,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "eco_financial_report.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\sammorgan\\eco_financial_report.pdf",
+    "size_bytes": 37469,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "eco_financial_report_feb2024.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\sammorgan\\eco_financial_report_feb2024.pdf",
+    "size_bytes": 109349,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "ECO_REPORT.docx",
+    "extension": ".docx",
+    "path": "D:\\AI\\data\\sammorgan\\ECO_REPORT.docx",
+    "size_bytes": 14018,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "EcoTech_Investment_Brief.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\sammorgan\\EcoTech_Investment_Brief.pdf",
+    "size_bytes": 3334,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "financial_report.xlsx",
+    "extension": ".xlsx",
+    "path": "D:\\AI\\data\\sammorgan\\financial_report.xlsx",
+    "size_bytes": 8889,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Screening_Call_Practice.html",
+    "extension": ".html",
+    "path": "D:\\AI\\data\\Screening_Call_Practice.html",
+    "size_bytes": 16674,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Screenshot 2026-04-05 at 3.08.50\u202fPM.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\Screenshot 2026-04-05 at 3.08.50\u202fPM.png",
+    "size_bytes": 111131,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Sellora_Process_Automation_Certificate.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Sellora_Process_Automation_Certificate.pdf",
+    "size_bytes": 46770,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "Sellora_WhatsApp_Operations_Certificate.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Sellora_WhatsApp_Operations_Certificate.pdf",
+    "size_bytes": 48433,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'pdf_ocr_enabled'"
+  },
+  {
+    "filename": "simple_test_result-2026-03-29T21-59-41-359Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\simple_test_result-2026-03-29T21-59-41-359Z.png",
+    "size_bytes": 87267,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "stabilization_test_1-2026-03-29T22-24-58-822Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\stabilization_test_1-2026-03-29T22-24-58-822Z.png",
+    "size_bytes": 90590,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "stabilization_test_complete-2026-03-29T22-25-29-158Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\stabilization_test_complete-2026-03-29T22-25-29-158Z.png",
+    "size_bytes": 96185,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "system_loaded-2026-03-30T03-02-39-172Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\system_loaded-2026-03-30T03-02-39-172Z.png",
+    "size_bytes": 82946,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Transfer repository.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\Transfer repository.png",
+    "size_bytes": 148983,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_api_working-2026-03-29T21-44-22-248Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_api_working-2026-03-29T21-44-22-248Z.png",
+    "size_bytes": 97359,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_chat_input-2026-03-29T21-13-39-869Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_chat_input-2026-03-29T21-13-39-869Z.png",
+    "size_bytes": 76350,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_chat_response-2026-03-29T21-13-46-725Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_chat_response-2026-03-29T21-13-46-725Z.png",
+    "size_bytes": 74788,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_chat_working-2026-03-29T21-16-57-749Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_chat_working-2026-03-29T21-16-57-749Z.png",
+    "size_bytes": 80924,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_final_response-2026-03-29T21-41-27-847Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_final_response-2026-03-29T21-41-27-847Z.png",
+    "size_bytes": 85613,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_full_interface-2026-03-29T21-14-56-507Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_full_interface-2026-03-29T21-14-56-507Z.png",
+    "size_bytes": 74880,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_maintenance_result-2026-03-29T21-17-53-562Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_maintenance_result-2026-03-29T21-17-53-562Z.png",
+    "size_bytes": 83378,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_qwen_response-2026-03-29T21-40-46-297Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_qwen_response-2026-03-29T21-40-46-297Z.png",
+    "size_bytes": 79552,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_rendering_fixed-2026-03-29T22-21-02-218Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_rendering_fixed-2026-03-29T22-21-02-218Z.png",
+    "size_bytes": 102500,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_rendering_fixed_2-2026-03-29T22-21-11-481Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_rendering_fixed_2-2026-03-29T22-21-11-481Z.png",
+    "size_bytes": 104159,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_rendering_fixed_3-2026-03-29T22-21-25-166Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_rendering_fixed_3-2026-03-29T22-21-25-166Z.png",
+    "size_bytes": 104011,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_system_maintenance_buttons-2026-03-29T21-15-44-471Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_system_maintenance_buttons-2026-03-29T21-15-44-471Z.png",
+    "size_bytes": 75343,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_system_tab-2026-03-29T21-15-06-857Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_system_tab-2026-03-29T21-15-06-857Z.png",
+    "size_bytes": 77055,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_verification-2026-03-29T21-43-15-798Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_verification-2026-03-29T21-43-15-798Z.png",
+    "size_bytes": 77661,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ui_working_test-2026-03-29T21-43-29-797Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\ui_working_test-2026-03-29T21-43-29-797Z.png",
+    "size_bytes": 81196,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Unconfirmed 776409.crdownload",
+    "extension": ".crdownload",
+    "path": "D:\\AI\\data\\Unconfirmed 776409.crdownload",
+    "size_bytes": 86221312,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "UNIFIED_ARCHITECTURE.md",
+    "extension": ".md",
+    "path": "D:\\AI\\data\\UNIFIED_ARCHITECTURE.md",
+    "size_bytes": 5030,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "usageReport_1_e042c5a736d54c35a9273c96dad58150.csv",
+    "extension": ".csv",
+    "path": "D:\\AI\\data\\usageReport_1_e042c5a736d54c35a9273c96dad58150.csv",
+    "size_bytes": 361,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Vat  certificate.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\Vat  certificate.pdf",
+    "size_bytes": 70913,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "websocket_connection_test-2026-03-29T22-42-45-297Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\websocket_connection_test-2026-03-29T22-42-45-297Z.png",
+    "size_bytes": 105492,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "websocket_e2e_test_1-2026-03-29T22-41-35-854Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\websocket_e2e_test_1-2026-03-29T22-41-35-854Z.png",
+    "size_bytes": 89519,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "websocket_e2e_test_2-2026-03-29T22-41-49-409Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\websocket_e2e_test_2-2026-03-29T22-41-49-409Z.png",
+    "size_bytes": 102007,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "websocket_e2e_test_3-2026-03-29T22-42-04-485Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\websocket_e2e_test_3-2026-03-29T22-42-04-485Z.png",
+    "size_bytes": 105839,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "websocket_integration_final-2026-03-29T22-30-24-939Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\websocket_integration_final-2026-03-29T22-30-24-939Z.png",
+    "size_bytes": 101521,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "websocket_integration_test-2026-03-29T22-29-50-625Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\websocket_integration_test-2026-03-29T22-29-50-625Z.png",
+    "size_bytes": 87950,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "websocket_integration_test_2-2026-03-29T22-30-05-133Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\websocket_integration_test_2-2026-03-29T22-30-05-133Z.png",
+    "size_bytes": 98704,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "working_chat_final-2026-03-29T22-05-59-103Z.png",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\working_chat_final-2026-03-29T22-05-59-103Z.png",
+    "size_bytes": 100469,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "Eco_Technology_Client_Statistics_2025.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u062a\u0635\u0645\u064a\u0645 \u0645\u0648\u0642\u0639 \u0648\u0647\u0648\u064a\u0629 \u0631\u0642\u0645\u064a\u0629 \u0645\u0648\u062d\u062f\u0629 \u0644\u0644\u062a\u0646\u0648\u0639 \u0641\u064a \u0627\u0644\u0645\u0644\u0641\u0627\u062a (1)\\Eco_Technology_Client_Statistics_2025.pdf",
+    "size_bytes": 166465,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Eco_Technology_Company_Profile_2025.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u062a\u0635\u0645\u064a\u0645 \u0645\u0648\u0642\u0639 \u0648\u0647\u0648\u064a\u0629 \u0631\u0642\u0645\u064a\u0629 \u0645\u0648\u062d\u062f\u0629 \u0644\u0644\u062a\u0646\u0648\u0639 \u0641\u064a \u0627\u0644\u0645\u0644\u0641\u0627\u062a (1)\\Eco_Technology_Company_Profile_2025.pdf",
+    "size_bytes": 173786,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Eco_Technology_Presentation_Update_2025.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u062a\u0635\u0645\u064a\u0645 \u0645\u0648\u0642\u0639 \u0648\u0647\u0648\u064a\u0629 \u0631\u0642\u0645\u064a\u0629 \u0645\u0648\u062d\u062f\u0629 \u0644\u0644\u062a\u0646\u0648\u0639 \u0641\u064a \u0627\u0644\u0645\u0644\u0641\u0627\u062a (1)\\Eco_Technology_Presentation_Update_2025.pdf",
+    "size_bytes": 253073,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Eco_Technology_Workshop_2025.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u062a\u0635\u0645\u064a\u0645 \u0645\u0648\u0642\u0639 \u0648\u0647\u0648\u064a\u0629 \u0631\u0642\u0645\u064a\u0629 \u0645\u0648\u062d\u062f\u0629 \u0644\u0644\u062a\u0646\u0648\u0639 \u0641\u064a \u0627\u0644\u0645\u0644\u0641\u0627\u062a (1)\\Eco_Technology_Workshop_2025.pdf",
+    "size_bytes": 190479,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "TRADE LICENSE KUNAFA NEW.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u0631\u062e\u0635 \u0627\u0644\u0639\u0645\u0644\u0627\u0621\\TRADE LICENSE KUNAFA NEW.pdf",
+    "size_bytes": 78466,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "2A24A41A-9C19-4DD2-A1A5-09C174F8EAD1.PNG",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\2A24A41A-9C19-4DD2-A1A5-09C174F8EAD1.PNG",
+    "size_bytes": 2931284,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "8E1CC7CC-7542-4537-BE12-CFD64A3FBF37.PNG",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\8E1CC7CC-7542-4537-BE12-CFD64A3FBF37.PNG",
+    "size_bytes": 2455090,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "92D7D6C1-0316-4A72-973C-EF44C527AD67.PNG",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\92D7D6C1-0316-4A72-973C-EF44C527AD67.PNG",
+    "size_bytes": 1807218,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "A2556409-8056-4F80-91FA-06141FD9C689.PNG",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\A2556409-8056-4F80-91FA-06141FD9C689.PNG",
+    "size_bytes": 2223734,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "CEC14169-BE75-4F34-BEFA-E5E3EFFD737F.PNG",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\CEC14169-BE75-4F34-BEFA-E5E3EFFD737F.PNG",
+    "size_bytes": 1353985,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "E66AE5DF-DA30-4D30-94D8-781906B35503.PNG",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\E66AE5DF-DA30-4D30-94D8-781906B35503.PNG",
+    "size_bytes": 1931393,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "IMG_1725.PNG",
+    "extension": ".png",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\IMG_1725.PNG",
+    "size_bytes": 4084587,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "IMG_1841 (1).jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\IMG_1841 (1).jpg",
+    "size_bytes": 475573,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "IMG_1841 (2).jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\IMG_1841 (2).jpg",
+    "size_bytes": 475573,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "IMG_1841.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\IMG_1841.jpg",
+    "size_bytes": 475573,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "IMG_3222.jpg",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\IMG_3222.jpg",
+    "size_bytes": 233669,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "IMG_3381.JPG",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\IMG_3381.JPG",
+    "size_bytes": 398539,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "IMG_3382.JPG",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\IMG_3382.JPG",
+    "size_bytes": 277668,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "IMG_3383.JPG",
+    "extension": ".jpg",
+    "path": "D:\\AI\\data\\\u0635\u0648\u0631 \u0648\u0644\u0648\u062c\u0648\\IMG_3383.JPG",
+    "size_bytes": 261326,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'NoneType' object has no attribute 'image_ocr_enabled'"
+  },
+  {
+    "filename": "ET_Invoice_SizeD_KUNAFA.html",
+    "extension": ".html",
+    "path": "D:\\AI\\data\\\u0643\u0648\u062a\u064a\u0634\u0646\u0627\u062a\\ET_Invoice_SizeD_KUNAFA.html",
+    "size_bytes": 8077,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "ET_Quotation_SizeD_KUNAFA.html",
+    "extension": ".html",
+    "path": "D:\\AI\\data\\\u0643\u0648\u062a\u064a\u0634\u0646\u0627\u062a\\ET_Quotation_SizeD_KUNAFA.html",
+    "size_bytes": 8165,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "skipped",
+    "error_msg": "Unsupported extension (not in {'.jpeg', '.docx', '.jpg', '.png', '.pdf', '.py', '.md', '.txt'})"
+  },
+  {
+    "filename": "Grease-Trap-Supply-and-Installation-Quotation.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u0643\u0648\u062a\u064a\u0634\u0646\u0627\u062a\\Grease-Trap-Supply-and-Installation-Quotation.pdf",
+    "size_bytes": 1995523,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "guide.txt",
+    "extension": ".txt",
+    "path": "D:\\AI\\data\\\u0643\u0648\u062a\u064a\u0634\u0646\u0627\u062a\\guide.txt",
+    "size_bytes": 8970,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Invoice _ \u0641\u0627\u062a\u0648\u0631\u0629 \u0636\u0631\u064a\u0628\u064a\u0629.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u0643\u0648\u062a\u064a\u0634\u0646\u0627\u062a\\Invoice _ \u0641\u0627\u062a\u0648\u0631\u0629 \u0636\u0631\u064a\u0628\u064a\u0629.pdf",
+    "size_bytes": 562571,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Quotation _ \u0639\u0631\u0636 \u0633\u0639\u0631.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u0643\u0648\u062a\u064a\u0634\u0646\u0627\u062a\\Quotation _ \u0639\u0631\u0636 \u0633\u0639\u0631.pdf",
+    "size_bytes": 564518,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "Yalla Pizza Pastries (S.P.S - L.L.C).pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u0643\u0648\u062a\u064a\u0634\u0646\u0627\u062a\\Yalla Pizza Pastries (S.P.S - L.L.C).pdf",
+    "size_bytes": 2543987,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  },
+  {
+    "filename": "\u0639\u0631\u0636_\u0633\u0639\u0631_\u062a\u0648\u0631\u064a\u062f_\u0648\u062a\u0631\u0643\u064a\u0628_\u0645\u0635\u064a\u062f\u0629_\u0627\u0644\u0634\u062d\u0648\u0645_UPVC.pdf",
+    "extension": ".pdf",
+    "path": "D:\\AI\\data\\\u0643\u0648\u062a\u064a\u0634\u0646\u0627\u062a\\\u0639\u0631\u0636_\u0633\u0639\u0631_\u062a\u0648\u0631\u064a\u062f_\u0648\u062a\u0631\u0643\u064a\u0628_\u0645\u0635\u064a\u062f\u0629_\u0627\u0644\u0634\u062d\u0648\u0645_UPVC.pdf",
+    "size_bytes": 975685,
+    "char_count": 0,
+    "chunk_count": 0,
+    "status": "error",
+    "error_msg": "'tuple' object has no attribute 'split'"
+  }
+]

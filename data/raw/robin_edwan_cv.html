@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robin Edwan - Professional CV</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+
+        .cv-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+        }
+
+        .header .title {
+            font-size: 1.2em;
+            font-weight: 300;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .contact-info {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 0.9em;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 0;
+        }
+
+        .sidebar {
+            background: #f8f9fa;
+            padding: 30px;
+            border-right: 1px solid #e9ecef;
+        }
+
+        .main {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .skills-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .skill-tag {
+            background: #e7f3ff;
+            color: #0066cc;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .experience-item, .education-item {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .experience-item:last-child, .education-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .item-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        .item-company {
+            color: #667eea;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .item-date {
+            color: #6c757d;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+
+        .item-description {
+            color: #495057;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        .language-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .language-level {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid #e9ecef;
+            }
+            
+            .contact-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .item-header {
+                flex-direction: column;
+                gap: 5px;
+            }
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                background: white;
+            }
+            
+            .cv-container {
+                box-shadow: none;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="cv-container">
+        <header class="header">
+            <h1>Robin Edwan</h1>
+            <div class="title">Sustainability Professional & Environmental Consultant</div>
+            <div class="contact-info">
+                <div class="contact-item">
+                    <span>📧</span>
+                    <span>robin.edwan@email.com</span>
+                </div>
+                <div class="contact-item">
+                    <span>📱</span>
+                    <span>+1 234-567-8900</span>
+                </div>
+                <div class="contact-item">
+                    <span>📍</span>
+                    <span>Your City, Country</span>
+                </div>
+                <div class="contact-item">
+                    <span>💼</span>
+                    <span>linkedin.com/in/robin-edwan</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <section class="section">
+                    <h2>Skills</h2>
+                    <div class="skills-list">
+                        <span class="skill-tag">Sustainability Strategy</span>
+                        <span class="skill-tag">Environmental Impact Assessment</span>
+                        <span class="skill-tag">Carbon Footprint Analysis</span>
+                        <span class="skill-tag">ESG Reporting</span>
+                        <span class="skill-tag">Renewable Energy</span>
+                        <span class="skill-tag">Waste Management</span>
+                        <span class="skill-tag">Policy Development</span>
+                        <span class="skill-tag">Stakeholder Engagement</span>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Languages</h2>
+                    <div class="language-item">
+                        <span>English</span>
+                        <span class="language-level">Native</span>
+                    </div>
+                    <div class="language-item">
+                        <span>Spanish</span>
+                        <span class="language-level">Professional</span>
+                    </div>
+                    <div class="language-item">
+                        <span>French</span>
+                        <span class="language-level">Basic</span>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Certifications</h2>
+                    <div class="experience-item">
+                        <div class="item-title">LEED Green Associate</div>
+                        <div class="item-company">U.S. Green Building Council</div>
+                        <div class="item-date">2022</div>
+                    </div>
+                    <div class="experience-item">
+                        <div class="item-title">ISO 14001 Lead Auditor</div>
+                        <div class="item-company">IRCA</div>
+                        <div class="item-date">2021</div>
+                    </div>
+                </section>
+            </aside>
+
+            <main class="main">
+                <section class="section">
+                    <h2>Professional Summary</h2>
+                    <p>Results-driven sustainability professional with over 8 years of experience in environmental consulting, ESG strategy development, and corporate sustainability initiatives. Proven track record of helping organizations reduce environmental impact while improving operational efficiency and stakeholder value. Expert in carbon accounting, renewable energy implementation, and sustainable business practices.</p>
+                </section>
+
+                <section class="section">
+                    <h2>Professional Experience</h2>
+                    <div class="experience-item">
+                        <div class="item-header">
+                            <div>
+                                <div class="item-title">Senior Sustainability Consultant</div>
+                                <div class="item-company">Green Future Consulting</div>
+                            </div>
+                            <div class="item-date">2020 - Present</div>
+                        </div>
+                        <div class="item-description">
+                            • Lead sustainability assessments and develop comprehensive ESG strategies for Fortune 500 clients<br>
+                            • Manage carbon footprint analysis projects, resulting in average 25% reduction in emissions<br>
+                            • Design and implement renewable energy solutions, saving clients over $2M annually<br>
+                            • Conduct stakeholder engagement workshops and sustainability training programs
+                        </div>
+                    </div>
+
+                    <div class="experience-item">
+                        <div class="item-header">
+                            <div>
+                                <div class="item-title">Environmental Analyst</div>
+                                <div class="item-company">EcoSolutions Inc.</div>
+                            </div>
+                            <div class="item-date">2018 - 2020</div>
+                        </div>
+                        <div class="item-description">
+                            • Performed environmental impact assessments for industrial and commercial projects<br>
+                            • Developed waste management strategies that reduced landfill waste by 40%<br>
+                            • Assisted in ISO 14001 certification processes for multiple clients<br>
+                            • Prepared regulatory compliance reports and environmental permits
+                        </div>
+                    </div>
+
+                    <div class="experience-item">
+                        <div class="item-header">
+                            <div>
+                                <div class="item-title">Sustainability Coordinator</div>
+                                <div class="item-company">Metro University</div>
+                            </div>
+                            <div class="item-date">2016 - 2018</div>
+                        </div>
+                        <div class="item-description">
+                            • Coordinated campus-wide sustainability initiatives and green building projects<br>
+                            • Managed recycling programs that increased diversion rates by 35%<br>
+                            • Organized environmental awareness events and educational programs<br>
+                            • Monitored and reported on sustainability metrics and goals
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Education</h2>
+                    <div class="education-item">
+                        <div class="item-header">
+                            <div>
+                                <div class="item-title">Master of Environmental Management</div>
+                                <div class="item-company">Yale University</div>
+                            </div>
+                            <div class="item-date">2014 - 2016</div>
+                        </div>
+                        <div class="item-description">
+                            Focus: Corporate Sustainability and Environmental Policy<br>
+                            GPA: 3.8/4.0
+                        </div>
+                    </div>
+
+                    <div class="education-item">
+                        <div class="item-header">
+                            <div>
+                                <div class="item-title">Bachelor of Science in Environmental Science</div>
+                                <div class="item-company">University of California, Berkeley</div>
+                            </div>
+                            <div class="item-date">2010 - 2014</div>
+                        </div>
+                        <div class="item-description">
+                            Magna Cum Laude, Dean's List all semesters
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+</body>
+</html>
