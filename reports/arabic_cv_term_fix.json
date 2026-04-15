@@ -1,0 +1,279 @@
+{
+  "metrics": {
+    "total": 12,
+    "passed": 8,
+    "failed": 4,
+    "errors": 0,
+    "pass_rate": 0.667,
+    "source_match_accuracy": 0.5,
+    "top1_source_accuracy": 0.5,
+    "source_precision": 0.5,
+    "refusal_accuracy": 1.0,
+    "failure_buckets": {
+      "low_source_precision": 3,
+      "top1_source_mismatch": 3,
+      "wrong_source": 3,
+      "wrong_answer": 1
+    },
+    "avg_elapsed_s": 3.98
+  },
+  "results": [
+    {
+      "test_id": 1,
+      "question": "ما هي الناتج المحلي الإجمالي لليابان؟",
+      "answer": "Insufficient data.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.html"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 3.2064016000003903,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "Insufficient data.",
+      "has_expected_source": false,
+      "has_expected_exact": true
+    },
+    {
+      "test_id": 2,
+      "question": "ما هي عاصمة فرنسا؟",
+      "answer": "Insufficient data.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 2.8119833000000654,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "Insufficient data.",
+      "has_expected_source": false,
+      "has_expected_exact": true
+    },
+    {
+      "test_id": 3,
+      "question": "من هو روبن إدوان؟",
+      "answer": "Robin Edwan is a UAE-based environmental operations and sustainability professional with more than ten years of experience in environmental services, regulatory coordination, and commercial facility compliance. He is the Founder and Managing Director of Eco Technology Environment Protection Services L.L.C. in Ajman, a municipality-approved environmental services company specializing in grease management systems, wastewater protection solutions, and environmental compliance services for restaurants and commercial facilities across the United Arab Emirates. Sources: [Rank 3 | Score 0.3807 | Source Robin_Edwan_Executive_Bio.html | Chunk html_Robin_Edwan_Executive_Bio.html_0000]",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.html",
+        "Robin_Edwan_Environmental_Sustainability_Specialist_CV_Final.html"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 7.016122600000017,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "",
+      "has_expected_source": false,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 4,
+      "question": "ما هي شركة إيكو؟",
+      "answer": "Eco-Friendly ✅",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 2.7863589999997203,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 5,
+      "question": "أين تقع شركة إيكو؟",
+      "answer": "ECO is located in Dubai and other Emirates. Sources: [ECO_Company_Profile.pdf | pdf_ECO_Company_Profile.pdf_0007]",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 3.49493910000092,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 6,
+      "question": "ما هي خدمات إيكو؟",
+      "answer": "Equipment supply from certified manufacturers, system design consultation and optimization, warranty and after-sales support, Used Cooking Oil (UCO) Collection and recycling services, Scheduled pickup routes across UAE, Proper disposal and recycling documentation, Environmental impact reporting, Waste Management Consulting, Environmental compliance guidance, and grease management systems.\n\nSources:\nECO_Company_Profile.pdf",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Roben_Edwan_Deliveroo_Tailored_CV.txt"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 5.044937700000446,
+      "error": "",
+      "expected_source": "ECO_Company_Profile.pdf",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 7,
+      "question": "ما هو تعليم روبن؟",
+      "answer": "Robin Edwan is a UAEIbased business and operations professional with over a decade of experience in environmental services, business development, and client relationship management.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf"
+      ],
+      "passed": false,
+      "reasons": [
+        "expected source 'Roben_Edwan_Deliveroo_Tailored_CV.txt', got ['ECO_Company_Profile.pdf', 'ECO_Company_Profile.pdf', 'Robin_Edwan_Executive_Bio.pdf', 'Robin_Edwan_Executive_Bio_.pdf']",
+        "top-1 source mismatch: expected 'Roben_Edwan_Deliveroo_Tailored_CV.txt', got 'ECO_Company_Profile.pdf'",
+        "expected source not in top-2: 'Roben_Edwan_Deliveroo_Tailored_CV.txt'"
+      ],
+      "buckets": [
+        "low_source_precision",
+        "top1_source_mismatch",
+        "wrong_source"
+      ],
+      "elapsed": 3.8509831999999733,
+      "error": "",
+      "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 8,
+      "question": "ما هي مهارات روبن؟",
+      "answer": "Robin Edwan is a UAEIbased business and operations professional with over a decade of experience in environmental services, business development, and client relationship management.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf"
+      ],
+      "passed": false,
+      "reasons": [
+        "expected source 'Roben_Edwan_Deliveroo_Tailored_CV.txt', got ['ECO_Company_Profile.pdf', 'ECO_Company_Profile.pdf', 'Robin_Edwan_Executive_Bio.pdf', 'Robin_Edwan_Executive_Bio_.pdf']",
+        "top-1 source mismatch: expected 'Roben_Edwan_Deliveroo_Tailored_CV.txt', got 'ECO_Company_Profile.pdf'",
+        "expected source not in top-2: 'Roben_Edwan_Deliveroo_Tailored_CV.txt'"
+      ],
+      "buckets": [
+        "low_source_precision",
+        "top1_source_mismatch",
+        "wrong_source"
+      ],
+      "elapsed": 3.8481646000000183,
+      "error": "",
+      "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 9,
+      "question": "ما هي شهادات روبن؟",
+      "answer": "Official Certifications ✅",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.pdf",
+        "Robin_Edwan_Executive_Bio_.pdf"
+      ],
+      "passed": false,
+      "reasons": [
+        "expected source 'Roben_Edwan_Deliveroo_Tailored_CV.txt', got ['ECO_Company_Profile.pdf', 'ECO_Company_Profile.pdf', 'Robin_Edwan_Executive_Bio.pdf', 'Robin_Edwan_Executive_Bio_.pdf']",
+        "top-1 source mismatch: expected 'Roben_Edwan_Deliveroo_Tailored_CV.txt', got 'ECO_Company_Profile.pdf'",
+        "expected source not in top-2: 'Roben_Edwan_Deliveroo_Tailored_CV.txt'"
+      ],
+      "buckets": [
+        "low_source_precision",
+        "top1_source_mismatch",
+        "wrong_source"
+      ],
+      "elapsed": 3.0642606999990676,
+      "error": "",
+      "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+      "expected_exact": "",
+      "has_expected_source": true,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 10,
+      "question": "ما هي لغة روبن؟",
+      "answer": "Insufficient data.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 2.816816299999118,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "Insufficient data.",
+      "has_expected_source": false,
+      "has_expected_exact": true
+    },
+    {
+      "test_id": 11,
+      "question": "ما هي جنسية روبن؟",
+      "answer": "Insufficient data.",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf"
+      ],
+      "passed": false,
+      "reasons": [
+        "missing terms: ['UAE']"
+      ],
+      "buckets": [
+        "wrong_answer"
+      ],
+      "elapsed": 2.8218134000017017,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "",
+      "has_expected_source": false,
+      "has_expected_exact": false
+    },
+    {
+      "test_id": 12,
+      "question": "من هو روبن إدوان؟",
+      "answer": "Robin Edwan is a UAE-based environmental operations and sustainability professional with more than ten years of experience in environmental services, regulatory coordination, and commercial facility compliance. He is the Founder and Managing Director of Eco Technology Environment Protection Services L.L.C. in Ajman, a municipality-approved environmental services company specializing in grease management systems, wastewater protection solutions, and environmental compliance services for restaurants and commercial facilities across the United Arab Emirates. Sources: [Rank 3 | Score 0.3807 | Source Robin_Edwan_Executive_Bio.html | Chunk html_Robin_Edwan_Executive_Bio.html_0000]",
+      "sources": [
+        "ECO_Company_Profile.pdf",
+        "ECO_Company_Profile.pdf",
+        "Robin_Edwan_Executive_Bio.html",
+        "Robin_Edwan_Environmental_Sustainability_Specialist_CV_Final.html"
+      ],
+      "passed": true,
+      "reasons": [],
+      "buckets": [],
+      "elapsed": 6.988315300000977,
+      "error": "",
+      "expected_source": "",
+      "expected_exact": "",
+      "has_expected_source": false,
+      "has_expected_exact": false
+    }
+  ]
+}

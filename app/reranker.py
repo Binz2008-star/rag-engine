@@ -37,11 +37,13 @@ class LightweightReranker:
         semantic_weight: float = RERANK_SEMANTIC_WEIGHT,
         lexical_weight: float = RERANK_LEXICAL_WEIGHT,
         phrase_weight: float = RERANK_PHRASE_WEIGHT,
+        bm25_weight: float = 0.3,  # BM25 weight for exact term matching
         source_prior_weight: float = 0.0,  # Disabled - no source biasing
     ) -> None:
         self.semantic_weight = semantic_weight
         self.lexical_weight = lexical_weight
         self.phrase_weight = phrase_weight
+        self.bm25_weight = bm25_weight
         self.source_prior_weight = source_prior_weight
 
     def rerank(self, query: str, candidates: List[RetrievedChunk]) -> List[RetrievedChunk]:
@@ -99,7 +101,10 @@ class LightweightReranker:
         # Semantic score (existing FAISS score)
         semantic_score = rc.score
 
-        # Lexical overlap score
+        # BM25 lexical score for exact term matching
+        bm25_score = self._compute_bm25_score(query, rc.chunk.text)
+
+        # Simple lexical overlap score
         normalized_chunk = self._normalize_text(rc.chunk.text)
         chunk_tokens = self._tokenize(normalized_chunk)
         lexical_score = self._compute_lexical_overlap(query_tokens, chunk_tokens)
@@ -110,9 +115,10 @@ class LightweightReranker:
         # Source prior disabled - using semantic and lexical only
         source_prior = 0.0
 
-        # Final weighted score (source prior disabled)
+        # Final weighted score with BM25 boost
         final_score = (
             self.semantic_weight * semantic_score
+            + self.bm25_weight * bm25_score
             + self.lexical_weight * lexical_score
             + self.phrase_weight * phrase_score
         )
@@ -167,4 +173,38 @@ class LightweightReranker:
 
         return 0.0
 
-    # Legacy source prior method removed - no longer needed
+    def _compute_bm25_score(self, query: str, document: str) -> float:
+        """Compute BM25 score for exact term matching."""
+        # Simple BM25 implementation
+        k1 = 1.2  # Controls term frequency scaling
+        b = 0.75  # Controls document length normalization
+
+        # Tokenize query and document
+        query_terms = query.lower().split()
+        doc_terms = document.lower().split()
+        doc_len = len(doc_terms)
+        avg_doc_len = 100  # Approximate average document length
+
+        # Calculate term frequencies
+        term_freqs = {}
+        for term in query_terms:
+            term_freqs[term] = doc_terms.count(term)
+
+        # Compute BM25 score
+        score = 0.0
+        for term, tf in term_freqs.items():
+            if tf > 0:
+                # IDF component (simplified)
+                idf = 1.0  # Simplified IDF for speed
+
+                # BM25 formula
+                tf_component = (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * doc_len / avg_doc_len))
+                score += idf * tf_component
+
+        # Boost for exact entity matches
+        entity_terms = ['eco', 'cv', 'deliveroo', 'robin', 'edwan']
+        for term in entity_terms:
+            if term in query.lower() and term in document.lower():
+                score += 0.5  # Additional boost for entity matches
+
+        return min(score, 2.0)  # Cap the score

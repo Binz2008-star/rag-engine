@@ -11,7 +11,7 @@ DATA_DIR = Path(os.getenv("DATA_DIR", r"D:\AI\data"))
 
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "900"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "120"))
-TOP_K = int(os.getenv("TOP_K", "4"))
+TOP_K = int(os.getenv("TOP_K", "20"))
 TIMEOUT = int(os.getenv("TIMEOUT", "300"))
 
 GPU_ENABLED = os.getenv("GPU_ENABLED", "true").lower() == "true"
