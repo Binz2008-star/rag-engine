@@ -25,7 +25,7 @@ class RerankBreakdown:
     semantic: float
     lexical: float
     phrase: float
-    source_prior: float
+    source_prior: float = 0.0  # Disabled - using semantic and lexical only
     final: float
 
 
@@ -37,7 +37,7 @@ class LightweightReranker:
         semantic_weight: float = RERANK_SEMANTIC_WEIGHT,
         lexical_weight: float = RERANK_LEXICAL_WEIGHT,
         phrase_weight: float = RERANK_PHRASE_WEIGHT,
-        source_prior_weight: float = RERANK_SOURCE_PRIOR_WEIGHT,
+        source_prior_weight: float = 0.0,  # Disabled - no source biasing
     ) -> None:
         self.semantic_weight = semantic_weight
         self.lexical_weight = lexical_weight
@@ -107,15 +107,14 @@ class LightweightReranker:
         # Phrase match bonus
         phrase_score = self._compute_phrase_bonus(normalized_query, normalized_chunk)
 
-        # Source prior (derived from boost rules)
-        source_prior = self._compute_source_prior(rc.chunk.source, query)
+        # Source prior disabled - using semantic and lexical only
+        source_prior = 0.0
 
-        # Final weighted score
+        # Final weighted score (source prior disabled)
         final_score = (
             self.semantic_weight * semantic_score
             + self.lexical_weight * lexical_score
             + self.phrase_weight * phrase_score
-            + self.source_prior_weight * source_prior
         )
 
         return RerankBreakdown(
@@ -168,9 +167,4 @@ class LightweightReranker:
 
         return 0.0
 
-    def _compute_source_prior(self, source: str, query: str) -> float:
-        """
-        Legacy source prior removed - using semantic and lexical signals only.
-        Returns 0.0 to disable source-based biasing.
-        """
-        return 0.0
+    # Legacy source prior method removed - no longer needed

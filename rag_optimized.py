@@ -185,6 +185,8 @@ class OllamaClient:
                 if attempt == MAX_RETRIES - 1:
                     raise
                 time.sleep(2 ** attempt)
+        # This line should never be reached due to the raise in the last attempt
+        raise RuntimeError("Failed to embed after all retries")
 
     def chat(self, prompt: str, model: str = CHAT_MODEL, stream: bool = True) -> str:
         for attempt in range(MAX_RETRIES):
@@ -226,6 +228,8 @@ class OllamaClient:
                 if attempt == MAX_RETRIES - 1:
                     raise
                 time.sleep(2 ** attempt)
+        # This line should never be reached due to the raise in the last attempt
+        raise RuntimeError("Failed to chat after all retries")
 
     def warmup(self) -> None:
         logger.info("Warming up model (eliminates first-query lag)...")
@@ -254,7 +258,7 @@ class VectorStore:
         self.index = faiss.read_index(str(store_dir / "index.faiss"))
         meta = json.loads((store_dir / "chunks.json").read_text(encoding="utf-8"))
         self.chunks = [Chunk(source=m["source"], text=m["text"]) for m in meta]
-        if self.index.ntotal != len(self.chunks):
+        if self.index and self.index.ntotal != len(self.chunks):
             raise ValueError("Corrupt cache: chunk/index count mismatch — delete vector_store/")
         logger.info(f"Loaded {len(self.chunks)} chunks from FAISS index.")
 
@@ -394,13 +398,13 @@ def _extract_text_pdf(path: Path) -> Tuple[str, str]:
     text = _extract_text_native_pdf(path)
     native_len = len(text.strip())
 
-    # Step 2: Check if we need OCR fallback
-    if native_len >= OCR_MIN_TEXT_THRESHOLD:
-        logger.info(f"PDF [{path.name}]: {native_len} chars (native)")
-        return text, ExtractionStatus.NATIVE_OK
+    # Step 2: Check if image OCR is available
+    if not OCR_CAPS or not OCR_CAPS.image_ocr_enabled:
+        logger.warning(f"Image [{path.name}]: OCR not available, returning empty text")
+        return "", ExtractionStatus.OCR_UNAVAILABLE
 
     # Step 3: Check OCR availability
-    if not OCR_CAPS.pdf_ocr_enabled:
+    if not OCR_CAPS or not OCR_CAPS.pdf_ocr_enabled:
         return text, ExtractionStatus.NATIVE_LOW_TEXT
 
     # Step 4: Check OCR cache
@@ -428,7 +432,7 @@ def _extract_text_pdf(path: Path) -> Tuple[str, str]:
 
 def _extract_text_image(path: Path) -> Tuple[str, str]:
     """Extract text from image using OCR. Returns (text, status) tuple."""
-    if not OCR_CAPS.image_ocr_enabled:
+    if not OCR_CAPS or not OCR_CAPS.image_ocr_enabled:
         return "", ExtractionStatus.OCR_UNAVAILABLE
 
     try:
@@ -546,7 +550,8 @@ def build_vector_store(chunks: List[Chunk], client: OllamaClient) -> VectorStore
     embeddings = np.array(all_embeddings, dtype=np.float32)
     dim = embeddings.shape[1]
     store.index = faiss.IndexFlatIP(dim)
-    store.index.add(embeddings)
+    if store.index:
+        store.index.add(embeddings)
     logger.info(f"FAISS index built: {len(store.chunks)} chunks, dim={dim}")
     return store
 

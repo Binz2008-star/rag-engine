@@ -58,15 +58,10 @@ class Retriever:
         return any('\u0600' <= c <= '\u06FF' for c in text)
 
     def _source_family(self, source: str) -> str:
-        s = source.lower()
-        if "eco" in s:
-            return "eco"
-        if "cv" in s or "deliveroo" in s or "roben" in s or "robin" in s:
-            return "cv"
+        # Legacy source classification removed - no longer needed without hardcoded logic
         return "other"
 
-    def _is_primary_eco(self, source: str) -> bool:
-        return source == "ECO_Company_Profile.pdf"
+    # Legacy primary source check removed - no longer needed
 
     def _safe_search(self, vector_store: VectorStore, query_embedding, top_k: int) -> List[tuple]:
         """Failsafe retrieval - never return empty results."""
@@ -98,8 +93,8 @@ class Retriever:
         result = sorted(retrieved, key=lambda x: x.score, reverse=True)
         return result
 
-    def _filter_score(self, retrieved: List[RetrievedChunk], intent: str) -> List[RetrievedChunk]:
-        """Filter out low-score chunks - intent protection removed for clean baseline."""
+    def _filter_score(self, retrieved: List[RetrievedChunk]) -> List[RetrievedChunk]:
+        """Filter out low-score chunks."""
         filtered = []
 
         for rc in retrieved:
@@ -111,7 +106,7 @@ class Retriever:
         return filtered
 
     def _diversify(self, retrieved: List[RetrievedChunk]) -> List[RetrievedChunk]:
-        """Diversify chunks - cap at 2 chunks per source (Phase 2)."""
+        """Diversify chunks - cap at 2 chunks per source."""
         counts = {}
         diversified = []
 
@@ -183,7 +178,7 @@ class Retriever:
             logger.debug("Raw[%2d] %.4f  %s  %s",
                          rank, rc.score, rc.chunk.source, rc.chunk.chunk_id)
 
-        # Pipeline: rerank → bias → rescue → boost → sort → score filter → diversify → top-k
+        # Pipeline: rerank → adjustments → score filter → diversify → top-k
         if RERANK_ENABLED:
             retrieved = retrieved[:20]
             retrieved = self.reranker.rerank(query, retrieved)
@@ -191,11 +186,11 @@ class Retriever:
             retrieved = self._apply_scoring_adjustments(query, retrieved, phase="rescue")
             logger.info("Reranking applied: %d candidates", len(retrieved))
 
-        retrieved = self._apply_scoring_adjustments(query, retrieved, phase="boost")
+        # Legacy scoring adjustments removed - using reranking scores only
 
         # Legacy intent-based source priors removed - using reranking scores only
 
-        retrieved = self._filter_score(retrieved, "neutral")  # Default intent
+        retrieved = self._filter_score(retrieved)  # No intent parameter needed
         retrieved = self._diversify(retrieved)
 
         final = retrieved[:FINAL_TOP_K]
