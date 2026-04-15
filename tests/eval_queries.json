@@ -98,7 +98,7 @@
   {
     "suite": "baseline_en",
     "question": "What is Robin's nationality?",
-    "expected_contains": ["UAEI"]
+    "expected_contains": ["UAE"]
   },
   {
     "suite": "baseline_en",

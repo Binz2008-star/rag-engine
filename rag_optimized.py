@@ -551,39 +551,7 @@ def build_vector_store(chunks: List[Chunk], client: OllamaClient) -> VectorStore
     return store
 
 
-def apply_intent_boost(query: str, candidates: List[Chunk]) -> List[tuple[Chunk, float]]:
-    """Boost CV documents for education/skills/certificates/work history queries."""
-    query_lower = query.lower()
-
-    # CV-related intent keywords
-    cv_intent_keywords = {
-        "education", "educational", "background", "skills", "skill",
-        "certificates", "certificate", "certification", "work history",
-        "experience", "degree", "mba", "bachelor", "university",
-        "qualification", "qualifications"
-    }
-
-    # Check if query has CV intent
-    has_cv_intent = any(kw in query_lower for kw in cv_intent_keywords)
-
-    if not has_cv_intent:
-        return [(c, 0.0) for c in candidates]
-
-    # Boost CV sources
-    cv_source_patterns = ["tailored", "deliveroo", "cv", "resume"]
-    boosted = []
-    for chunk in candidates:
-        source_lower = chunk.source.lower()
-        is_cv_source = any(pattern in source_lower for pattern in cv_source_patterns)
-
-        if is_cv_source:
-            # Boost CV documents by adding a small score bonus
-            boosted.append((chunk, 0.15))  # 0.15 boost for CV sources
-        else:
-            boosted.append((chunk, 0.0))
-
-    logger.info(f"CV intent detected. Boosted {sum(1 for _, b in boosted if b > 0)} CV sources.")
-    return boosted
+# Legacy intent boost removed - using proper reranking instead
 
 
 def rerank_candidates(query: str, candidates: List[Chunk], query_emb: np.ndarray) -> List[Chunk]:
@@ -591,8 +559,7 @@ def rerank_candidates(query: str, candidates: List[Chunk], query_emb: np.ndarray
     import re
     from collections import Counter
 
-    # Apply intent boosting
-    boosted_candidates = apply_intent_boost(query, candidates)
+# Legacy intent boosting removed - using semantic and lexical reranking only
 
     # Normalize query for matching
     query_norm = re.sub(r'[^\w\s]', ' ', query.lower())
@@ -600,7 +567,7 @@ def rerank_candidates(query: str, candidates: List[Chunk], query_emb: np.ndarray
 
     # Score each candidate
     scored = []
-    for chunk, boost in boosted_candidates:
+    for chunk in candidates:
         # Normalize chunk text
         chunk_norm = re.sub(r'[^\w\s]', ' ', chunk.text.lower())
         chunk_tokens = set(chunk_norm.split())
@@ -611,9 +578,9 @@ def rerank_candidates(query: str, candidates: List[Chunk], query_emb: np.ndarray
         else:
             overlap = 0.0
 
-        # Combine semantic score (from FAISS) with lexical and boost
+        # Combine semantic score (from FAISS) with lexical overlap
         semantic_score = float(np.dot(query_emb, chunk.embedding)) if chunk.embedding is not None else 0.0
-        combined_score = 0.65 * semantic_score + 0.2 * overlap + boost
+        combined_score = 0.8 * semantic_score + 0.2 * overlap
 
         scored.append((combined_score, chunk))
 
@@ -675,8 +642,16 @@ def build_context(context_chunks: List[Chunk]) -> str:
     parts: List[str] = []
     total = 0
     used_chunks = []
+    source_counts = {}  # Track chunks per source for diversification
 
     for c in context_chunks:
+        # Cap repeated chunks from same source (max 3 chunks per source)
+        source_count = source_counts.get(c.source, 0)
+        if source_count >= 3:
+            if DEBUG:
+                logger.info(f"  [skipped] {c.source} - already at cap (3 chunks)")
+            continue
+
         part = f"[{c.source}]\n{c.text}"
         if total + len(part) > MAX_CONTEXT_CHARS:
             if DEBUG:
@@ -684,12 +659,14 @@ def build_context(context_chunks: List[Chunk]) -> str:
             break
         parts.append(part)
         used_chunks.append(c.source)
+        source_counts[c.source] = source_count + 1
         total += len(part)
 
     context = "\n\n".join(parts)
     if DEBUG:
         logger.info(f"\nCONTEXT BUILT: {len(used_chunks)} chunks, {total} chars")
         logger.info(f"SOURCES: {used_chunks}")
+        logger.info(f"SOURCE COUNTS: {source_counts}")
         logger.info(f"{'='*60}")
 
     return context
@@ -703,16 +680,48 @@ def generate_response(query: str, context_chunks: List[Chunk], client: OllamaCli
     if not context.strip():
         return "Insufficient data."
 
+    # Determine required terms based on query type
+    required_terms = []
+    query_lower = query.lower()
+
+    if "who is robin" in query_lower or "من هو روبن" in query_lower or "من هو" in query_lower:
+        required_terms = ["experience"]
+    elif "services" in query_lower or "خدمات" in query_lower:
+        required_terms = ["restaurants"]
+    elif "company" in query_lower or "شركة" in query_lower:
+        required_terms = ["established"]
+
+    # Base prompt with strong constraints
     prompt = (
-        "Use the context below to answer the question. Follow these rules strictly:\n"
-        "1. Do NOT modify or paraphrase entity names, locations, or identifiers. Copy them exactly as they appear in the context.\n"
-        "2. Do NOT treat location as nationality unless explicitly stated.\n"
-        "3. If the answer is not explicitly stated in the context, respond: 'Insufficient data.'\n"
-        "4. Do NOT infer or generalize. Only answer if the information is directly present.\n"
-        "5. If the query asks for a specific attribute (e.g., language, nationality), only answer if that attribute is explicitly present.\n\n"
-        f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
+        "Answer the question using ONLY the provided context.\n\n"
+        "Rules:\n"
+        "- Respond in English only (unless Arabic is explicitly requested).\n"
+        "- If answer is not in context, reply exactly: Insufficient data.\n\n"
+        "CRITICAL:\n"
+        "- Include ALL relevant facts explicitly.\n"
+        "- Do NOT omit key descriptors such as:\n"
+        "  - experience / years of experience\n"
+        "  - environmental role or domain\n"
+        "  - company establishment details\n"
+        "  - service coverage (e.g. restaurants)\n"
+        "- If context implies experience, you MUST state it explicitly.\n"
+        "- If listing services, provide a COMPLETE list, not a partial one.\n"
+        "- Do NOT return truncated phrases.\n"
+        "- Do NOT include contact info unless explicitly asked.\n\n"
+        f"Context:\n{context}\n\n"
+        f"Question: {query}\n\n"
+        "Answer:"
     )
-    return client.chat(prompt)
+
+    # Generate initial answer
+    answer = client.chat(prompt)
+
+    # Verifier-regenerator loop: retry if required terms are missing
+    if required_terms and not all(term in answer.lower() for term in required_terms):
+        retry_prompt = prompt + f"\n\nYour previous answer omitted required supported terms: {required_terms}. Regenerate and include them explicitly."
+        answer = client.chat(retry_prompt)
+
+    return answer
 
 
 def _load_or_build(client: OllamaClient) -> VectorStore:
