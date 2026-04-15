@@ -25,8 +25,8 @@ class RerankBreakdown:
     semantic: float
     lexical: float
     phrase: float
-    source_prior: float = 0.0  # Disabled - using semantic and lexical only
     final: float
+    source_prior: float = 0.0  # Disabled - using semantic and lexical only
 
 
 class LightweightReranker:
