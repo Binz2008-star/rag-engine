@@ -170,23 +170,7 @@ class LightweightReranker:
 
     def _compute_source_prior(self, source: str, query: str) -> float:
         """
-        Compute source prior based on existing boost rules and query context.
-        Returns a small contribution (0.0-0.2 range).
+        Legacy source prior removed - using semantic and lexical signals only.
+        Returns 0.0 to disable source-based biasing.
         """
-        source_lower = source.lower()
-        query_lower = query.lower()
-
-        # Force ECO boost for company-related queries
-        if "eco" in query_lower or "company" in query_lower or "services" in query_lower:
-            if "eco_company_profile" in source_lower:
-                return 0.25  # Strong boost for ECO profile on company queries
-
-        # ECO Company Profile prior
-        if "eco" in source_lower or "company_profile" in source_lower:
-            return 0.15
-
-        # CV TXT prior
-        if "tailored" in source_lower or "deliveroo" in source_lower:
-            return 0.1
-
         return 0.0
