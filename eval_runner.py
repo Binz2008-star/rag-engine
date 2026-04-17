@@ -69,11 +69,16 @@ def check_result(result, test: dict, elapsed: float) -> tuple[bool, list[str], l
     reasons: list[str] = []
     buckets: set[str]  = set()
 
+    # expected_refusal: true — pattern-based, not string-exact
+    if test.get("expected_refusal") is True:
+        if not is_insufficient_response(answer):
+            buckets.add("refusal_failure")
+            reasons.append(f"expected refusal, got {answer!r}")
+
     # Refusal response validation with semantic matching
     if "expected_exact" in test:
         exp = test["expected_exact"]
         if exp == "Insufficient data.":
-            # Use semantic matching instead of exact string
             if not is_insufficient_response(answer):
                 buckets.add("refusal_failure")
                 reasons.append(f"expected refusal response, got {answer!r}")
@@ -164,6 +169,10 @@ def compute_metrics(results: list[TestResult]) -> dict:
         for b in r.buckets:
             bucket_counts[b] = bucket_counts.get(b, 0) + 1
 
+    avg_elapsed = round(sum(r.elapsed for r in results) / total, 2) if total else 0
+    latency_sla_ms = 2500
+    sla_pass = (avg_elapsed * 1000) <= latency_sla_ms
+
     return {
         "total":              total,
         "passed":             passed,
@@ -175,7 +184,9 @@ def compute_metrics(results: list[TestResult]) -> dict:
         "source_precision": round(precision_hits / len(precision_tests), 3) if precision_tests else None,
         "refusal_accuracy":   round(refusal_hits / len(refusal_tests), 3) if refusal_tests else None,
         "failure_buckets":    bucket_counts,
-        "avg_elapsed_s":      round(sum(r.elapsed for r in results) / total, 2) if total else 0,
+        "avg_elapsed_s":      avg_elapsed,
+        "latency_sla_ms":     latency_sla_ms,
+        "sla_pass":           sla_pass,
     }
 
 
@@ -284,7 +295,7 @@ def main(query_fn=None) -> int:
             print(f"  Refusal accuracy:   {metrics['refusal_accuracy']*100:.1f}%")
         print(f"  Errors:             {metrics['errors']}")
         print(f"  Failure buckets:    {metrics['failure_buckets']}")
-        print(f"  Avg latency:        {metrics['avg_elapsed_s']}s")
+        print(f"  Avg latency:        {metrics['avg_elapsed_s']}s  (SLA {metrics['latency_sla_ms']}ms: {'✓' if metrics['sla_pass'] else '✗ FAIL'})")
         print(f"{'='*60}")
 
         # ── Save report ───────────────────────────────────────────────────────
