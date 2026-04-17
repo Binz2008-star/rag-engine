@@ -38,9 +38,7 @@ jobs:
   eval:
     name: RAG Evaluation (95% Gate)
     runs-on: self-hosted
-    continue-on-error: true
     # Requires: Ollama running with 'robin-assistant' model, all deps installed locally
-    # continue-on-error: remove once runner is confirmed stable
 
     steps:
       - name: Checkout
