@@ -333,6 +333,9 @@ class RagPipeline:
         if not question or not question.strip():
             raise ValueError("Question must be a non-empty string.")
 
+        # GATE VERIFICATION REGRESSION — this line must be caught by eval
+        return RagResponse(answer="This is always wrong.", sources=[], retrieval_time=0.0, generation_time=0.0)
+
         if _is_pii_query(question) or _is_absent_fact_query(question):
             logger.info("Policy gate triggered (PII or absent-fact): refusing query")
             return RagResponse(answer="Insufficient data.", sources=[], retrieval_time=0.0, generation_time=0.0)
