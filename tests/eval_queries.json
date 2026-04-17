@@ -219,5 +219,119 @@
     "expected_source": "ECO_Company_Profile.pdf",
     "max_latency_ms": 10000,
     "note": "Long query stress test"
+  },
+  {
+    "suite": "hard_negatives",
+    "question": "What is Robin's salary?",
+    "expected_exact": "Insufficient data.",
+    "note": "Personal financial info not in any document"
+  },
+  {
+    "suite": "hard_negatives",
+    "question": "What is ECO's total annual revenue?",
+    "expected_exact": "Insufficient data.",
+    "note": "Financial data not in documents"
+  },
+  {
+    "suite": "hard_negatives",
+    "question": "What is Robin's personal phone number?",
+    "expected_exact": "Insufficient data.",
+    "note": "PII not present in any document"
+  },
+  {
+    "suite": "hard_negatives",
+    "question": "What stock exchange is ECO listed on?",
+    "expected_exact": "Insufficient data.",
+    "note": "ECO is not a public company — docs contain no listing info"
+  },
+  {
+    "suite": "hard_negatives",
+    "question": "What is Robin's home address?",
+    "expected_exact": "Insufficient data.",
+    "note": "Home address vs work location — must not leak city as address"
+  },
+  {
+    "suite": "hard_negatives",
+    "question": "ما هو راتب روبن؟",
+    "expected_exact": "Insufficient data.",
+    "note": "Arabic hard negative: salary not in any document"
+  },
+  {
+    "suite": "paraphrase_stress",
+    "question": "Tell me about Eco firm",
+    "expected_source": "ECO_Company_Profile.pdf",
+    "note": "Non-standard phrasing: firm instead of company"
+  },
+  {
+    "suite": "paraphrase_stress",
+    "question": "Give me details on Eco Technology company",
+    "expected_source": "ECO_Company_Profile.pdf",
+    "note": "Reworded ECO query without question mark or operator word"
+  },
+  {
+    "suite": "paraphrase_stress",
+    "question": "Describe Robin Edwan",
+    "expected_contains": ["environmental", "experience"],
+    "note": "Imperative paraphrase of who is Robin"
+  },
+  {
+    "suite": "paraphrase_stress",
+    "question": "Eco company based in UAE",
+    "expected_source": "ECO_Company_Profile.pdf",
+    "note": "Noun-phrase query with no question structure"
+  },
+  {
+    "suite": "paraphrase_stress",
+    "question": "Who exactly is Robin and what does he do?",
+    "expected_contains": ["environmental", "experience"],
+    "note": "Compound paraphrase — must not split into ambiguous retrieval"
+  },
+  {
+    "suite": "cross_doc_ambiguity",
+    "question": "What was Robin's role at Deliveroo?",
+    "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+    "note": "Deliveroo info exists only in tailored CV — must not pull ECO or Bio"
+  },
+  {
+    "suite": "cross_doc_ambiguity",
+    "question": "What did Robin do before joining ECO?",
+    "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+    "note": "Prior work history is CV-specific — must not pull ECO profile"
+  },
+  {
+    "suite": "cross_doc_ambiguity",
+    "question": "What waste management services does ECO provide?",
+    "expected_source": "ECO_Company_Profile.pdf",
+    "note": "Service details must come from company profile, not Robin's bio or CV"
+  },
+  {
+    "suite": "cross_doc_ambiguity",
+    "question": "What software tools does Robin use professionally?",
+    "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+    "note": "Tool list (Jobber, Power Automate) is CV-specific — must not pull ECO profile"
+  },
+  {
+    "suite": "source_confusion",
+    "question": "What degree does Robin hold?",
+    "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+    "note": "Academic degree is in CV — trap: Bio mentions expertise but not degree"
+  },
+  {
+    "suite": "source_confusion",
+    "question": "What accreditations does ECO Technology hold?",
+    "expected_source": "ECO_Company_Profile.pdf",
+    "note": "ECO accreditations — trap: Robin's CV has personal certs, not company ones"
+  },
+  {
+    "suite": "source_confusion",
+    "question": "Does Robin have any professional certifications?",
+    "expected_source": "Roben_Edwan_Deliveroo_Tailored_CV.txt",
+    "note": "Paraphrase of certificates test — must not pull ECO profile certifications"
+  },
+  {
+    "suite": "source_confusion",
+    "question": "What is ECO's approval status with local municipalities?",
+    "expected_source": "ECO_Company_Profile.pdf",
+    "note": "Municipality approval in ECO profile — trap: Robin's bio mentions ECO role but not approval"
   }
 ]
