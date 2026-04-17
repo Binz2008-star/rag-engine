@@ -7,9 +7,9 @@ on:
     branches: [main, develop]
 
 jobs:
-  eval:
-    name: RAG Evaluation (95% Gate)
-    runs-on: self-hosted
+  lint:
+    name: Lint & Import Check
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -19,6 +19,28 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate eval suite JSON
+        run: python -c "import json; data=json.load(open('tests/eval_queries.json')); print(f'Eval suite: {len(data)} tests loaded OK')"
+
+      - name: Check core module imports
+        run: |
+          python -c "from app.config import PRODUCTION_MODE; print('config OK')"
+          python -c "from app.chunking import chunk_documents; print('chunking OK')"
+          python -c "from app.prompting import build_prompt; print('prompting OK')"
+          python -c "from app.retriever import Retriever; print('retriever OK')"
+
+  eval:
+    name: RAG Evaluation (95% Gate)
+    runs-on: self-hosted
+    # Requires: Ollama running with 'robin-assistant' model + openclaw at C:\openclaw
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: pip install -r requirements.txt
