@@ -7,36 +7,38 @@ on:
     branches: [main, develop]
 
 jobs:
-  lint:
-    name: Lint & Import Check
+  check:
+    name: Repo Integrity (Portable)
     runs-on: ubuntu-latest
+    # No pip install — stdlib only. Tests repo structure and file validity.
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
       - name: Validate eval suite JSON
-        run: python -c "import json; data=json.load(open('tests/eval_queries.json')); print(f'Eval suite: {len(data)} tests loaded OK')"
-
-      - name: Check core module imports
         run: |
-          python -c "from app.config import PRODUCTION_MODE; print('config OK')"
-          python -c "from app.chunking import chunk_documents; print('chunking OK')"
-          python -c "from app.prompting import build_prompt; print('prompting OK')"
-          python -c "from app.retriever import Retriever; print('retriever OK')"
+          python -c "
+          import json, sys
+          data = json.load(open('tests/eval_queries.json', encoding='utf-8'))
+          assert isinstance(data, list) and len(data) > 0, 'eval_queries.json is empty or malformed'
+          print(f'eval_queries.json OK — {len(data)} tests')
+          "
+
+      - name: Syntax check (py_compile)
+        run: |
+          python -m py_compile eval_runner.py       && echo 'eval_runner.py OK'
+          python -m py_compile compare_reports.py   && echo 'compare_reports.py OK'
+          python -m py_compile analyze_logs.py      && echo 'analyze_logs.py OK'
+          python -m py_compile app/config.py        && echo 'app/config.py OK'
+          python -m py_compile app/retriever.py     && echo 'app/retriever.py OK'
+          python -m py_compile app/rag_pipeline.py  && echo 'app/rag_pipeline.py OK'
+          python -m py_compile app/prompting.py     && echo 'app/prompting.py OK'
 
   eval:
     name: RAG Evaluation (95% Gate)
     runs-on: self-hosted
-    # Requires: Ollama running with 'robin-assistant' model + openclaw at C:\openclaw
+    # Requires: Ollama running with 'robin-assistant' model, all deps installed locally
 
     steps:
       - name: Checkout
@@ -46,7 +48,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run evaluation
-        run: python run_agent_eval.py --report reports/ci_eval.json
+        run: python eval_runner.py --report reports/ci_eval.json
 
       - name: Upload evaluation report
         if: always()
