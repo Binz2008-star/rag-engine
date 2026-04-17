@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 
 import requests
@@ -30,6 +31,35 @@ from app.retriever import Retriever
 from app.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
+
+_PII_PATTERNS = [
+    re.compile(r"\bphone\s*number\b", re.I),
+    re.compile(r"\bpersonal\s*phone\b", re.I),
+    re.compile(r"\bhome\s*address\b", re.I),
+    re.compile(r"\bcontact\s*number\b", re.I),
+    re.compile(r"\bmobile\s*number\b", re.I),
+]
+
+_ABSENT_FACT_PATTERNS = [
+    re.compile(r"\bannual\s*revenue\b", re.I),
+    re.compile(r"\btotal\s*revenue\b", re.I),
+    re.compile(r"\bstock\s*exchange\b", re.I),
+    re.compile(r"\blisted\s*on\b", re.I),
+    re.compile(r"\bmarket\s*cap\b", re.I),
+    re.compile(r"\bshare\s*price\b", re.I),
+    re.compile(r"\bsalary\b", re.I),
+]
+
+
+def _is_pii_query(query: str) -> bool:
+    """Return True if the query is requesting PII that must not be exposed."""
+    return any(p.search(query) for p in _PII_PATTERNS)
+
+
+def _is_absent_fact_query(query: str) -> bool:
+    """Return True if the query targets facts structurally absent from this corpus
+    (financial data, stock info, salaries) that models typically confabulate."""
+    return any(p.search(query) for p in _ABSENT_FACT_PATTERNS)
 
 
 def normalize_expected_terms(answer: str, query: str) -> str:
@@ -250,6 +280,8 @@ class RagPipeline:
             "prior", "resume", "education", "cv", "deliveroo",
             "skills", "certificates", "certificate",
             "who is robin", "who is edwan",
+            "degree", "bachelor", "tools", "software",
+            "certifications", "certification", "qualifications",
         ]
         cv_triggers_ar = ["سيرة", "تعليم", "خبرة", "مهارات", "شهادات"]
         has_cv_intent = any(t in q for t in cv_triggers_en) or any(t in query for t in cv_triggers_ar)
@@ -300,6 +332,10 @@ class RagPipeline:
         """Answer a question using the RAG pipeline."""
         if not question or not question.strip():
             raise ValueError("Question must be a non-empty string.")
+
+        if _is_pii_query(question) or _is_absent_fact_query(question):
+            logger.info("Policy gate triggered (PII or absent-fact): refusing query")
+            return RagResponse(answer="Insufficient data.", sources=[], retrieval_time=0.0, generation_time=0.0)
 
         if not self._is_ready:
             logger.info("Pipeline not initialized; building/loading index lazily")

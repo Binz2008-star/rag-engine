@@ -23,6 +23,13 @@ SCORE_THRESHOLD    = 0.35
 MAX_PER_SOURCE     = 2  # STRICT
 FINAL_TOP_K        = 6
 RETRIEVAL_POOL     = 30
+
+_CV_DETAIL_TERMS = {
+    "degree", "education", "bachelor", "mba",
+    "software", "tools", "jobber", "power automate",
+    "certification", "certifications", "certificate", "certificates",
+    "skills", "technical skills",
+}
 RERANK_ENABLED     = True
 
 
@@ -110,22 +117,31 @@ class Retriever:
         """Detect query type: 'cv', 'eco', or 'general'."""
         q = query.lower()
 
-        # ECO domain phrases take precedence (eval expects ECO sources)
-        if "environmental services" in q:
+        # Pre-ECO modifiers: queries about work/history BEFORE ECO override ECO entity
+        pre_eco_signals = ["before eco", "before joining", "work history", "prior to", "previously"]
+        if any(x in q for x in pre_eco_signals):
+            return "cv"
+
+        # Profile identity queries: broad summary requests that should surface Bio
+        profile_signals = ["full profile", "professional profile", "overview"]
+        if any(x in q for x in profile_signals):
+            return "profile"
+
+        # ECO entity detection — runs after pre-ECO and profile checks
+        if "eco" in q or "إيكو" in query or "company" in q or "environmental services" in q:
             return "eco"
 
-        # Strong CV-specific signals only (avoid ambiguous words like 'experience')
+        # CV-specific signals — only reached if no ECO entity detected above
         cv_triggers = [
             "work history", "before eco", "before joining", "previous",
             "prior", "resume", "education", "cv", "deliveroo",
             "skills", "certificates", "certificate", "who is robin",
+            "degree", "bachelor", "tools", "software", "certifications",
+            "certification", "qualifications",
         ]
         cv_triggers_ar = ["سيرة", "تعليم", "خبرة", "مهارات", "شهادات"]
         if any(x in q for x in cv_triggers) or any(x in query for x in cv_triggers_ar):
             return "cv"
-
-        if "eco" in q or "إيكو" in query or "company" in q:
-            return "eco"
 
         return "general"
 
@@ -151,27 +167,37 @@ class Retriever:
 
         # Apply clean intent-based sorting for CV and ECO queries
         if query_type == 'cv':
-            # Prioritize CV documents, especially Deliveroo CV
-            doc_scores = sorted(
-                doc_scores,
-                key=lambda x: (
-                    1 if 'deliveroo' in x[1].lower() else 0,
-                    1 if 'cv' in x[1].lower() or 'roben' in x[1].lower() else 0,
-                    x[0]  # original score
-                ),
-                reverse=True
-            )
+            def _cv_doc_priority(source: str) -> int:
+                s = source.lower()
+                if "deliveroo" in s:
+                    return 0
+                if "cv" in s:
+                    return 1
+                return 2
+
+            doc_scores = sorted(doc_scores, key=lambda x: (_cv_doc_priority(x[1]), -x[0]))
+
         elif query_type == 'eco':
-            # Prioritize ECO_Company_Profile.pdf first, then other ECO documents
-            doc_scores = sorted(
-                doc_scores,
-                key=lambda x: (
-                    1 if 'eco_company_profile.pdf' in x[1].lower() else 0,
-                    1 if ('eco' in x[1].lower() or 'ecotech' in x[1].lower() or 'eco technology environmental protection services' in x[1].lower()) else 0,
-                    x[0]  # original score
-                ),
-                reverse=True
-            )
+            def _eco_doc_priority(source: str) -> int:
+                s = source.lower()
+                if "eco_company_profile.pdf" in s:
+                    return 0
+                if "eco" in s or "ecotech" in s:
+                    return 1
+                return 2
+
+            doc_scores = sorted(doc_scores, key=lambda x: (_eco_doc_priority(x[1]), -x[0]))
+
+        elif query_type == 'profile':
+            def _profile_doc_priority(source: str) -> int:
+                s = source.lower()
+                if "bio" in s:
+                    return 0
+                if "cv" in s or "deliveroo" in s:
+                    return 1
+                return 2
+
+            doc_scores = sorted(doc_scores, key=lambda x: (_profile_doc_priority(x[1]), -x[0]))
 
         # Select chunks from top documents (top 3 documents)
         selected_chunks = []
@@ -190,7 +216,7 @@ class Retriever:
 
         return selected_chunks
 
-    def _diversify(self, retrieved: List[RetrievedChunk]) -> List[RetrievedChunk]:
+    def _diversify(self, retrieved: List[RetrievedChunk], max_per_source: int = MAX_PER_SOURCE) -> List[RetrievedChunk]:
         """Diversify chunks - cap at 2 chunks per source."""
         counts = {}
         diversified = []
@@ -199,20 +225,27 @@ class Retriever:
             source = rc.chunk.source
             count = counts.get(source, 0)
 
-            if count < 2:  # Cap at 2 chunks per source
+            if count < max_per_source:
                 diversified.append(rc)
                 counts[source] = count + 1
 
-        logger.info("Diversify: %d/%d after capping at 2 per source", len(diversified), len(retrieved))
+        logger.info("Diversify: %d/%d after capping at %d per source", len(diversified), len(retrieved), max_per_source)
         return diversified
+
+    def _has_cv_detail_signal(self, query: str) -> bool:
+        """Return True if the query asks for CV-specific detail (degree, tools, certs)."""
+        q = query.lower()
+        return any(term in q for term in _CV_DETAIL_TERMS)
 
     def _rrf_fuse(
         self,
         dense: List[RetrievedChunk],
         sparse: List[tuple],
         k: int = 60,
+        dense_weight: float = 0.70,
+        sparse_weight: float = 0.30,
     ) -> List[RetrievedChunk]:
-        """Reciprocal Rank Fusion of dense (FAISS) and sparse (BM25) rankings.
+        """Weighted Reciprocal Rank Fusion of dense (FAISS) and sparse (BM25) rankings.
 
         Preserves original FAISS scores so the downstream score-threshold
         filter and reranker operate on meaningful cosine similarities.
@@ -224,20 +257,20 @@ class Retriever:
 
         for rank, rc in enumerate(dense, 1):
             cid = rc.chunk.chunk_id
-            rrf[cid] = rrf.get(cid, 0.0) + 1.0 / (k + rank)
+            rrf[cid] = rrf.get(cid, 0.0) + dense_weight / (k + rank)
             rc_map[cid] = rc
 
         for rank, (chunk, _) in enumerate(sparse, 1):
             cid = chunk.chunk_id
-            rrf[cid] = rrf.get(cid, 0.0) + 1.0 / (k + rank)
+            rrf[cid] = rrf.get(cid, 0.0) + sparse_weight / (k + rank)
             if cid not in rc_map:
                 rc_map[cid] = RetrievedChunk(chunk=chunk, score=SCORE_THRESHOLD + 0.01)
 
         ordered = sorted(rrf, key=lambda c: rrf[c], reverse=True)
         fused = [rc_map[cid] for cid in ordered]
         logger.info(
-            "RRF fusion: %d dense + %d sparse → %d unique chunks",
-            len(dense), len(sparse), len(fused),
+            "RRF fusion: %d dense + %d sparse → %d unique (dense_w=%.2f sparse_w=%.2f)",
+            len(dense), len(sparse), len(fused), dense_weight, sparse_weight,
         )
         return fused
 
@@ -278,6 +311,12 @@ class Retriever:
 
         # Get dynamic TOP_K based on query length (reduce retrieval cost)
         retrieval_pool = self._get_top_k(query)
+
+        # cv_signal: True only when query_type is 'cv' AND query contains detail terms.
+        # Using query_type as the gate ensures ECO queries with shared terms (certifications)
+        # and pre-ECO queries both route correctly without independent signal conflicts.
+        _early_query_type = self._detect_query_type(query)
+        cv_signal = (_early_query_type == "cv") and self._has_cv_detail_signal(query)
 
         queries = self._expand_query(query)
 
@@ -334,7 +373,24 @@ class Retriever:
         sparse_retrieved = self._bm25.search(query, retrieval_pool)
         logger.info("BM25 sparse: %d candidates", len(sparse_retrieved))
 
-        retrieved = self._rrf_fuse(dense_retrieved, sparse_retrieved)
+        if cv_signal:
+            # Hard filter: only CV-family sources allowed in both pools.
+            # Bio and ECO both dominate semantically but are not authoritative for CV-detail queries.
+            def _is_cv_source(src: str) -> bool:
+                s = src.lower()
+                return "cv" in s or "deliveroo" in s
+
+            dense_before = len(dense_retrieved)
+            sparse_before = len(sparse_retrieved)
+            dense_retrieved = [rc for rc in dense_retrieved if _is_cv_source(rc.chunk.source)]
+            sparse_retrieved = [(c, s) for c, s in sparse_retrieved if _is_cv_source(c.source)]
+            logger.info(
+                "CV-detail signal: CV-only filter — dense %d→%d, sparse %d→%d",
+                dense_before, len(dense_retrieved), sparse_before, len(sparse_retrieved),
+            )
+
+        dense_w, sparse_w = (0.55, 0.45) if cv_signal else (0.70, 0.30)
+        retrieved = self._rrf_fuse(dense_retrieved, sparse_retrieved, dense_weight=dense_w, sparse_weight=sparse_w)
 
         # Diagnostic: Show all unique sources in retrieval pool
         unique_sources = set(rc.chunk.source for rc in retrieved)
@@ -364,7 +420,8 @@ class Retriever:
         logger.info(f"Query type detected: {query_type}")
 
         retrieved = self._group_by_document(retrieved, query_type)  # Group by document with type-specific boosting
-        retrieved = self._diversify(retrieved)
+        source_cap = 1 if cv_signal else MAX_PER_SOURCE
+        retrieved = self._diversify(retrieved, max_per_source=source_cap)
 
         final = retrieved[:FINAL_TOP_K]
 
