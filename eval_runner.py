@@ -181,7 +181,7 @@ def compute_metrics(results: list[TestResult]) -> dict:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def main() -> int:
+def main(query_fn=None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT_PATH,
                         help="Path to save JSON report")
@@ -207,15 +207,21 @@ def main() -> int:
         print("ERROR: eval_queries.json is empty.", file=sys.stderr)
         return 2
 
-    pipeline = RagPipeline()
-    results: list[TestResult] = []
-
-    try:
+    # Use provided query function or default to RagPipeline
+    pipeline = None
+    if query_fn is None:
+        pipeline = RagPipeline()
         print("Building index...")
         t0 = time.perf_counter()
         pipeline.build_index()
         print(f"Index ready in {time.perf_counter() - t0:.1f}s\n")
+        query_fn = pipeline.query
+    else:
+        print("Using provided query function\n")
 
+    results: list[TestResult] = []
+
+    try:
         for i, test in enumerate(tests, 1):
             question = test.get("question", "").strip()
             print(f"[{i}/{len(tests)}] {question or '(no question)'}")
@@ -240,9 +246,9 @@ def main() -> int:
 
             try:
                 t1 = time.perf_counter()
-                result  = pipeline.query(question)
+                result = query_fn(question)
                 tr.elapsed = time.perf_counter() - t1
-                tr.answer  = result.answer or ""
+                tr.answer = result.answer or ""
                 tr.sources = [s["source"] for s in result.sources]
 
                 tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed)
@@ -256,12 +262,12 @@ def main() -> int:
                 else:
                     print(f"  ✗ FAIL — {'; '.join(tr.reasons)}")
 
-            except Exception as e:
-                tr.error   = str(e)
+            except Exception as exc:
+                tr.error = str(exc)
                 tr.buckets = ["error"]
-                print(f"  ✗ ERROR — {e}")
-
-            results.append(tr)
+                print(f"  ✗ ERROR — {exc}")
+            finally:
+                results.append(tr)
 
         # ── Metrics ───────────────────────────────────────────────────────────
         metrics = compute_metrics(results)
@@ -294,7 +300,8 @@ def main() -> int:
         return 0 if (metrics["failed"] == 0 and metrics["errors"] == 0) else 1
 
     finally:
-        pipeline.close()
+        if pipeline is not None:
+            pipeline.close()
 
 
 if __name__ == "__main__":

@@ -123,6 +123,9 @@ class LightweightReranker:
             + self.phrase_weight * phrase_score
         )
 
+        # Apply 1.5x multiplier to reduce reranking aggression
+        final_score *= 1.5
+
         return RerankBreakdown(
             semantic=semantic_score,
             lexical=lexical_score,

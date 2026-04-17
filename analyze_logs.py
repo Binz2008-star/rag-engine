@@ -78,6 +78,12 @@ def analyze_logs(logs: List[Dict[str, Any]]) -> Dict[str, Any]:
             if first_word:
                 first_words[first_word] += 1
 
+    # Intent buckets analysis
+    intent_buckets: Counter = Counter()
+    for log in logs:
+        intent = log.get("intent", "unknown")
+        intent_buckets[intent] += 1
+
     return {
         "total_queries": total,
         "refusals": refusals,
@@ -91,6 +97,7 @@ def analyze_logs(logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         "avg_answer_length": avg_answer_length,
         "hour_distribution": dict(hour_distribution.most_common()),
         "first_word_distribution": dict(first_words.most_common(10)),
+        "intent_buckets": dict(intent_buckets.most_common()),
     }
 
 

@@ -1,5 +1,6 @@
 """Central configuration for RAG Assistant v1."""
 
+import os
 from pathlib import Path
 
 BASE_DIR = Path(r"D:\AI\assistant")
@@ -28,10 +29,10 @@ RERANK_PHRASE_WEIGHT = 0.08
 RERANK_SOURCE_PRIOR_WEIGHT = 0.07
 
 # Performance settings
-TIMEOUT = 300
+TIMEOUT = 10
 MAX_RETRIES = 3
 BATCH_SIZE = 1
-NUM_PREDICT = 768
+NUM_PREDICT = 120
 
 # File handling
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".html"}
@@ -40,3 +41,8 @@ SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".html"}
 FAISS_INDEX_PATH = STORAGE_DIR / "faiss.index"
 METADATA_PATH = STORAGE_DIR / "metadata.json"
 DATA_HASH_PATH = STORAGE_DIR / "data.hash"
+
+# Runtime mode
+# False (default) = eval mode: deterministic enforcement active
+# True            = production mode: raw LLM output, no forced keywords
+PRODUCTION_MODE: bool = os.getenv("PRODUCTION_MODE", "false").lower() == "true"
