@@ -7,12 +7,12 @@ import time
 from dataclasses import dataclass
 from typing import List
 
+from app.bm25_index import BM25Index
 from app.chunking import Chunk
 from app.embeddings import EmbeddingClient
 from app.models import RetrievedChunk
 from app.query_normalizer import normalize_query
 from app.reranker import LightweightReranker
-# Legacy SourcePolicy import removed - no longer needed without boost logic
 from app.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class Retriever:
     def __init__(self, embedding_client: EmbeddingClient) -> None:
         self.embedding_client = embedding_client
         self.reranker = LightweightReranker()
-        # Legacy SourcePolicy removed - no longer needed
+        self._bm25: BM25Index | None = None
 
     def _contains_arabic(self, text: str) -> bool:
         return any('\u0600' <= c <= '\u06FF' for c in text)
@@ -206,6 +206,41 @@ class Retriever:
         logger.info("Diversify: %d/%d after capping at 2 per source", len(diversified), len(retrieved))
         return diversified
 
+    def _rrf_fuse(
+        self,
+        dense: List[RetrievedChunk],
+        sparse: List[tuple],
+        k: int = 60,
+    ) -> List[RetrievedChunk]:
+        """Reciprocal Rank Fusion of dense (FAISS) and sparse (BM25) rankings.
+
+        Preserves original FAISS scores so the downstream score-threshold
+        filter and reranker operate on meaningful cosine similarities.
+        BM25-only chunks receive a provisional score just above SCORE_THRESHOLD
+        so they reach the reranker for adjudication.
+        """
+        rrf: dict[str, float] = {}
+        rc_map: dict[str, RetrievedChunk] = {}
+
+        for rank, rc in enumerate(dense, 1):
+            cid = rc.chunk.chunk_id
+            rrf[cid] = rrf.get(cid, 0.0) + 1.0 / (k + rank)
+            rc_map[cid] = rc
+
+        for rank, (chunk, _) in enumerate(sparse, 1):
+            cid = chunk.chunk_id
+            rrf[cid] = rrf.get(cid, 0.0) + 1.0 / (k + rank)
+            if cid not in rc_map:
+                rc_map[cid] = RetrievedChunk(chunk=chunk, score=SCORE_THRESHOLD + 0.01)
+
+        ordered = sorted(rrf, key=lambda c: rrf[c], reverse=True)
+        fused = [rc_map[cid] for cid in ordered]
+        logger.info(
+            "RRF fusion: %d dense + %d sparse → %d unique chunks",
+            len(dense), len(sparse), len(fused),
+        )
+        return fused
+
     def _expand_query(self, query: str) -> List[str]:
         """Generate deterministic English query variants for multi-query retrieval."""
         q = query.strip()
@@ -290,7 +325,16 @@ class Retriever:
             if existing is None or rc.score > existing.score:
                 best_by_chunk[cid] = rc
 
-        retrieved = list(best_by_chunk.values())
+        dense_retrieved = sorted(best_by_chunk.values(), key=lambda rc: rc.score, reverse=True)
+
+        # Hybrid: BM25 sparse search + RRF fusion with dense results
+        if self._bm25 is None or len(self._bm25.chunks) != len(vector_store.chunks):
+            self._bm25 = BM25Index()
+            self._bm25.build(vector_store.chunks)
+        sparse_retrieved = self._bm25.search(query, retrieval_pool)
+        logger.info("BM25 sparse: %d candidates", len(sparse_retrieved))
+
+        retrieved = self._rrf_fuse(dense_retrieved, sparse_retrieved)
 
         # Diagnostic: Show all unique sources in retrieval pool
         unique_sources = set(rc.chunk.source for rc in retrieved)
