@@ -46,9 +46,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
       - name: Run evaluation
         run: python eval_runner.py --report reports/ci_eval.json
 
