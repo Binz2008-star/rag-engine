@@ -206,6 +206,29 @@ class Retriever:
         logger.info("Diversify: %d/%d after capping at 2 per source", len(diversified), len(retrieved))
         return diversified
 
+    def _expand_query(self, query: str) -> List[str]:
+        """Generate deterministic English query variants for multi-query retrieval."""
+        q = query.strip()
+        ql = q.lower()
+        variants = [q]
+
+        if "who is" in ql:
+            variants.append(ql.replace("who is", "describe", 1))
+            variants.append(ql.replace("who is", "background of", 1))
+        elif "what is" in ql:
+            variants.append(ql.replace("what is", "describe", 1))
+            variants.append(ql.replace("what is", "information about", 1))
+        elif "what are" in ql:
+            variants.append(ql.replace("what are", "list of", 1))
+
+        seen: set = set()
+        unique: List[str] = []
+        for v in variants:
+            if v not in seen:
+                seen.add(v)
+                unique.append(v)
+        return unique
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     def retrieve(self, query: str, vector_store: VectorStore) -> List[RetrievedChunk]:
@@ -221,7 +244,7 @@ class Retriever:
         # Get dynamic TOP_K based on query length (reduce retrieval cost)
         retrieval_pool = self._get_top_k(query)
 
-        queries = [query]
+        queries = self._expand_query(query)
 
         if is_ar:
             query, _ = normalize_query(query)
@@ -280,7 +303,7 @@ class Retriever:
 
         # Pipeline: rerank → adjustments → score filter → diversify → top-k
         if RERANK_ENABLED:
-            retrieved = retrieved[:20]
+            retrieved = sorted(retrieved, key=lambda rc: rc.score, reverse=True)[:20]
             retrieved = self.reranker.rerank(query, retrieved)
             retrieved = self._apply_scoring_adjustments(query, retrieved, phase="bias")
             retrieved = self._apply_scoring_adjustments(query, retrieved, phase="rescue")
