@@ -9,6 +9,7 @@ from typing import List
 
 from app.bm25_index import BM25Index
 from app.chunking import Chunk
+from app.decision_logger import DecisionLogger
 from app.embeddings import EmbeddingClient
 from app.models import RetrievedChunk
 from app.query_normalizer import normalize_query
@@ -60,6 +61,7 @@ class Retriever:
         self.embedding_client = embedding_client
         self.reranker = LightweightReranker()
         self._bm25: BM25Index | None = None
+        self.decision_logger = DecisionLogger()
 
     def _contains_arabic(self, text: str) -> bool:
         return any('\u0600' <= c <= '\u06FF' for c in text)
@@ -120,15 +122,18 @@ class Retriever:
         # Pre-ECO modifiers: queries about work/history BEFORE ECO override ECO entity
         pre_eco_signals = ["before eco", "before joining", "work history", "prior to", "previously"]
         if any(x in q for x in pre_eco_signals):
+            self.decision_logger.log_intent(query, "cv")
             return "cv"
 
         # Profile identity queries: broad summary requests that should surface Bio
         profile_signals = ["full profile", "professional profile", "overview"]
         if any(x in q for x in profile_signals):
+            self.decision_logger.log_intent(query, "profile")
             return "profile"
 
         # ECO entity detection — runs after pre-ECO and profile checks
         if "eco" in q or "إيكو" in query or "company" in q or "environmental services" in q:
+            self.decision_logger.log_intent(query, "eco")
             return "eco"
 
         # CV-specific signals — only reached if no ECO entity detected above
@@ -141,8 +146,10 @@ class Retriever:
         ]
         cv_triggers_ar = ["سيرة", "تعليم", "خبرة", "مهارات", "شهادات"]
         if any(x in q for x in cv_triggers) or any(x in query for x in cv_triggers_ar):
+            self.decision_logger.log_intent(query, "cv")
             return "cv"
 
+        self.decision_logger.log_intent(query, "general")
         return "general"
 
     def _group_by_document(self, retrieved: List[RetrievedChunk], query_type: str = 'general') -> List[RetrievedChunk]:
@@ -213,6 +220,10 @@ class Retriever:
         # Log top documents
         for i, (score, source, _) in enumerate(doc_scores[:3], 1):
             logger.info("  Doc[%d]: %s (score=%.4f)", i, source, score)
+
+        # Log grouped order
+        grouped_order = [source for _, source, _ in doc_scores[:3]]
+        self.decision_logger.log_grouped_order(grouped_order)
 
         return selected_chunks
 
@@ -392,6 +403,13 @@ class Retriever:
         dense_w, sparse_w = (0.55, 0.45) if cv_signal else (0.70, 0.30)
         retrieved = self._rrf_fuse(dense_retrieved, sparse_retrieved, dense_weight=dense_w, sparse_weight=sparse_w)
 
+        # Log retrieved chunks BEFORE grouping
+        retrieved_log = [
+            {"chunk_id": rc.chunk.chunk_id, "source": rc.chunk.source, "score": rc.score}
+            for rc in retrieved
+        ]
+        self.decision_logger.log_retrieved(retrieved_log)
+
         # Diagnostic: Show all unique sources in retrieval pool
         unique_sources = set(rc.chunk.source for rc in retrieved)
         logger.info("Retrieval pool contains %d unique sources: %s",
@@ -424,6 +442,13 @@ class Retriever:
         retrieved = self._diversify(retrieved, max_per_source=source_cap)
 
         final = retrieved[:FINAL_TOP_K]
+
+        # Log final selected chunks
+        final_chunks_log = [
+            {"chunk_id": rc.chunk.chunk_id, "source": rc.chunk.source, "score": rc.score}
+            for rc in final
+        ]
+        self.decision_logger.log_final_chunks(final_chunks_log)
 
         # Aggressive context trimming for Arabic-only queries (test 38)
         if "answer in arabic only" in query.lower():
