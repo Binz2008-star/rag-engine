@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import joblib
 import logging
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List
 
 from app.bm25_index import BM25Index
@@ -63,8 +65,54 @@ class Retriever:
         self._bm25: BM25Index | None = None
         self.decision_logger = DecisionLogger()
 
+        # Load intent classifier
+        self._load_intent_classifier()
+
     def _contains_arabic(self, text: str) -> bool:
         return any('\u0600' <= c <= '\u06FF' for c in text)
+
+    def _load_intent_classifier(self) -> None:
+        """Load intent classifier model if available."""
+        model_path = Path(__file__).parent.parent / "models" / "intent_model.joblib"
+        if model_path.exists():
+            try:
+                model_data = joblib.load(model_path)
+                self.intent_model = model_data['model']
+                self.intent_vectorizer = model_data['vectorizer']
+                self.intent_label_encoder = model_data['label_encoder']
+                logger.info("Intent classifier loaded successfully")
+            except Exception as e:
+                logger.warning(f"Failed to load intent classifier: {e}")
+                self.intent_model = None
+        else:
+            logger.info("Intent classifier not found, using rules only")
+            self.intent_model = None
+
+    def _predict_intent(self, query: str) -> tuple[str, float]:
+        """Predict intent using ML model if available.
+
+        Returns:
+            Tuple of (intent, confidence)
+        """
+        if self.intent_model is None:
+            return None, 0.0
+
+        try:
+            # Vectorize query
+            query_vec = self.intent_vectorizer.transform([query])
+
+            # Predict
+            pred_idx = self.intent_model.predict(query_vec)[0]
+            proba = self.intent_model.predict_proba(query_vec)[0]
+
+            # Get confidence and intent
+            confidence = proba.max()
+            intent = self.intent_label_encoder.inverse_transform([pred_idx])[0]
+
+            return intent, confidence
+        except Exception as e:
+            logger.warning(f"Intent prediction failed: {e}")
+            return None, 0.0
 
     def _source_family(self, source: str) -> str:
         # Legacy source classification removed - no longer needed without hardcoded logic
@@ -117,6 +165,16 @@ class Retriever:
 
     def _detect_query_type(self, query: str) -> str:
         """Detect query type: 'cv', 'eco', or 'general'."""
+        # Try ML model first with confidence threshold
+        ml_intent, ml_confidence = self._predict_intent(query)
+
+        if ml_intent and ml_confidence > 0.6:
+            self.decision_logger.log_intent(query, ml_intent, method="v2_model")
+            return ml_intent
+        elif ml_intent:
+            # Low confidence - log and fall back to rules
+            logger.debug(f"ML intent low confidence: {ml_intent} ({ml_confidence:.3f}) → using rules")
+
         q = query.lower()
 
         # Pre-ECO modifiers: queries about work/history BEFORE ECO override ECO entity
