@@ -31,8 +31,12 @@ class IntentRouter:
             return cls(model=None)
 
         meta = json.loads(ACTIVE_MODEL_PATH.read_text(encoding="utf-8"))
+        model_path = Path(meta["path"])
+        # Resolve relative to MODEL_DIR, not current working directory
+        if not model_path.is_absolute():
+            model_path = MODEL_DIR / model_path
         return cls.from_path(
-            Path(meta["path"]),
+            model_path,
             threshold=meta.get("threshold", ROUTER_CONFIDENCE_THRESHOLD),
         )
 
