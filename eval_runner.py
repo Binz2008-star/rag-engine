@@ -15,7 +15,14 @@ import time
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 
-from app.rag_pipeline import RagPipeline
+from app.pipeline import Pipeline
+from app.inference_service import InferenceService
+from router.intent_router import IntentRouter
+from retrieval.embeddings import Embedder
+from retrieval.faiss_index import FaissIndex
+from retrieval.multi_retriever import MultiRetriever
+from retrieval.reranker import Reranker
+from generation.llm import LLMClient
 
 EVAL_QUERIES_PATH = Path(__file__).parent / "tests" / "eval_queries.json"
 DEFAULT_REPORT_PATH = Path(__file__).parent / "reports" / f"eval_{int(time.time())}.json"
@@ -304,15 +311,56 @@ def main(query_fn=None) -> int:
         print("ERROR: eval_queries.json is empty.", file=sys.stderr)
         return 2
 
-    # Use provided query function or default to RagPipeline
-    pipeline = None
+    # Use provided query function or default to new Pipeline architecture
+    service = None
     if query_fn is None:
-        pipeline = RagPipeline()
-        print("Building index...")
-        t0 = time.perf_counter()
-        pipeline.build_index()
-        print(f"Index ready in {time.perf_counter() - t0:.1f}s\n")
-        query_fn = pipeline.query
+        print("Initializing components...")
+        router = IntentRouter.from_active_model()
+        embedder = Embedder()
+
+        # Load indexes
+        indexes: dict[str, FaissIndex] = {}
+        for name in ("cv", "eco", "general"):
+            try:
+                indexes[name] = FaissIndex.load(name, out_dir=Path("models"))
+            except FileNotFoundError:
+                continue
+
+        if not indexes:
+            print("ERROR: No FAISS indexes found. Run scripts/build_indexes.py first.")
+            return 2
+
+        retriever = MultiRetriever(indexes=indexes)
+        reranker = Reranker(embed_fn=embedder.embed_batch)
+        llm = LLMClient()
+        pipeline = Pipeline(router=router, embedder=embedder, retriever=retriever, llm=llm, reranker=reranker)
+        service = InferenceService(pipeline=pipeline)
+        print(f"Ready with {len(indexes)} indexes\n")
+
+        def query_fn(question: str):
+            result = service.handle_query(question, query_id=f"eval_{int(time.time()*1000)}")
+            # Convert to expected format
+            @dataclass
+            class QueryResult:
+                answer: str
+                sources: list[dict]
+                request_id: str
+                intent: str
+                intent_confidence: float
+                intent_method: str
+
+            sources = [{"source": h.source} for h in result.retrieval]
+            # Determine intent method based on confidence
+            intent_method = "rules" if result.confidence >= 0.85 else "v2_model"
+
+            return QueryResult(
+                answer=result.answer,
+                sources=sources,
+                request_id=result.query_id,
+                intent=result.intent,
+                intent_confidence=result.confidence,
+                intent_method=intent_method
+            )
     else:
         print("Using provided query function\n")
 
