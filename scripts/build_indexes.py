@@ -51,16 +51,25 @@ def classify_doc(path: Path) -> str:
     return "general"
 
 
-def load_text(path: Path) -> str:
+def load_text(path: Path, ocr_tracking: dict) -> str:
     try:
         suffix = path.suffix.lower()
         if suffix in {".txt", ".md", ".py"}:
             return path.read_text(encoding="utf-8", errors="ignore")
         if suffix == ".pdf":
-            import fitz
+            from scripts.ocr_helper import extract_text_with_ocr_fallback
 
-            document = fitz.open(str(path))
-            return "\n".join(page.get_text() for page in document)
+            text, used_ocr, ocr_failed = extract_text_with_ocr_fallback(path)
+            if used_ocr:
+                ocr_tracking["ocr_used_files"].append(path.name)
+                print(f"OCR fallback used: {path.name}")
+            if ocr_failed:
+                ocr_tracking["ocr_failed_files"].append(path.name)
+                print(f"OCR failed: {path.name}")
+            if len(text.strip()) < 200:
+                ocr_tracking["low_text_files"].append(path.name)
+                print(f"LOW TEXT WARNING: {path.name} ({len(text.strip())} chars)")
+            return text
         if suffix == ".docx":
             from docx import Document
 
@@ -72,16 +81,21 @@ def load_text(path: Path) -> str:
         return ""
 
 
-def build_grouped_chunks(debug: bool) -> tuple[dict[str, list[Chunk]], dict[str, list[str]]]:
+def build_grouped_chunks(debug: bool) -> tuple[dict[str, list[Chunk]], dict[str, list[str]], dict]:
     grouped: dict[str, list[Chunk]] = {"cv": [], "eco": [], "general": []}
     loaded_docs: dict[str, list[str]] = {"cv": [], "eco": [], "general": []}
+    ocr_tracking = {
+        "ocr_used_files": [],
+        "ocr_failed_files": [],
+        "low_text_files": [],
+    }
 
     for path in sorted(DATA_DIR.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in {".txt", ".md", ".pdf", ".docx", ".py"}:
             continue
         doc_type = classify_doc(path)
         try:
-            text = load_text(path)
+            text = load_text(path, ocr_tracking)
         except Exception as exc:
             if debug:
                 print(f"skipped unreadable doc={path.name} error={exc}")
@@ -99,7 +113,11 @@ def build_grouped_chunks(debug: bool) -> tuple[dict[str, list[Chunk]], dict[str,
                 f"chunks={len(doc_chunks)} chars={len(text)}"
             )
 
-    return grouped, loaded_docs
+    print(f"OCR used for {len(ocr_tracking['ocr_used_files'])} files: {ocr_tracking['ocr_used_files']}")
+    print(f"OCR failed for {len(ocr_tracking['ocr_failed_files'])} files: {ocr_tracking['ocr_failed_files']}")
+    print(f"Low-text warnings for {len(ocr_tracking['low_text_files'])} files: {ocr_tracking['low_text_files']}")
+
+    return grouped, loaded_docs, ocr_tracking
 
 
 def validate_expected_docs(loaded_docs: dict[str, list[str]]) -> list[str]:
@@ -122,7 +140,7 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
-    grouped, loaded_docs = build_grouped_chunks(debug=args.debug)
+    grouped, loaded_docs, ocr_tracking = build_grouped_chunks(debug=args.debug)
     missing = validate_expected_docs(loaded_docs)
 
     for intent, chunks in grouped.items():

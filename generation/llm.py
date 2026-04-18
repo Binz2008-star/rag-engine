@@ -40,10 +40,13 @@ class LLMClient:
             return "Insufficient data."
 
         prompt = (
-            "Answer only from the context below. "
-            "If the answer is not supported by context, reply exactly: Insufficient data. "
-            "If the question is in Arabic, still answer in English.\n\n"
-            f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
+            "Answer only from the retrieved text. "
+            "Do not infer, speculate, expand acronyms, or add explanations. "
+            "If the answer is not explicitly stated in the retrieved text, reply exactly: Insufficient data. "
+            "Keep the answer short and extractive.\n\n"
+            f"Context:\n{context}\n\n"
+            f"Question: {query}\n\n"
+            "Answer:"
         )
 
         last_exc: Exception | None = None

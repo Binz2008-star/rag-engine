@@ -78,10 +78,19 @@ class Pipeline:
             )
 
         answer = self.llm.generate(normalized_query, hits)
-        grounded = check_grounding(answer, hits, self.embedder.embed_batch)
-        failure_type = None if grounded else "hallucination"
-        if answer == "Insufficient data." and failure_type is None:
+        normalized_answer = answer.strip().lower()
+
+        if normalized_answer.startswith(("based on the context", "it appears", "it can be inferred")):
+            answer = "Insufficient data."
+            grounded = True
             failure_type = "retrieval_miss"
+        elif normalized_answer.startswith("insufficient data"):
+            answer = "Insufficient data."
+            grounded = True
+            failure_type = "retrieval_miss"
+        else:
+            grounded = check_grounding(answer, hits, self.embedder.embed_batch)
+            failure_type = None if grounded else "hallucination"
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         return PipelineResult(

@@ -8,7 +8,7 @@ class Reranker:
     def __init__(self, embed_fn):
         self.embed_fn = embed_fn
 
-    def rerank(self, query: str, hits: list[RetrievalHit], top_k: int) -> list[RetrievalHit]:
+    def rerank(self, hits: list[RetrievalHit], query: str, top_k: int) -> list[RetrievalHit]:
         if not hits or len(hits) <= 1:
             return hits[:top_k]
 
