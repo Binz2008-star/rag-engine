@@ -55,8 +55,7 @@ jobs:
       - name: Start Ollama service
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
-          ollama serve &
-          sleep 30
+          sleep 10
           ollama pull qwen3:8b
           ollama pull nomic-embed-text
 
