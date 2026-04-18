@@ -116,3 +116,7 @@ class Pipeline:
             model_version=self.model_version,
             retriever_version=self.retriever_version,
         )
+
+    def close(self) -> None:
+        """No-op close method for CI compatibility."""
+        return None

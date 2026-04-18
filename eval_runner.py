@@ -368,7 +368,8 @@ def main(query_fn=None) -> int:
 
     try:
         for i, test in enumerate(tests, 1):
-            question = test.get("question", "").strip()
+            question = test.get("question") or test.get("query", "")
+            question = str(question).strip()
             print(f"[{i}/{len(tests)}] {question or '(no question)'}")
 
             tr = TestResult(
@@ -383,10 +384,10 @@ def main(query_fn=None) -> int:
             )
 
             if not question:
-                tr.error = "missing 'question' field"
+                tr.error = "missing 'question' or 'query' field"
                 tr.buckets = ["error"]
                 results.append(tr)
-                print("  ✗ SKIP — missing 'question' field")
+                print("  ✗ SKIP — missing 'question' or 'query' field")
                 continue
 
             try:
