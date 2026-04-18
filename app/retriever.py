@@ -408,7 +408,7 @@ class Retriever:
             {"chunk_id": rc.chunk.chunk_id, "source": rc.chunk.source, "score": rc.score}
             for rc in retrieved
         ]
-        self.decision_logger.log_retrieved(retrieved_log)
+        self.decision_logger.log_retrieved(query, retrieved_log)
 
         # Diagnostic: Show all unique sources in retrieval pool
         unique_sources = set(rc.chunk.source for rc in retrieved)
@@ -448,7 +448,7 @@ class Retriever:
             {"chunk_id": rc.chunk.chunk_id, "source": rc.chunk.source, "score": rc.score}
             for rc in final
         ]
-        self.decision_logger.log_final_chunks(final_chunks_log)
+        self.decision_logger.log_final_chunks(query, final_chunks_log)
 
         # Aggressive context trimming for Arabic-only queries (test 38)
         if "answer in arabic only" in query.lower():
