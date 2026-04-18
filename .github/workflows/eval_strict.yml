@@ -57,20 +57,20 @@ jobs:
           curl -fsSL https://ollama.com/install.sh | sh
           ollama serve &
           sleep 30
-          ollama pull llama3
+          ollama pull qwen3:8b
           ollama pull nomic-embed-text
 
       - name: Build FAISS indexes
         run: python scripts/build_indexes.py
         env:
           PYTHONPATH: ${{ github.workspace }}
-          CHAT_MODEL: llama3
+          CHAT_MODEL: qwen3:8b
           EMBED_MODEL: nomic-embed-text
 
       - name: Run strict evaluation
         run: python eval_runner.py --mode strict --report reports/ci_eval_strict.json
         env:
-          CHAT_MODEL: llama3
+          CHAT_MODEL: qwen3:8b
           EMBED_MODEL: nomic-embed-text
 
       - name: Upload strict evaluation report
