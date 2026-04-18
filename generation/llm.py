@@ -15,7 +15,7 @@ class LLMClient:
         model: str = CHAT_MODEL,
         timeout: int = TIMEOUT,
     ):
-        self.base_url = base_url
+        self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
         self.session = requests.Session()
@@ -50,7 +50,7 @@ class LLMClient:
         for attempt in range(MAX_RETRIES):
             try:
                 response = self.session.post(
-                    f"{self.base_url}/chat",
+                    f"{self.base_url}/api/chat",
                     json={
                         "model": self.model,
                         "stream": False,

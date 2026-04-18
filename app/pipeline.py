@@ -6,13 +6,13 @@ import time
 from app.config import ACTIVE_MODEL_PATH
 from app.models import PipelineResult
 from app.utils import stable_hash
-from events.emitter import emit_event
-from generation.grounding import check_grounding
 from router.features import normalize_query
+from generation.grounding import check_grounding
+from retrieval.reranker import Reranker
 
 
 class Pipeline:
-    def __init__(self, router, embedder, retriever, llm, reranker=None):
+    def __init__(self, router, embedder, retriever, llm, reranker: Reranker | None = None):
         self.router = router
         self.embedder = embedder
         self.retriever = retriever
@@ -26,38 +26,42 @@ class Pipeline:
             self.model_version = "unknown"
 
         sample_ids: list[str] = []
-        for index in retriever.indexes.values():
-            sample_ids.extend(chunk.chunk_id for chunk in index.chunks[:100])
-        self.retriever_version = (
-            f"{getattr(retriever, 'version', 'unknown')}_{stable_hash(sample_ids)[:8]}"
-        )
+        for idx in retriever.indexes.values():
+            sample_ids.extend(c.chunk_id for c in idx.chunks[:100])
+        self.retriever_version = f"{getattr(retriever, 'version', 'unknown')}_{stable_hash(sample_ids)[:8]}"
 
     def run(self, query: str, query_id: str) -> PipelineResult:
         t0 = time.perf_counter()
         normalized_query = normalize_query(query)
-        terminal_emitted = False
+        route = self.router.route(normalized_query)
+        vec = self.embedder.embed_batch([normalized_query])[0]
 
-        try:
-            route = self.router.route(normalized_query)
-            vec = self.embedder.embed_batch([normalized_query])[0]
-            hits = self.retriever.retrieve(vec, route.intent)
+        hits = self.retriever.retrieve(vec, route.intent, normalized_query)
 
-            if self.reranker and hits:
-                from app.config import TOP_K
-                hits = self.reranker.rerank(normalized_query, hits, TOP_K)
-
-            answer = self.llm.generate(normalized_query, hits)
-            grounded = check_grounding(answer, hits, self.embedder.embed_batch)
-
-            if not hits:
-                failure_type = "retrieval_miss"
-            elif not grounded:
-                failure_type = "hallucination"
-            else:
-                failure_type = None
-
+        if not hits:
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
-            result = PipelineResult(
+            return PipelineResult(
+                query_id=query_id,
+                query=query,
+                normalized_query=normalized_query,
+                intent=route.intent,
+                confidence=route.confidence,
+                intent_method=route.intent_method,
+                retrieval=[],
+                answer="Insufficient data.",
+                grounded=True,
+                failure_type="retrieval_miss",
+                latency_ms=elapsed_ms,
+                model_version=self.model_version,
+                retriever_version=self.retriever_version,
+            )
+
+        if self.reranker:
+            hits = self.reranker.rerank(hits, normalized_query, top_k=len(hits))
+
+        if hits and hits[0].score < 0.20:
+            elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            return PipelineResult(
                 query_id=query_id,
                 query=query,
                 normalized_query=normalized_query,
@@ -65,52 +69,33 @@ class Pipeline:
                 confidence=route.confidence,
                 intent_method=route.intent_method,
                 retrieval=hits,
-                answer=answer,
-                grounded=grounded,
-                failure_type=failure_type,
+                answer="Insufficient data.",
+                grounded=True,
+                failure_type="retrieval_miss",
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
                 retriever_version=self.retriever_version,
             )
 
-            emit_event(
-                {
-                    "event_type": "query_completed",
-                    "query_id": result.query_id,
-                    "query": result.query,
-                    "normalized_query": result.normalized_query,
-                    "intent": result.intent,
-                    "confidence": result.confidence,
-                    "intent_method": result.intent_method,
-                    "answer": result.answer,
-                    "grounded": result.grounded,
-                    "failure_type": result.failure_type,
-                    "latency_ms": result.latency_ms,
-                    "retrieval_count": len(result.retrieval),
-                },
-            )
-            terminal_emitted = True
-            return result
-        except Exception as exc:
-            emit_event(
-                {
-                    "event_type": "query_failed",
-                    "query_id": query_id,
-                    "query": query,
-                    "normalized_query": normalized_query,
-                    "error": str(exc),
-                },
-            )
-            terminal_emitted = True
-            raise
-        finally:
-            if not terminal_emitted:
-                emit_event(
-                    {
-                        "event_type": "query_failed",
-                        "query_id": query_id,
-                        "query": query,
-                        "normalized_query": normalized_query,
-                        "error": "pipeline exited without terminal event",
-                    },
-                )
+        answer = self.llm.generate(normalized_query, hits)
+        grounded = check_grounding(answer, hits, self.embedder.embed_batch)
+        failure_type = None if grounded else "hallucination"
+        if answer == "Insufficient data." and failure_type is None:
+            failure_type = "retrieval_miss"
+
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        return PipelineResult(
+            query_id=query_id,
+            query=query,
+            normalized_query=normalized_query,
+            intent=route.intent,
+            confidence=route.confidence,
+            intent_method=route.intent_method,
+            retrieval=hits,
+            answer=answer,
+            grounded=grounded,
+            failure_type=failure_type,
+            latency_ms=elapsed_ms,
+            model_version=self.model_version,
+            retriever_version=self.retriever_version,
+        )

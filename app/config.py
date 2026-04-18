@@ -15,9 +15,9 @@ EVENT_DB_PATH = LOG_DIR / "events.db"
 INDEX_DIR = MODEL_DIR
 
 # Ollama configuration
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/api")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3.2")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3")
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "4000"))
 TIMEOUT = int(os.getenv("TIMEOUT", "60"))
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))

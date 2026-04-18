@@ -42,13 +42,7 @@ def create_app() -> FastAPI:
     retriever = MultiRetriever(indexes=indexes)
     reranker = Reranker(embed_fn=embedder.embed_batch)
     llm = LLMClient()
-    pipeline = Pipeline(
-        router=router,
-        embedder=embedder,
-        retriever=retriever,
-        llm=llm,
-        reranker=reranker,
-    )
+    pipeline = Pipeline(router=router, embedder=embedder, retriever=retriever, llm=llm, reranker=reranker)
     service = InferenceService(pipeline=pipeline)
 
     @app.get("/health")
@@ -69,10 +63,11 @@ def create_app() -> FastAPI:
             "query_id": result.query_id,
             "intent": result.intent,
             "confidence": result.confidence,
+            "intent_method": result.intent_method,
             "answer": result.answer,
             "grounded": result.grounded,
             "failure_type": result.failure_type,
-            "sources": [hit.source for hit in result.retrieval],
+            "sources": [h.source for h in result.retrieval],
             "latency_ms": result.latency_ms,
         }
 

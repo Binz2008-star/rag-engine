@@ -28,7 +28,7 @@ class Embedder:
         for attempt in range(MAX_RETRIES):
             try:
                 response = self.session.post(
-                    f"{self.base_url}/embed",
+                    f"{self.base_url}/api/embed",
                     json={"model": self.model, "input": texts},
                     timeout=self.timeout,
                 )
