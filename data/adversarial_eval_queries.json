@@ -14,11 +14,9 @@
       "query": "What role is the CV tailored for?",
       "expected_intent": "cv",
       "expected_method": "rule",
-      "expected_refusal": true,
-      "expected_answer_exact": "Insufficient data.",
       "must_be_grounded": true,
-      "expected_failure_type": "retrieval_miss",
-      "todo": "Re-audit after corpus expansion - may flip to grounded answer if CV contains more role information"
+      "must_not_contain": ["appears to be", "can be inferred", "based on context"],
+      "expected_answer_contains": ["Deliveroo"]
     },
     {
       "query": "What is the GDP of Japan?",
