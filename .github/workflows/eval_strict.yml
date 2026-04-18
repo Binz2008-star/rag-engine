@@ -43,6 +43,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
 
+      - name: Build FAISS indexes
+        run: python scripts/build_indexes.py
+
       - name: Run strict evaluation
         run: python eval_runner.py --mode strict --report reports/ci_eval_strict.json
 
