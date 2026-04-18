@@ -152,7 +152,7 @@ class Retriever:
         self.decision_logger.log_intent(query, "general")
         return "general"
 
-    def _group_by_document(self, retrieved: List[RetrievedChunk], query_type: str = 'general') -> List[RetrievedChunk]:
+    def _group_by_document(self, retrieved: List[RetrievedChunk], query_type: str = 'general', query: str = '') -> List[RetrievedChunk]:
         """Group chunks by document and rank documents before selecting chunks."""
         from collections import defaultdict
 
@@ -405,8 +405,12 @@ class Retriever:
 
         # Log retrieved chunks BEFORE grouping
         retrieved_log = [
-            {"chunk_id": rc.chunk.chunk_id, "source": rc.chunk.source, "score": rc.score}
-            for rc in retrieved
+            {
+                "source": rc.chunk.source,
+                "score": float(rc.score),
+                "rank": i
+            }
+            for i, rc in enumerate(retrieved)
         ]
         self.decision_logger.log_retrieved(query, retrieved_log)
 
@@ -437,7 +441,7 @@ class Retriever:
         query_type = self._detect_query_type(query)
         logger.info(f"Query type detected: {query_type}")
 
-        retrieved = self._group_by_document(retrieved, query_type)  # Group by document with type-specific boosting
+        retrieved = self._group_by_document(retrieved, query_type, query)  # Group by document with type-specific boosting
         source_cap = 1 if cv_signal else MAX_PER_SOURCE
         retrieved = self._diversify(retrieved, max_per_source=source_cap)
 
@@ -445,8 +449,12 @@ class Retriever:
 
         # Log final selected chunks
         final_chunks_log = [
-            {"chunk_id": rc.chunk.chunk_id, "source": rc.chunk.source, "score": rc.score}
-            for rc in final
+            {
+                "source": rc.chunk.source,
+                "score": float(rc.score),
+                "rank": i
+            }
+            for i, rc in enumerate(final)
         ]
         self.decision_logger.log_final_chunks(query, final_chunks_log)
 

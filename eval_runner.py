@@ -275,7 +275,11 @@ def main(query_fn=None) -> int:
 
             except Exception as exc:
                 tr.error = str(exc)
-                tr.buckets = ["error"]
+                # Classify embedding failures as infra_failure
+                if "Embedding failure" in str(exc) or "embedding" in str(exc).lower():
+                    tr.buckets = ["infra_failure"]
+                else:
+                    tr.buckets = ["error"]
                 print(f"  ✗ ERROR — {exc}")
             finally:
                 results.append(tr)

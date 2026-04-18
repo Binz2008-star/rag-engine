@@ -46,7 +46,7 @@ class DecisionLogger:
 
         Args:
             query: The user query.
-            retrieved: List of retrieved chunks with chunk_id, source, score.
+            retrieved: List of retrieved chunks with source, score, rank.
         """
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
