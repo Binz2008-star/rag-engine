@@ -1,0 +1,158 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from app.config import BATCH_SIZE, CHUNK_OVERLAP, CHUNK_SIZE, DATA_DIR
+from app.models import Chunk
+from retrieval.embeddings import Embedder
+from retrieval.faiss_index import FaissIndex
+
+EXPECTED_DOC_MATCHERS = {
+    "cv": ("cv", "deliveroo"),
+    "eco": ("eco_company_profile", "eco technology"),
+}
+
+
+def chunk_text(text: str, source: str, path: str, doc_type: str) -> list[Chunk]:
+    text = " ".join(text.split())
+    chunks: list[Chunk] = []
+    start = 0
+    index = 0
+
+    while start < len(text):
+        end = min(len(text), start + CHUNK_SIZE)
+        part = text[start:end].strip()
+        if part:
+            chunks.append(
+                Chunk(
+                    chunk_id=f"{doc_type}_{source}_{index:04d}",
+                    source=source,
+                    text=part,
+                    path=path,
+                    doc_type=doc_type,
+                    offset=start,
+                )
+            )
+            index += 1
+        if end >= len(text):
+            break
+        start = max(start + 1, end - CHUNK_OVERLAP)
+
+    return chunks
+
+
+def classify_doc(path: Path) -> str:
+    name = path.name.lower()
+    if "cv" in name or "resume" in name or "deliveroo" in name:
+        return "cv"
+    if "eco" in name or "company" in name:
+        return "eco"
+    return "general"
+
+
+def load_text(path: Path) -> str:
+    try:
+        suffix = path.suffix.lower()
+        if suffix in {".txt", ".md", ".py"}:
+            return path.read_text(encoding="utf-8", errors="ignore")
+        if suffix == ".pdf":
+            import fitz
+
+            document = fitz.open(str(path))
+            return "\n".join(page.get_text() for page in document)
+        if suffix == ".docx":
+            from docx import Document
+
+            document = Document(str(path))
+            return "\n".join(paragraph.text for paragraph in document.paragraphs)
+        return ""
+    except Exception as e:
+        print(f"Warning: Failed to load {path}: {e}")
+        return ""
+
+
+def build_grouped_chunks(debug: bool) -> tuple[dict[str, list[Chunk]], dict[str, list[str]]]:
+    grouped: dict[str, list[Chunk]] = {"cv": [], "eco": [], "general": []}
+    loaded_docs: dict[str, list[str]] = {"cv": [], "eco": [], "general": []}
+
+    for path in sorted(DATA_DIR.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in {".txt", ".md", ".pdf", ".docx", ".py"}:
+            continue
+        doc_type = classify_doc(path)
+        try:
+            text = load_text(path)
+        except Exception as exc:
+            if debug:
+                print(f"skipped unreadable doc={path.name} error={exc}")
+            continue
+        if not text.strip():
+            continue
+        doc_chunks = chunk_text(text, path.name, str(path), doc_type)
+        if not doc_chunks:
+            continue
+        grouped[doc_type].extend(doc_chunks)
+        loaded_docs[doc_type].append(path.name)
+        if debug:
+            print(
+                f"loaded doc={path.name} doc_type={doc_type} "
+                f"chunks={len(doc_chunks)} chars={len(text)}"
+            )
+
+    return grouped, loaded_docs
+
+
+def validate_expected_docs(loaded_docs: dict[str, list[str]]) -> list[str]:
+    missing: list[str] = []
+    lowered = {
+        intent: [name.lower() for name in names]
+        for intent, names in loaded_docs.items()
+    }
+
+    for intent, matchers in EXPECTED_DOC_MATCHERS.items():
+        docs = lowered.get(intent, [])
+        if not any(any(matcher in name for matcher in matchers) for name in docs):
+            missing.append(intent)
+
+    return missing
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", action="store_true")
+    args = parser.parse_args()
+
+    grouped, loaded_docs = build_grouped_chunks(debug=args.debug)
+    missing = validate_expected_docs(loaded_docs)
+
+    for intent, chunks in grouped.items():
+        print(f"doc_type={intent} docs={len(loaded_docs[intent])} chunks={len(chunks)}")
+
+    if missing:
+        raise SystemExit(f"Missing expected docs for: {', '.join(sorted(missing))}")
+
+    if not grouped["cv"] or not grouped["eco"]:
+        raise SystemExit("Expected CV and ECO corpora to contain at least one chunk each")
+
+    embedder = Embedder()
+    out_dir = Path("models")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    for name, chunks in grouped.items():
+        if not chunks:
+            continue
+
+        for start in range(0, len(chunks), BATCH_SIZE):
+            batch = chunks[start : start + BATCH_SIZE]
+            embeddings = embedder.embed_batch([chunk.text for chunk in batch])
+            for chunk, emb in zip(batch, embeddings):
+                chunk.embedding = emb
+
+        index = FaissIndex(name=name)
+        index.build(chunks)
+        index.save(out_dir)
+        print(f"Built index: {name} ({len(chunks)} chunks)")
+
+
+if __name__ == "__main__":
+    main()

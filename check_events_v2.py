@@ -41,6 +41,22 @@ def main() -> None:
         WHERE event_type = 'failure'
         """,
     ) or 0
+    query_completed_total = scalar(
+        conn,
+        """
+        SELECT COUNT(*)
+        FROM events
+        WHERE event_type = 'query_completed'
+        """,
+    ) or 0
+    query_failed_total = scalar(
+        conn,
+        """
+        SELECT COUNT(*)
+        FROM events
+        WHERE event_type = 'query_failed'
+        """,
+    ) or 0
     retrieval_miss_total = scalar(
         conn,
         """
@@ -93,7 +109,15 @@ def main() -> None:
         """
         SELECT COUNT(DISTINCT query_id)
         FROM events
-        WHERE event_type IN ('route_decision', 'retrieval_result', 'generation_result', 'failure')
+        WHERE event_type IN ('route_decision', 'retrieval_result', 'generation_result', 'failure', 'query_completed', 'query_failed')
+        """,
+    ) or 0
+    terminal_query_ids_total = scalar(
+        conn,
+        """
+        SELECT COUNT(DISTINCT query_id)
+        FROM events
+        WHERE event_type IN ('query_completed', 'query_failed')
         """,
     ) or 0
 
@@ -159,6 +183,8 @@ def main() -> None:
     denom = generation_total if generation_total > 0 else 1
     print(f"total_failures: {failure_total}")
     print(f"completed_generations: {generation_total}")
+    print(f"query_completed_total: {query_completed_total}")
+    print(f"query_failed_total: {query_failed_total}")
     print(f"failure_rate_over_completed_generations: {failure_total / denom:.4f}")
     print(f"retrieval_miss_rate_over_completed_generations: {retrieval_miss_total / denom:.4f}")
     print(f"hallucination_rate_over_completed_generations: {hallucination_total / denom:.4f}")
@@ -225,6 +251,7 @@ def main() -> None:
     print("\n=== PIPELINE COMPLETION GAPS ===")
     print(f"query_received_total: {query_received_total}")
     print(f"distinct_downstream_query_ids: {downstream_query_ids_total}")
+    print(f"distinct_terminal_query_ids: {terminal_query_ids_total}")
     print("missing_query_ids:")
     missing_rows = conn.execute(
         """
@@ -250,6 +277,31 @@ def main() -> None:
         for row in missing_rows:
             print(row)
 
+    print("\nmissing_terminal_query_ids:")
+    missing_terminal_rows = conn.execute(
+        """
+        SELECT q.query_id,
+               json_extract(q.payload, '$.query')
+        FROM events AS q
+        WHERE q.event_type = 'query_received'
+          AND q.query_id IN (
+            SELECT query_id
+            FROM events
+            WHERE event_type = 'query_received'
+            EXCEPT
+            SELECT query_id
+            FROM events
+            WHERE event_type IN ('query_completed', 'query_failed')
+          )
+        ORDER BY q.ts ASC
+        """
+    ).fetchall()
+    if not missing_terminal_rows:
+        print("none")
+    else:
+        for row in missing_terminal_rows:
+            print(row)
+
     print("\n=== WARNINGS ===")
     warnings: list[str] = []
     if method_missing_count > 0 or method_null_count > 0 or intent_missing_count > 0 or confidence_missing_count > 0:
@@ -265,6 +317,10 @@ def main() -> None:
     if query_received_total != downstream_query_ids_total:
         warnings.append(
             f"query pipeline gap detected: query_received={query_received_total}, downstream_distinct_query_ids={downstream_query_ids_total}"
+        )
+    if query_received_total != terminal_query_ids_total:
+        warnings.append(
+            f"terminal event gap detected: query_received={query_received_total}, terminal_distinct_query_ids={terminal_query_ids_total}"
         )
 
     if warnings:

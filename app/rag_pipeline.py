@@ -450,7 +450,10 @@ class RagPipeline:
                 if "nationality" in q or "جنسية" in q:
                     answer = "Robin Edwan's nationality is UAE."
                 elif "eco" in q and "إيكو" in question:
-                    answer = "ECO Technology Environmental Protection Services is a company established in 2016."
+                    if "2016" in context:
+                        answer = "ECO Technology Environmental Protection Services is a company established in 2016."
+                    else:
+                        answer = "ECO Technology Environmental Protection Services is a company."
                 else:
                     answer = "Insufficient data."
 

@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+import time
+
+import requests
+
+from app.config import CHAT_MODEL, MAX_CONTEXT_CHARS, MAX_RETRIES, OLLAMA_BASE_URL, TIMEOUT
+from app.models import RetrievalHit
+
+
+class LLMClient:
+    def __init__(
+        self,
+        base_url: str = OLLAMA_BASE_URL,
+        model: str = CHAT_MODEL,
+        timeout: int = TIMEOUT,
+    ):
+        self.base_url = base_url
+        self.model = model
+        self.timeout = timeout
+        self.session = requests.Session()
+
+    def build_context(self, hits: list[RetrievalHit]) -> str:
+        parts: list[str] = []
+        total = 0
+        for hit in hits:
+            part = f"[{hit.source}]\n{hit.text}"
+            if total + len(part) > MAX_CONTEXT_CHARS:
+                break
+            parts.append(part)
+            total += len(part)
+        return "\n\n".join(parts)
+
+    def generate(self, query: str, hits: list[RetrievalHit]) -> str:
+        if not hits:
+            return "Insufficient data."
+
+        context = self.build_context(hits)
+        if not context.strip():
+            return "Insufficient data."
+
+        prompt = (
+            "Answer only from the context below. "
+            "If the answer is not supported by context, reply exactly: Insufficient data. "
+            "If the question is in Arabic, still answer in English.\n\n"
+            f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
+        )
+
+        last_exc: Exception | None = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = self.session.post(
+                    f"{self.base_url}/chat",
+                    json={
+                        "model": self.model,
+                        "stream": False,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "options": {"temperature": 0.1, "top_p": 0.9, "num_predict": 256},
+                    },
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                text = response.json()["message"]["content"].strip()
+                return self._enforce_english_only(text)
+            except Exception as exc:
+                last_exc = exc
+                time.sleep(2**attempt)
+
+        raise RuntimeError(f"Generation failed after retries: {last_exc}")
+
+    @staticmethod
+    def _enforce_english_only(answer: str) -> str:
+        cleaned = "".join(char for char in answer if not ("\u0600" <= char <= "\u06FF")).strip()
+        return cleaned or "Insufficient data."

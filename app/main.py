@@ -12,6 +12,7 @@ from generation.llm import LLMClient
 from retrieval.embeddings import Embedder
 from retrieval.faiss_index import FaissIndex
 from retrieval.multi_retriever import MultiRetriever
+from retrieval.reranker import SimpleReranker
 from router.intent_router import IntentRouter
 
 
@@ -39,8 +40,9 @@ def create_app() -> FastAPI:
         raise RuntimeError("No FAISS indexes found. Run scripts/build_indexes.py first.")
 
     retriever = MultiRetriever(indexes=indexes)
+    reranker = SimpleReranker(embedder.embed_batch)
     llm = LLMClient()
-    pipeline = Pipeline(router=router, embedder=embedder, retriever=retriever, llm=llm)
+    pipeline = Pipeline(router=router, embedder=embedder, retriever=retriever, llm=llm, reranker=reranker)
     service = InferenceService(pipeline=pipeline)
 
     @app.get("/health")

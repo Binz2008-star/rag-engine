@@ -12,11 +12,12 @@ from router.features import normalize_query
 
 
 class Pipeline:
-    def __init__(self, router, embedder, retriever, llm):
+    def __init__(self, router, embedder, retriever, llm, reranker=None):
         self.router = router
         self.embedder = embedder
         self.retriever = retriever
         self.llm = llm
+        self.reranker = reranker
 
         if ACTIVE_MODEL_PATH.exists():
             meta = json.loads(ACTIVE_MODEL_PATH.read_text(encoding="utf-8"))
@@ -39,12 +40,12 @@ class Pipeline:
         try:
             route = self.router.route(normalized_query)
             vec = self.embedder.embed_batch([normalized_query])[0]
-            hits = self.retriever.retrieve(
-                vec,
-                route.intent,
-                query=normalized_query,
-                query_id=query_id,
-            )
+            hits = self.retriever.retrieve(vec, route.intent)
+
+            if self.reranker and hits:
+                from app.config import TOP_K
+                hits = self.reranker.rerank(normalized_query, hits, TOP_K)
+
             answer = self.llm.generate(normalized_query, hits)
             grounded = check_grounding(answer, hits, self.embedder.embed_batch)
 

@@ -1,9 +1,0 @@
-{
-  "intents": [
-    "cv",
-    "eco",
-    "general"
-  ],
-  "n_features": 460,
-  "model_type": "LogisticRegression"
-}
