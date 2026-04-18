@@ -74,6 +74,7 @@ class Retriever:
 
         # Store last request metadata for pipeline access
         self.last_request_id: str = ""
+        self.last_intent: str = ""
         self.last_intent_confidence: float = 0.0
         self.last_intent_method: str = ""
 
@@ -179,12 +180,14 @@ class Retriever:
 
         if ml_intent and ml_confidence > INTENT_CONF_THRESHOLD:
             self.decision_logger.log_intent(request_id, query, ml_intent, method="v2_model", confidence=float(ml_confidence))
+            self.last_intent = ml_intent
             self.last_intent_confidence = ml_confidence
             self.last_intent_method = "v2_model"
             return ml_intent
         elif ml_intent:
             # Low confidence - log and fall back to rules
             logger.debug(f"ML intent low confidence: {ml_intent} ({ml_confidence:.3f}) → using rules")
+            self.last_intent = ml_intent
             self.last_intent_confidence = ml_confidence
             self.last_intent_method = "v2_model_fallback"
 
@@ -194,6 +197,7 @@ class Retriever:
         pre_eco_signals = ["before eco", "before joining", "work history", "prior to", "previously"]
         if any(x in q for x in pre_eco_signals):
             self.decision_logger.log_intent(request_id, query, "cv", confidence=1.0)
+            self.last_intent = "cv"
             self.last_intent_confidence = 1.0
             self.last_intent_method = "v1_keyword_pre_eco"
             return "cv"
@@ -202,6 +206,7 @@ class Retriever:
         profile_signals = ["full profile", "professional profile", "overview"]
         if any(x in q for x in profile_signals):
             self.decision_logger.log_intent(request_id, query, "profile", confidence=1.0)
+            self.last_intent = "profile"
             self.last_intent_confidence = 1.0
             self.last_intent_method = "v1_keyword_profile"
             return "profile"
@@ -209,6 +214,7 @@ class Retriever:
         # ECO entity detection — runs after pre-ECO and profile checks
         if "eco" in q or "إيكو" in query or "company" in q or "environmental services" in q:
             self.decision_logger.log_intent(request_id, query, "eco", confidence=1.0)
+            self.last_intent = "eco"
             self.last_intent_confidence = 1.0
             self.last_intent_method = "v1_keyword_eco"
             return "eco"
@@ -224,11 +230,13 @@ class Retriever:
         cv_triggers_ar = ["سيرة", "تعليم", "خبرة", "مهارات", "شهادات"]
         if any(x in q for x in cv_triggers) or any(x in query for x in cv_triggers_ar):
             self.decision_logger.log_intent(request_id, query, "cv", confidence=1.0)
+            self.last_intent = "cv"
             self.last_intent_confidence = 1.0
             self.last_intent_method = "v1_keyword_cv"
             return "cv"
 
         self.decision_logger.log_intent(request_id, query, "general", confidence=1.0)
+        self.last_intent = "general"
         self.last_intent_confidence = 1.0
         self.last_intent_method = "v1_keyword_general"
         return "general"

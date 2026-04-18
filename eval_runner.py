@@ -41,6 +41,7 @@ class TestResult:
     has_expected_exact: bool = False
     # ML observability fields
     request_id: str = ""
+    intent: str = ""
     intent_confidence: float = 0.0
     intent_method: str = ""
 
@@ -177,22 +178,39 @@ def compute_metrics(results: list[TestResult]) -> dict:
         for b in r.buckets:
             bucket_counts[b] = bucket_counts.get(b, 0) + 1
 
-    # Per-intent metrics
+    # Per-intent metrics (method-level: v2_model vs rules)
     from collections import Counter
-    intent_stats = Counter()
-    intent_passes = Counter()
+    intent_method_stats = Counter()
+    intent_method_passes = Counter()
     for r in results:
         if r.intent_method:
-            intent_stats[r.intent_method] += 1
+            intent_method_stats[r.intent_method] += 1
             if r.passed:
-                intent_passes[r.intent_method] += 1
+                intent_method_passes[r.intent_method] += 1
 
-    intent_metrics = {}
-    for method, count in intent_stats.items():
-        intent_metrics[method] = {
+    intent_method_metrics = {}
+    for method, count in intent_method_stats.items():
+        intent_method_metrics[method] = {
             "total": count,
-            "passed": intent_passes[method],
-            "accuracy": round(intent_passes[method] / count, 3) if count > 0 else 0.0
+            "passed": intent_method_passes[method],
+            "accuracy": round(intent_method_passes[method] / count, 3) if count > 0 else 0.0
+        }
+
+    # Per-intent type metrics (cv/eco/general)
+    intent_type_stats = Counter()
+    intent_type_passes = Counter()
+    for r in results:
+        if r.intent:
+            intent_type_stats[r.intent] += 1
+            if r.passed:
+                intent_type_passes[r.intent] += 1
+
+    intent_type_metrics = {}
+    for intent_type, count in intent_type_stats.items():
+        intent_type_metrics[intent_type] = {
+            "total": count,
+            "passed": intent_type_passes[intent_type],
+            "accuracy": round(intent_type_passes[intent_type] / count, 3) if count > 0 else 0.0
         }
 
     # Low confidence failure analysis
@@ -213,7 +231,8 @@ def compute_metrics(results: list[TestResult]) -> dict:
         "source_precision": round(precision_hits / len(precision_tests), 3) if precision_tests else None,
         "refusal_accuracy":   round(refusal_hits / len(refusal_tests), 3) if refusal_tests else None,
         "failure_buckets":    bucket_counts,
-        "intent_metrics":     intent_metrics,
+        "intent_method_metrics": intent_method_metrics,
+        "intent_type_metrics": intent_type_metrics,
         "low_conf_failures":  len(low_conf_failures),
         "avg_elapsed_s":      avg_elapsed,
         "latency_sla_ms":     latency_sla_ms,
@@ -293,6 +312,7 @@ def main(query_fn=None) -> int:
                 tr.answer = result.answer or ""
                 tr.sources = [s["source"] for s in result.sources]
                 tr.request_id = result.request_id or ""
+                tr.intent = result.intent or ""
                 tr.intent_confidence = result.intent_confidence or 0.0
                 tr.intent_method = result.intent_method or ""
 
@@ -306,6 +326,8 @@ def main(query_fn=None) -> int:
                     print("  ✓ PASS")
                 else:
                     print(f"  ✗ FAIL — {'; '.join(tr.reasons)}")
+                    if tr.request_id:
+                        print(f"  request_id: {tr.request_id}")
 
             except Exception as exc:
                 tr.error = str(exc)
