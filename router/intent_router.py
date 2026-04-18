@@ -35,6 +35,11 @@ class IntentRouter:
         # Resolve relative to MODEL_DIR, not current working directory
         if not model_path.is_absolute():
             model_path = MODEL_DIR / model_path
+
+        # Check if model file exists (may not be present in CI)
+        if not model_path.exists():
+            return cls(model=None)
+
         return cls.from_path(
             model_path,
             threshold=meta.get("threshold", ROUTER_CONFIDENCE_THRESHOLD),
