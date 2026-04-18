@@ -105,6 +105,9 @@ class EmbeddingClient:
                 )
                 if attempt < MAX_RETRIES:
                     time.sleep(2 ** (attempt - 1))
+                else:
+                    logger.error("Embedding failed permanently - deterministic infra failure")
+                    raise RuntimeError("Embedding failure - deterministic infra failure") from last_error
 
         raise RuntimeError(f"Embedding failed after {MAX_RETRIES} attempts") from last_error
 
