@@ -39,6 +39,11 @@ class IntentRouter:
     def route(self, query: str) -> Route:
         eco_hint, cv_hint = extract_hints(query)
 
+        # Priority check for CV-specific entities
+        q = query.lower()
+        if "roben" in q or "roben's" in q:
+            return Route(intent="cv", confidence=1.0, intent_method="rule")
+
         if eco_hint and not cv_hint:
             return Route(intent="eco", confidence=1.0, intent_method="rule")
 

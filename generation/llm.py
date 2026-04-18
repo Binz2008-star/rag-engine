@@ -41,9 +41,10 @@ class LLMClient:
 
         prompt = (
             "Answer only from the retrieved text. "
-            "Do not infer, speculate, expand acronyms, or add explanations. "
+            "Do not infer, speculate, summarize broadly, or expand acronyms. "
+            "Include all relevant information explicitly stated in the text. "
             "If the answer is not explicitly stated in the retrieved text, reply exactly: Insufficient data. "
-            "Keep the answer short and extractive.\n\n"
+            "Do not explain why.\n\n"
             f"Context:\n{context}\n\n"
             f"Question: {query}\n\n"
             "Answer:"

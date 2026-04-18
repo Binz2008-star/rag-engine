@@ -80,7 +80,15 @@ class Pipeline:
         answer = self.llm.generate(normalized_query, hits)
         normalized_answer = answer.strip().lower()
 
-        if normalized_answer.startswith(("based on the context", "it appears", "it can be inferred")):
+        speculative_prefixes = (
+            "based on the context",
+            "it appears",
+            "it can be inferred",
+            "this suggests",
+            "likely",
+        )
+
+        if normalized_answer.startswith(speculative_prefixes):
             answer = "Insufficient data."
             grounded = True
             failure_type = "retrieval_miss"

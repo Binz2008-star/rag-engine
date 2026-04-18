@@ -14,7 +14,7 @@ def _sentences(text: str) -> list[str]:
     return [p.strip() for p in parts if len(p.strip()) > 0]
 
 
-def check_grounding(answer: str, hits: list[RetrievalHit], embed_fn, threshold: float = 0.58) -> bool:
+def check_grounding(answer: str, hits: list[RetrievalHit], embed_fn, threshold: float = 0.60) -> bool:
     if not hits:
         return True
 
@@ -27,7 +27,7 @@ def check_grounding(answer: str, hits: list[RetrievalHit], embed_fn, threshold: 
         return True
 
     candidate_sentences: list[str] = []
-    for hit in hits[:2]:
+    for hit in hits[:4]:
         candidate_sentences.extend(_sentences(hit.text))
 
     if not candidate_sentences:

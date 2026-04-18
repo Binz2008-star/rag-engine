@@ -21,12 +21,18 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
         failure_reasons = []
 
         actual_method = getattr(result, "intent_method", None)
-        intent_correct = result.intent == item["expected_intent"]
+        actual_intent = getattr(result, "intent", None)
+        actual_answer = getattr(result, "answer", "")
+        actual_grounded = getattr(result, "grounded", True)
+        actual_failure_type = getattr(result, "failure_type", None)
+        actual_latency_ms = getattr(result, "latency_ms", 0)
+
+        intent_correct = actual_intent == item["expected_intent"]
 
         if not intent_correct:
             passed = False
             failure_reasons.append(
-                f"intent mismatch: expected {item['expected_intent']}, got {result.intent}"
+                f"intent mismatch: expected {item['expected_intent']}, got {actual_intent}"
             )
 
         if "expected_method" in item and actual_method != item["expected_method"]:
@@ -35,37 +41,37 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
                 f"method mismatch: expected {item['expected_method']}, got {actual_method}"
             )
 
-        if item.get("must_be_grounded", True) and not result.grounded:
+        if item.get("must_be_grounded", True) and not actual_grounded:
             passed = False
             failure_reasons.append("not grounded when required")
 
         for phrase in item.get("must_not_contain", []):
-            if phrase.lower() in result.answer.lower():
+            if phrase.lower() in actual_answer.lower():
                 passed = False
                 failure_reasons.append(f"contains forbidden phrase: '{phrase}'")
 
-        if "expected_answer_exact" in item and result.answer != item["expected_answer_exact"]:
+        if "expected_answer_exact" in item and actual_answer != item["expected_answer_exact"]:
             passed = False
             failure_reasons.append(
-                f"answer mismatch: expected '{item['expected_answer_exact']}', got '{result.answer}'"
+                f"answer mismatch: expected '{item['expected_answer_exact']}', got '{actual_answer}'"
             )
 
         if "expected_answer_contains" in item:
             for term in item["expected_answer_contains"]:
-                if term.lower() not in result.answer.lower():
+                if term.lower() not in actual_answer.lower():
                     passed = False
                     failure_reasons.append(f"missing expected term: '{term}'")
 
         if "expected_failure_type" in item:
             expected = item["expected_failure_type"]
-            if expected is not None and result.failure_type != expected:
+            if expected is not None and actual_failure_type != expected:
                 passed = False
                 failure_reasons.append(
-                    f"failure_type mismatch: expected {expected}, got {result.failure_type}"
+                    f"failure_type mismatch: expected {expected}, got {actual_failure_type}"
                 )
-            elif expected is None and result.failure_type is not None:
+            elif expected is None and actual_failure_type is not None:
                 passed = False
-                failure_reasons.append(f"unexpected failure_type: {result.failure_type}")
+                failure_reasons.append(f"unexpected failure_type: {actual_failure_type}")
 
         expected_refusal = item.get(
             "expected_refusal",
@@ -75,14 +81,14 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
         results.append(
             {
                 "query": item["query"],
-                "answer": result.answer,
-                "intent": result.intent,
+                "answer": actual_answer,
+                "intent": actual_intent,
                 "intent_method": actual_method,
-                "grounded": result.grounded,
-                "failure_type": result.failure_type,
+                "grounded": actual_grounded,
+                "failure_type": actual_failure_type,
                 "passed": passed,
                 "failure_reasons": failure_reasons,
-                "latency_ms": result.latency_ms,
+                "latency_ms": actual_latency_ms,
                 "intent_correct": intent_correct,
                 "expected_intent": item["expected_intent"],
                 "expected_refusal": expected_refusal,
