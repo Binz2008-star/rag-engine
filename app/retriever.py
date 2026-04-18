@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import joblib
 import logging
 import time
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List
 
 from app.bm25_index import BM25Index
@@ -17,6 +20,9 @@ from app.reranker import LightweightReranker
 from app.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
+
+# Configuration constants
+INTENT_CONF_THRESHOLD = 0.6
 
 # ── Retrieval parameters ──────────────────────────────────────────────────────
 
@@ -63,8 +69,60 @@ class Retriever:
         self._bm25: BM25Index | None = None
         self.decision_logger = DecisionLogger()
 
+        # Load intent classifier
+        self._load_intent_classifier()
+
+        # Store last request metadata for pipeline access
+        self.last_request_id: str = ""
+        self.last_intent: str = ""
+        self.last_intent_confidence: float = 0.0
+        self.last_intent_method: str = ""
+
     def _contains_arabic(self, text: str) -> bool:
         return any('\u0600' <= c <= '\u06FF' for c in text)
+
+    def _load_intent_classifier(self) -> None:
+        """Load intent classifier model if available."""
+        model_path = Path(__file__).parent.parent / "models" / "intent_model.joblib"
+        if model_path.exists():
+            try:
+                model_data = joblib.load(model_path)
+                self.intent_model = model_data['model']
+                self.intent_vectorizer = model_data['vectorizer']
+                self.intent_label_encoder = model_data['label_encoder']
+                logger.info("Intent classifier loaded successfully")
+            except Exception as e:
+                logger.warning(f"Failed to load intent classifier: {e}")
+                self.intent_model = None
+        else:
+            logger.info("Intent classifier not found, using rules only")
+            self.intent_model = None
+
+    def _predict_intent(self, query: str) -> tuple[str, float]:
+        """Predict intent using ML model if available.
+
+        Returns:
+            Tuple of (intent, confidence)
+        """
+        if self.intent_model is None:
+            return None, 0.0
+
+        try:
+            # Vectorize query
+            query_vec = self.intent_vectorizer.transform([query])
+
+            # Predict
+            pred_idx = self.intent_model.predict(query_vec)[0]
+            proba = self.intent_model.predict_proba(query_vec)[0]
+
+            # Get confidence and intent
+            confidence = proba.max()
+            intent = self.intent_label_encoder.inverse_transform([pred_idx])[0]
+
+            return intent, confidence
+        except Exception as e:
+            logger.warning(f"Intent prediction failed: {e}")
+            return None, 0.0
 
     def _source_family(self, source: str) -> str:
         # Legacy source classification removed - no longer needed without hardcoded logic
@@ -115,25 +173,50 @@ class Retriever:
                    len(filtered), len(retrieved), SCORE_THRESHOLD)
         return filtered
 
-    def _detect_query_type(self, query: str) -> str:
+    def _detect_query_type(self, query: str, request_id: str) -> str:
         """Detect query type: 'cv', 'eco', or 'general'."""
+        # Try ML model first with confidence threshold
+        ml_intent, ml_confidence = self._predict_intent(query)
+
+        if ml_intent and ml_confidence > INTENT_CONF_THRESHOLD:
+            self.decision_logger.log_intent(request_id, query, ml_intent, method="v2_model", confidence=float(ml_confidence))
+            self.last_intent = ml_intent
+            self.last_intent_confidence = ml_confidence
+            self.last_intent_method = "v2_model"
+            return ml_intent
+        elif ml_intent:
+            # Low confidence - log and fall back to rules
+            logger.debug(f"ML intent low confidence: {ml_intent} ({ml_confidence:.3f}) → using rules")
+            self.last_intent = ml_intent
+            self.last_intent_confidence = ml_confidence
+            self.last_intent_method = "v2_model_fallback"
+
         q = query.lower()
 
         # Pre-ECO modifiers: queries about work/history BEFORE ECO override ECO entity
         pre_eco_signals = ["before eco", "before joining", "work history", "prior to", "previously"]
         if any(x in q for x in pre_eco_signals):
-            self.decision_logger.log_intent(query, "cv")
+            self.decision_logger.log_intent(request_id, query, "cv", confidence=1.0)
+            self.last_intent = "cv"
+            self.last_intent_confidence = 1.0
+            self.last_intent_method = "v1_keyword_pre_eco"
             return "cv"
 
         # Profile identity queries: broad summary requests that should surface Bio
         profile_signals = ["full profile", "professional profile", "overview"]
         if any(x in q for x in profile_signals):
-            self.decision_logger.log_intent(query, "profile")
+            self.decision_logger.log_intent(request_id, query, "profile", confidence=1.0)
+            self.last_intent = "profile"
+            self.last_intent_confidence = 1.0
+            self.last_intent_method = "v1_keyword_profile"
             return "profile"
 
         # ECO entity detection — runs after pre-ECO and profile checks
         if "eco" in q or "إيكو" in query or "company" in q or "environmental services" in q:
-            self.decision_logger.log_intent(query, "eco")
+            self.decision_logger.log_intent(request_id, query, "eco", confidence=1.0)
+            self.last_intent = "eco"
+            self.last_intent_confidence = 1.0
+            self.last_intent_method = "v1_keyword_eco"
             return "eco"
 
         # CV-specific signals — only reached if no ECO entity detected above
@@ -146,13 +229,19 @@ class Retriever:
         ]
         cv_triggers_ar = ["سيرة", "تعليم", "خبرة", "مهارات", "شهادات"]
         if any(x in q for x in cv_triggers) or any(x in query for x in cv_triggers_ar):
-            self.decision_logger.log_intent(query, "cv")
+            self.decision_logger.log_intent(request_id, query, "cv", confidence=1.0)
+            self.last_intent = "cv"
+            self.last_intent_confidence = 1.0
+            self.last_intent_method = "v1_keyword_cv"
             return "cv"
 
-        self.decision_logger.log_intent(query, "general")
+        self.decision_logger.log_intent(request_id, query, "general", confidence=1.0)
+        self.last_intent = "general"
+        self.last_intent_confidence = 1.0
+        self.last_intent_method = "v1_keyword_general"
         return "general"
 
-    def _group_by_document(self, retrieved: List[RetrievedChunk], query_type: str = 'general', query: str = '') -> List[RetrievedChunk]:
+    def _group_by_document(self, retrieved: List[RetrievedChunk], query_type: str = 'general', query: str = '', request_id: str = '') -> List[RetrievedChunk]:
         """Group chunks by document and rank documents before selecting chunks."""
         from collections import defaultdict
 
@@ -223,7 +312,7 @@ class Retriever:
 
         # Log grouped order
         grouped_order = [source for _, source, _ in doc_scores[:3]]
-        self.decision_logger.log_grouped_order(query, grouped_order)
+        self.decision_logger.log_grouped_order(request_id, query, grouped_order)
 
         return selected_chunks
 
@@ -315,6 +404,10 @@ class Retriever:
         if not isinstance(query, str) or not query.strip():
             raise ValueError("Query must be a non-empty string.")
 
+        # Generate unique request ID for this retrieval
+        request_id = str(uuid.uuid4())
+        self.last_request_id = request_id
+
         # Arabic detection and normalization
         is_ar = self._contains_arabic(query)
 
@@ -323,11 +416,13 @@ class Retriever:
         # Get dynamic TOP_K based on query length (reduce retrieval cost)
         retrieval_pool = self._get_top_k(query)
 
+        # Detect query type once for all downstream decisions
+        query_type = self._detect_query_type(query, request_id)
+
         # cv_signal: True only when query_type is 'cv' AND query contains detail terms.
         # Using query_type as the gate ensures ECO queries with shared terms (certifications)
         # and pre-ECO queries both route correctly without independent signal conflicts.
-        _early_query_type = self._detect_query_type(query)
-        cv_signal = (_early_query_type == "cv") and self._has_cv_detail_signal(query)
+        cv_signal = (query_type == "cv") and self._has_cv_detail_signal(query)
 
         queries = self._expand_query(query)
 
@@ -412,7 +507,7 @@ class Retriever:
             }
             for i, rc in enumerate(retrieved)
         ]
-        self.decision_logger.log_retrieved(query, retrieved_log)
+        self.decision_logger.log_retrieved(request_id, query, retrieved_log)
 
         # Diagnostic: Show all unique sources in retrieval pool
         unique_sources = set(rc.chunk.source for rc in retrieved)
@@ -437,11 +532,7 @@ class Retriever:
 
         retrieved = self._filter_score(retrieved)  # No intent parameter needed
 
-        # Detect query type for document-level routing
-        query_type = self._detect_query_type(query)
-        logger.info(f"Query type detected: {query_type}")
-
-        retrieved = self._group_by_document(retrieved, query_type, query)  # Group by document with type-specific boosting
+        retrieved = self._group_by_document(retrieved, query_type, query, request_id)  # Group by document with type-specific boosting
         source_cap = 1 if cv_signal else MAX_PER_SOURCE
         retrieved = self._diversify(retrieved, max_per_source=source_cap)
 
@@ -456,7 +547,7 @@ class Retriever:
             }
             for i, rc in enumerate(final)
         ]
-        self.decision_logger.log_final_chunks(query, final_chunks_log)
+        self.decision_logger.log_final_chunks(request_id, query, final_chunks_log)
 
         # Aggressive context trimming for Arabic-only queries (test 38)
         if "answer in arabic only" in query.lower():

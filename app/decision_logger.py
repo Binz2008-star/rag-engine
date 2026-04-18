@@ -23,63 +23,76 @@ class DecisionLogger:
         self.log_path = Path(log_path)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def log_intent(self, query: str, intent: str, method: str = "v1_keyword") -> None:
+    def log_intent(self, request_id: str, query: str, intent: str, method: str = "v1_keyword", confidence: float = 1.0) -> None:
         """Log intent classification decision.
 
         Args:
+            request_id: Unique identifier for this request.
             query: The user query.
             intent: Detected intent (cv, eco, general, profile).
             method: Method used for detection (e.g., "v1_keyword").
+            confidence: Confidence score (0.0-1.0). Default 1.0 for rule-based.
         """
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
+            "request_id": request_id,
+            "schema_version": 1,
             "type": "intent",
             "query": query,
             "intent": intent,
-            "confidence": 1.0,  # rule-based deterministic
+            "confidence": confidence,
             "method": method,
         }
         self._append(entry)
 
-    def log_retrieved(self, query: str, retrieved: list[dict]) -> None:
+    def log_retrieved(self, request_id: str, query: str, retrieved: list[dict]) -> None:
         """Log retrieved chunks BEFORE grouping.
 
         Args:
+            request_id: Unique identifier for this request.
             query: The user query.
             retrieved: List of retrieved chunks with source, score, rank.
         """
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
+            "request_id": request_id,
+            "schema_version": 1,
             "type": "retrieved",
             "query": query,
             "retrieved": retrieved,
         }
         self._append(entry)
 
-    def log_grouped_order(self, query: str, grouped_order: list[str]) -> None:
+    def log_grouped_order(self, request_id: str, query: str, grouped_order: list[str]) -> None:
         """Log document order AFTER grouping/priority.
 
         Args:
+            request_id: Unique identifier for this request.
             query: The user query.
             grouped_order: List of document names in priority order.
         """
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
+            "request_id": request_id,
+            "schema_version": 1,
             "type": "grouped_order",
             "query": query,
             "grouped_order": grouped_order,
         }
         self._append(entry)
 
-    def log_final_chunks(self, query: str, final_chunks: list[dict]) -> None:
+    def log_final_chunks(self, request_id: str, query: str, final_chunks: list[dict]) -> None:
         """Log final selected chunks.
 
         Args:
+            request_id: Unique identifier for this request.
             query: The user query.
             final_chunks: List of final chunks with chunk_id, source, score.
         """
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
+            "request_id": request_id,
+            "schema_version": 1,
             "type": "final_chunks",
             "query": query,
             "final_chunks": final_chunks,

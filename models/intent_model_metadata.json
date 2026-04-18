@@ -4,6 +4,6 @@
     "eco",
     "general"
   ],
-  "n_features": 441,
+  "n_features": 470,
   "model_type": "LogisticRegression"
 }

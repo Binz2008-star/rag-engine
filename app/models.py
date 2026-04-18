@@ -40,3 +40,7 @@ class RagResponse:
     sources: list[dict[str, str]]
     retrieval_time: float
     generation_time: float
+    request_id: str = ""
+    intent: str = ""
+    intent_confidence: float = 0.0
+    intent_method: str = ""
