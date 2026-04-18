@@ -16,7 +16,7 @@ class DecisionLogger:
 
     def __init__(self, log_path: str | Path = "logs/decisions.jsonl") -> None:
         """Initialize the decision logger.
-        
+
         Args:
             log_path: Path to the JSONL log file (append-only).
         """
@@ -25,7 +25,7 @@ class DecisionLogger:
 
     def log_intent(self, query: str, intent: str, method: str = "v1_keyword") -> None:
         """Log intent classification decision.
-        
+
         Args:
             query: The user query.
             intent: Detected intent (cv, eco, general, profile).
@@ -36,46 +36,52 @@ class DecisionLogger:
             "type": "intent",
             "query": query,
             "intent": intent,
-            "confidence": None,
+            "confidence": 1.0,  # rule-based deterministic
             "method": method,
         }
         self._append(entry)
 
-    def log_retrieved(self, retrieved: list[dict]) -> None:
+    def log_retrieved(self, query: str, retrieved: list[dict]) -> None:
         """Log retrieved chunks BEFORE grouping.
-        
+
         Args:
+            query: The user query.
             retrieved: List of retrieved chunks with chunk_id, source, score.
         """
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
             "type": "retrieved",
+            "query": query,
             "retrieved": retrieved,
         }
         self._append(entry)
 
-    def log_grouped_order(self, grouped_order: list[str]) -> None:
+    def log_grouped_order(self, query: str, grouped_order: list[str]) -> None:
         """Log document order AFTER grouping/priority.
-        
+
         Args:
+            query: The user query.
             grouped_order: List of document names in priority order.
         """
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
             "type": "grouped_order",
+            "query": query,
             "grouped_order": grouped_order,
         }
         self._append(entry)
 
-    def log_final_chunks(self, final_chunks: list[dict]) -> None:
+    def log_final_chunks(self, query: str, final_chunks: list[dict]) -> None:
         """Log final selected chunks.
-        
+
         Args:
+            query: The user query.
             final_chunks: List of final chunks with chunk_id, source, score.
         """
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
             "type": "final_chunks",
+            "query": query,
             "final_chunks": final_chunks,
         }
         self._append(entry)
