@@ -61,7 +61,7 @@ jobs:
 
       - name: Check strict pass rate
         run: |
-          python -c "
+          python << 'EOF'
           import json, sys
           with open('reports/ci_eval_strict.json', encoding='utf-8') as f:
               report = json.load(f)
@@ -76,4 +76,4 @@ jobs:
               sys.exit(1)
 
           print(f'PASS: Real pass rate {real_pass_rate*100:.1f}% >= 95% threshold')
-          "
+          EOF
