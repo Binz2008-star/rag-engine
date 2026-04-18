@@ -20,20 +20,19 @@ jobs:
         run: |
           python -c "
           import json, sys
-          data = json.load(open('tests/eval_queries.json', encoding='utf-8'))
-          assert isinstance(data, list) and len(data) > 0, 'eval_queries.json is empty or malformed'
-          print(f'eval_queries.json OK — {len(data)} tests')
+          data = json.load(open('data/adversarial_eval_queries.json', encoding='utf-8'))
+          assert isinstance(data, dict) and 'queries' in data, 'adversarial_eval_queries.json is malformed'
+          assert len(data['queries']) > 0, 'adversarial_eval_queries.json is empty'
+          print(f'adversarial_eval_queries.json OK — {len(data[\"queries\"])} tests')
           "
 
       - name: Syntax check (py_compile)
         run: |
           python -m py_compile eval_runner.py       && echo 'eval_runner.py OK'
-          python -m py_compile compare_reports.py   && echo 'compare_reports.py OK'
-          python -m py_compile analyze_logs.py      && echo 'analyze_logs.py OK'
           python -m py_compile app/config.py        && echo 'app/config.py OK'
-          python -m py_compile app/retriever.py     && echo 'app/retriever.py OK'
-          python -m py_compile app/rag_pipeline.py  && echo 'app/rag_pipeline.py OK'
-          python -m py_compile app/prompting.py     && echo 'app/prompting.py OK'
+          python -m py_compile app/pipeline.py     && echo 'app/pipeline.py OK'
+          python -m py_compile generation/llm.py    && echo 'generation/llm.py OK'
+          python -m py_compile evaluation/eval_main.py && echo 'evaluation/eval_main.py OK'
 
   eval:
     name: RAG Evaluation (Dev Mode - 95% Gate)

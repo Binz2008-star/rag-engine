@@ -1,0 +1,89 @@
+[
+  {
+    "query": "What is Eco company?",
+    "expected_intent": "eco",
+    "expected_method": "rule",
+    "must_be_grounded": true,
+    "must_not_contain": ["appears to be", "can be inferred", "based on context"],
+    "expected_answer_contains": ["ECO"]
+  },
+  {
+    "query": "What role is the CV tailored for?",
+    "expected_intent": "cv",
+    "expected_method": "rule",
+    "must_be_grounded": true,
+    "must_not_contain": ["appears to be", "can be inferred", "based on context"],
+    "expected_answer_contains": ["Deliveroo"]
+  },
+  {
+    "query": "What is the GDP of Japan?",
+    "expected_intent": "general",
+    "expected_method": "rule",
+    "expected_refusal": true,
+    "expected_answer_exact": "Insufficient data.",
+    "must_be_grounded": true,
+    "expected_failure_type": "retrieval_miss"
+  },
+  {
+    "query": "What waste management services does ECO provide?",
+    "expected_intent": "eco",
+    "expected_method": "rule",
+    "must_be_grounded": true,
+    "must_not_contain": ["appears to be", "can be inferred", "based on context"],
+    "expected_answer_contains": ["waste"]
+  },
+  {
+    "query": "What is Roben's experience in environmental operations?",
+    "expected_intent": "cv",
+    "expected_method": "rule",
+    "expected_refusal": true,
+    "expected_answer_exact": "Insufficient data.",
+    "must_be_grounded": true,
+    "expected_failure_type": "retrieval_miss"
+  },
+  {
+    "query": "What certifications does the CV mention?",
+    "expected_intent": "cv",
+    "expected_method": "rule",
+    "must_be_grounded": true,
+    "must_not_contain": ["appears to be", "can be inferred", "based on context"],
+    "expected_answer_contains": ["certification"],
+    "todo": "Strengthen after corpus expansion - replace brittle lexical matching with explicit certificate names or [certificate, one concrete term]"
+  },
+  {
+    "query": "What is the contact information for ECO?",
+    "expected_intent": "eco",
+    "expected_method": "rule",
+    "must_be_grounded": true,
+    "must_not_contain": ["appears to be", "can be inferred", "based on context"],
+    "expected_refusal": true,
+    "expected_failure_type": "retrieval_miss",
+    "todo": "Re-audit after corpus expansion - may flip to grounded answer if contact info added"
+  },
+  {
+    "query": "What is NAFFCO?",
+    "expected_intent": "general",
+    "expected_method": "rule",
+    "expected_refusal": true,
+    "expected_answer_exact": "Insufficient data.",
+    "must_be_grounded": true,
+    "expected_failure_type": "retrieval_miss"
+  },
+  {
+    "query": "What environmental compliance services are offered?",
+    "expected_intent": "eco",
+    "expected_method": "rule",
+    "must_be_grounded": true,
+    "expected_answer_contains": ["compliance"],
+    "todo": "Updated after ECO corpus expansion introduced explicit compliance-service evidence"
+  },
+  {
+    "query": "What is Robin's LinkedIn profile?",
+    "expected_intent": "general",
+    "expected_method": "rule",
+    "expected_refusal": true,
+    "expected_answer_exact": "Insufficient data.",
+    "must_be_grounded": true,
+    "expected_failure_type": "retrieval_miss"
+  }
+]

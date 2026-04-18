@@ -158,4 +158,4 @@ retrieval_audit.py
 truth_table_post_fix.md
 
 # Optional local eval scratch
-tests/eval_queries.json
+# tests/eval_queries.json - removed for CI compatibility
