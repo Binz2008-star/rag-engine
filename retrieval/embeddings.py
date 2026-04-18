@@ -15,7 +15,7 @@ class Embedder:
         model: str = EMBED_MODEL,
         timeout: int = TIMEOUT,
     ):
-        self.base_url = base_url
+        self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
         self.session = requests.Session()

@@ -4,7 +4,7 @@ import numpy as np
 from app.models import RetrievalHit
 
 
-class SimpleReranker:
+class Reranker:
     def __init__(self, embed_fn):
         self.embed_fn = embed_fn
 

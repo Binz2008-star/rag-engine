@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.models import PipelineResult
-from events.emitter import emit
+from events.emitter import emit_event
 from router.features import normalize_query
 
 
@@ -11,9 +11,9 @@ class InferenceService:
 
     def handle_query(self, query: str, query_id: str) -> PipelineResult:
         normalized_query = normalize_query(query)
-        emit(
-            "query_received",
+        emit_event(
             {
+                "event_type": "query_received",
                 "query_id": query_id,
                 "query": query,
                 "normalized_query": normalized_query,
@@ -22,27 +22,25 @@ class InferenceService:
 
         result = self.pipeline.run(query=query, query_id=query_id)
 
-        emit(
-            "route_decision",
+        emit_event(
             {
+                "event_type": "route_decision",
                 "query_id": result.query_id,
                 "query": result.query,
                 "normalized_query": result.normalized_query,
                 "intent": result.intent,
                 "confidence": result.confidence,
-                "intent_method": result.intent_method,
             },
         )
 
-        emit(
-            "retrieval_result",
+        emit_event(
             {
+                "event_type": "retrieval_result",
                 "query_id": result.query_id,
                 "query": result.query,
                 "normalized_query": result.normalized_query,
                 "intent": result.intent,
                 "confidence": result.confidence,
-                "intent_method": result.intent_method,
                 "retrieval": [
                     {
                         "doc_id": hit.chunk_id,
@@ -56,15 +54,14 @@ class InferenceService:
             },
         )
 
-        emit(
-            "generation_result",
+        emit_event(
             {
+                "event_type": "generation_result",
                 "query_id": result.query_id,
                 "query": result.query,
                 "normalized_query": result.normalized_query,
                 "intent": result.intent,
                 "confidence": result.confidence,
-                "intent_method": result.intent_method,
                 "retrieval": [
                     {
                         "doc_id": hit.chunk_id,
@@ -83,15 +80,14 @@ class InferenceService:
         )
 
         if result.failure_type:
-            emit(
-                "failure",
+            emit_event(
                 {
+                    "event_type": "failure",
                     "query_id": result.query_id,
                     "query": result.query,
                     "normalized_query": result.normalized_query,
                     "intent": result.intent,
                     "confidence": result.confidence,
-                    "intent_method": result.intent_method,
                     "retrieval": [
                         {
                             "doc_id": hit.chunk_id,

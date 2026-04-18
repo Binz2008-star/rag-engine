@@ -5,15 +5,15 @@ from pathlib import Path
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.utils import new_query_id
 from app.inference_service import InferenceService
 from app.pipeline import Pipeline
-from app.utils import new_query_id
-from generation.llm import LLMClient
+from router.intent_router import IntentRouter
 from retrieval.embeddings import Embedder
 from retrieval.faiss_index import FaissIndex
 from retrieval.multi_retriever import MultiRetriever
-from retrieval.reranker import SimpleReranker
-from router.intent_router import IntentRouter
+from retrieval.reranker import Reranker
+from generation.llm import LLMClient
 
 
 class QueryRequest(BaseModel):
@@ -40,9 +40,15 @@ def create_app() -> FastAPI:
         raise RuntimeError("No FAISS indexes found. Run scripts/build_indexes.py first.")
 
     retriever = MultiRetriever(indexes=indexes)
-    reranker = SimpleReranker(embedder.embed_batch)
+    reranker = Reranker(embed_fn=embedder.embed_batch)
     llm = LLMClient()
-    pipeline = Pipeline(router=router, embedder=embedder, retriever=retriever, llm=llm, reranker=reranker)
+    pipeline = Pipeline(
+        router=router,
+        embedder=embedder,
+        retriever=retriever,
+        llm=llm,
+        reranker=reranker,
+    )
     service = InferenceService(pipeline=pipeline)
 
     @app.get("/health")
@@ -63,12 +69,11 @@ def create_app() -> FastAPI:
             "query_id": result.query_id,
             "intent": result.intent,
             "confidence": result.confidence,
-            "intent_method": result.intent_method,
             "answer": result.answer,
             "grounded": result.grounded,
+            "failure_type": result.failure_type,
             "sources": [hit.source for hit in result.retrieval],
             "latency_ms": result.latency_ms,
-            "failure_type": result.failure_type,
         }
 
     return app

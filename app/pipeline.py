@@ -6,7 +6,7 @@ import time
 from app.config import ACTIVE_MODEL_PATH
 from app.models import PipelineResult
 from app.utils import stable_hash
-from events.emitter import emit
+from events.emitter import emit_event
 from generation.grounding import check_grounding
 from router.features import normalize_query
 
@@ -73,9 +73,9 @@ class Pipeline:
                 retriever_version=self.retriever_version,
             )
 
-            emit(
-                "query_completed",
+            emit_event(
                 {
+                    "event_type": "query_completed",
                     "query_id": result.query_id,
                     "query": result.query,
                     "normalized_query": result.normalized_query,
@@ -92,9 +92,9 @@ class Pipeline:
             terminal_emitted = True
             return result
         except Exception as exc:
-            emit(
-                "query_failed",
+            emit_event(
                 {
+                    "event_type": "query_failed",
                     "query_id": query_id,
                     "query": query,
                     "normalized_query": normalized_query,
@@ -105,9 +105,9 @@ class Pipeline:
             raise
         finally:
             if not terminal_emitted:
-                emit(
-                    "query_failed",
+                emit_event(
                     {
+                        "event_type": "query_failed",
                         "query_id": query_id,
                         "query": query,
                         "normalized_query": normalized_query,
