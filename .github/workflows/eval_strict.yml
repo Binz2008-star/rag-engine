@@ -1,10 +1,10 @@
-name: Evaluation Quality Gate
+name: Evaluation Quality Gate (Strict)
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 jobs:
   check:
@@ -35,8 +35,8 @@ jobs:
           python -m py_compile app/rag_pipeline.py  && echo 'app/rag_pipeline.py OK'
           python -m py_compile app/prompting.py     && echo 'app/prompting.py OK'
 
-  eval:
-    name: RAG Evaluation (Dev Mode - 95% Gate)
+  eval_strict:
+    name: RAG Evaluation (Strict Mode - 100% Gate)
     runs-on: self-hosted
     # Requires: Ollama running with 'robin-assistant' model, all deps installed locally
 
@@ -44,13 +44,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
 
-      - name: Run evaluation (dev mode)
-        run: python eval_runner.py --mode dev --report reports/ci_eval.json
+      - name: Run strict evaluation
+        run: python eval_runner.py --mode strict --report reports/ci_eval_strict.json
 
-      - name: Upload evaluation report
+      - name: Upload strict evaluation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eval-report-${{ github.run_id }}
-          path: reports/ci_eval.json
+          name: eval-strict-report-${{ github.run_id }}
+          path: reports/ci_eval_strict.json
           retention-days: 30
+
+      - name: Check strict pass rate
+        run: |
+          python -c "
+          import json, sys
+          with open('reports/ci_eval_strict.json', encoding='utf-8') as f:
+              report = json.load(f)
+          metrics = report['metrics']
+          
+          # Strict mode: require real_pass_rate >= 0.95
+          real_pass_rate = metrics.get('real_pass_rate', 0)
+          if real_pass_rate < 0.95:
+              print(f'FAIL: Real pass rate {real_pass_rate*100:.1f}% < 95% threshold')
+              print(f'Corpus missing: {metrics.get(\"corpus_missing_count\", 0)}')
+              print(f'Generic answers: {metrics.get(\"generic_answer_count\", 0)}')
+              sys.exit(1)
+          
+          print(f'PASS: Real pass rate {real_pass_rate*100:.1f}% >= 95% threshold')
+          "

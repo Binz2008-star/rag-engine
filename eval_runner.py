@@ -68,7 +68,7 @@ def contains_numbers(text: str) -> bool:
     return any(char.isdigit() for char in text)
 
 
-def check_result(result, test: dict, elapsed: float) -> tuple[bool, list[str], list[str]]:
+def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple[bool, list[str], list[str]]:
     """
     Evaluate ALL criteria in the test case.
     Returns (passed, reasons, buckets).
@@ -143,13 +143,33 @@ def check_result(result, test: dict, elapsed: float) -> tuple[bool, list[str], l
             buckets.add("latency_too_high")
             reasons.append(f"latency too high ({elapsed_ms:.0f}ms > {test['max_latency_ms']}ms)")
 
+    # Strict mode: additional checks
+    if mode == "strict":
+        # Fail on generic fallback answers
+        if not is_insufficient_response(answer):
+            # Check for generic company description patterns
+            generic_patterns = [
+                "environmental services company",
+                "waste management",
+                "sustainability",
+                "professional services",
+            ]
+            if any(p in answer.lower() and len(answer.split()) < 15 for p in generic_patterns):
+                buckets.add("generic_answer")
+                reasons.append("generic answer (strict mode)")
+
+        # Fail if corpus_missing for required queries
+        if test.get("required_corpus", False) and "corpus_missing" in buckets:
+            buckets.add("corpus_missing_strict")
+            reasons.append("corpus missing for required query (strict mode)")
+
     passed = len(reasons) == 0
     return passed, reasons, sorted(buckets)
 
 
 # ── Metrics ───────────────────────────────────────────────────────────────────
 
-def compute_metrics(results: list[TestResult]) -> dict:
+def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
     total   = len(results)
     passed  = sum(r.passed for r in results)
     errors  = sum(bool(r.error) for r in results)
@@ -220,7 +240,7 @@ def compute_metrics(results: list[TestResult]) -> dict:
     latency_sla_ms = 2500
     sla_pass = (avg_elapsed * 1000) <= latency_sla_ms
 
-    return {
+    metrics_dict = {
         "total":              total,
         "passed":             passed,
         "failed":             total - passed - errors,
@@ -239,6 +259,18 @@ def compute_metrics(results: list[TestResult]) -> dict:
         "sla_pass":           sla_pass,
     }
 
+    # Strict mode: compute real pass rate excluding corpus_missing
+    if mode == "strict":
+        corpus_missing_count = bucket_counts.get("corpus_missing", 0) + bucket_counts.get("corpus_missing_strict", 0)
+        generic_answer_count = bucket_counts.get("generic_answer", 0)
+        real_passed = passed - corpus_missing_count - generic_answer_count
+        real_total = total - corpus_missing_count - generic_answer_count
+        metrics_dict["real_pass_rate"] = round(real_passed / real_total, 3) if real_total > 0 else 0
+        metrics_dict["corpus_missing_count"] = corpus_missing_count
+        metrics_dict["generic_answer_count"] = generic_answer_count
+
+    return metrics_dict
+
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -248,6 +280,8 @@ def main(query_fn=None) -> int:
                         help="Path to save JSON report")
     parser.add_argument("--suite", type=str, default=None,
                         help="Run only tests matching this suite (e.g. baseline_en, feature_ar)")
+    parser.add_argument("--mode", type=str, default="dev", choices=["dev", "strict"],
+                        help="Evaluation mode: dev (relaxed) or strict (requires grounded answers)")
     args = parser.parse_args()
 
     if not EVAL_QUERIES_PATH.exists():
@@ -263,6 +297,8 @@ def main(query_fn=None) -> int:
             print(f"ERROR: no tests found for suite={args.suite!r}", file=sys.stderr)
             return 2
         print(f"Suite filter: {args.suite!r} → {len(tests)} tests\n")
+
+    print(f"Evaluation mode: {args.mode.upper()}\n")
 
     if not tests:
         print("ERROR: eval_queries.json is empty.", file=sys.stderr)
@@ -316,7 +352,7 @@ def main(query_fn=None) -> int:
                 tr.intent_confidence = result.intent_confidence or 0.0
                 tr.intent_method = result.intent_method or ""
 
-                tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed)
+                tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed, args.mode)
 
                 preview = tr.answer[:120] + ("..." if len(tr.answer) > 120 else "")
                 print(f"  Answer ({tr.elapsed:.2f}s): {preview}")
@@ -341,10 +377,12 @@ def main(query_fn=None) -> int:
                 results.append(tr)
 
         # ── Metrics ───────────────────────────────────────────────────────────
-        metrics = compute_metrics(results)
+        metrics = compute_metrics(results, args.mode)
 
         print(f"\n{'='*60}")
         print(f"  Pass rate:            {metrics['pass_rate']*100:.1f}%  ({metrics['passed']}/{metrics['total']})")
+        if args.mode == "strict" and "real_pass_rate" in metrics:
+            print(f"  Real pass rate:       {metrics['real_pass_rate']*100:.1f}%  (excluding corpus_missing & generic)")
         if metrics["source_match_accuracy"] is not None:
             print(f"  Source match acc:     {metrics['source_match_accuracy']*100:.1f}%")
         if metrics["top1_source_accuracy"] is not None:
@@ -355,6 +393,11 @@ def main(query_fn=None) -> int:
             print(f"  Refusal accuracy:   {metrics['refusal_accuracy']*100:.1f}%")
         print(f"  Errors:             {metrics['errors']}")
         print(f"  Failure buckets:    {metrics['failure_buckets']}")
+        if args.mode == "strict":
+            if "corpus_missing_count" in metrics:
+                print(f"  Corpus missing:      {metrics['corpus_missing_count']}")
+            if "generic_answer_count" in metrics:
+                print(f"  Generic answers:     {metrics['generic_answer_count']}")
         print(f"  Avg latency:        {metrics['avg_elapsed_s']}s  (SLA {metrics['latency_sla_ms']}ms: {'✓' if metrics['sla_pass'] else '✗ FAIL'})")
         print(f"{'='*60}")
 

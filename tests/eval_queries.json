@@ -345,5 +345,13 @@
     "question": "Tell me Robin's full professional profile",
     "expected_source": "Robin_Edwan_Executive_Bio.pdf",
     "note": "Broad profile query — must surface Bio, not ECO profile or CV"
+  },
+  {
+    "suite": "strict_certification",
+    "question": "What environmental certifications does Eco-Technology hold?",
+    "expected_contains": ["certificate", "automation", "whatsapp"],
+    "expected_source": "Sellora_Process_Automation_Certificate.pdf",
+    "required_corpus": true,
+    "note": "Strict test: requires certificate PDFs to be OCR'd and indexed"
   }
 ]
