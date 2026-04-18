@@ -39,13 +39,21 @@ class TestResult:
     expected_exact: str = ""
     has_expected_source: bool = False
     has_expected_exact: bool = False
+    # ML observability fields
+    request_id: str = ""
+    intent_confidence: float = 0.0
+    intent_method: str = ""
 
 
 # ── Checker ───────────────────────────────────────────────────────────────────
 
 def is_insufficient_response(answer: str) -> bool:
     """Check if answer is a refusal/insufficient data response using semantic matching."""
-    keywords = ["insufficient", "not enough", "no data", "no information", "not found"]
+    keywords = [
+        "insufficient", "not enough", "no data", "no information", "not found",
+        "i don't have", "cannot find", "no available data", "i don't know",
+        "not available", "cannot provide", "unable to find", "no information available"
+    ]
     return any(k in answer.lower() for k in keywords)
 
 
@@ -169,6 +177,27 @@ def compute_metrics(results: list[TestResult]) -> dict:
         for b in r.buckets:
             bucket_counts[b] = bucket_counts.get(b, 0) + 1
 
+    # Per-intent metrics
+    from collections import Counter
+    intent_stats = Counter()
+    intent_passes = Counter()
+    for r in results:
+        if r.intent_method:
+            intent_stats[r.intent_method] += 1
+            if r.passed:
+                intent_passes[r.intent_method] += 1
+
+    intent_metrics = {}
+    for method, count in intent_stats.items():
+        intent_metrics[method] = {
+            "total": count,
+            "passed": intent_passes[method],
+            "accuracy": round(intent_passes[method] / count, 3) if count > 0 else 0.0
+        }
+
+    # Low confidence failure analysis
+    low_conf_failures = [r for r in results if not r.passed and r.intent_confidence > 0 and r.intent_confidence < 0.6]
+
     avg_elapsed = round(sum(r.elapsed for r in results) / total, 2) if total else 0
     latency_sla_ms = 2500
     sla_pass = (avg_elapsed * 1000) <= latency_sla_ms
@@ -184,6 +213,8 @@ def compute_metrics(results: list[TestResult]) -> dict:
         "source_precision": round(precision_hits / len(precision_tests), 3) if precision_tests else None,
         "refusal_accuracy":   round(refusal_hits / len(refusal_tests), 3) if refusal_tests else None,
         "failure_buckets":    bucket_counts,
+        "intent_metrics":     intent_metrics,
+        "low_conf_failures":  len(low_conf_failures),
         "avg_elapsed_s":      avg_elapsed,
         "latency_sla_ms":     latency_sla_ms,
         "sla_pass":           sla_pass,
@@ -261,6 +292,9 @@ def main(query_fn=None) -> int:
                 tr.elapsed = time.perf_counter() - t1
                 tr.answer = result.answer or ""
                 tr.sources = [s["source"] for s in result.sources]
+                tr.request_id = result.request_id or ""
+                tr.intent_confidence = result.intent_confidence or 0.0
+                tr.intent_method = result.intent_method or ""
 
                 tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed)
 

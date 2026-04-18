@@ -371,6 +371,9 @@ class RagPipeline:
                 sources=[],
                 retrieval_time=t1 - t0,
                 generation_time=0.0,
+                request_id=self.retriever.last_request_id,
+                intent_confidence=self.retriever.last_intent_confidence,
+                intent_method=self.retriever.last_intent_method,
             )
 
         prompt = build_prompt(question, retrieved)
@@ -387,6 +390,9 @@ class RagPipeline:
                 sources=[],
                 retrieval_time=t1 - t0,
                 generation_time=t2 - t1,
+                request_id=self.retriever.last_request_id,
+                intent_confidence=self.retriever.last_intent_confidence,
+                intent_method=self.retriever.last_intent_method,
             )
 
         if not answer:
@@ -443,6 +449,9 @@ class RagPipeline:
             sources=sources,
             retrieval_time=t1 - t0,
             generation_time=t2 - t1,
+            request_id=self.retriever.last_request_id,
+            intent_confidence=self.retriever.last_intent_confidence,
+            intent_method=self.retriever.last_intent_method,
         )
 
     def _generate(self, prompt: str) -> str:

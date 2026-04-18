@@ -5,6 +5,7 @@ from __future__ import annotations
 import joblib
 import logging
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
@@ -70,6 +71,11 @@ class Retriever:
 
         # Load intent classifier
         self._load_intent_classifier()
+
+        # Store last request metadata for pipeline access
+        self.last_request_id: str = ""
+        self.last_intent_confidence: float = 0.0
+        self.last_intent_method: str = ""
 
     def _contains_arabic(self, text: str) -> bool:
         return any('\u0600' <= c <= '\u06FF' for c in text)
@@ -166,35 +172,45 @@ class Retriever:
                    len(filtered), len(retrieved), SCORE_THRESHOLD)
         return filtered
 
-    def _detect_query_type(self, query: str) -> str:
+    def _detect_query_type(self, query: str, request_id: str) -> str:
         """Detect query type: 'cv', 'eco', or 'general'."""
         # Try ML model first with confidence threshold
         ml_intent, ml_confidence = self._predict_intent(query)
 
         if ml_intent and ml_confidence > INTENT_CONF_THRESHOLD:
-            self.decision_logger.log_intent(query, ml_intent, method="v2_model", confidence=float(ml_confidence))
+            self.decision_logger.log_intent(request_id, query, ml_intent, method="v2_model", confidence=float(ml_confidence))
+            self.last_intent_confidence = ml_confidence
+            self.last_intent_method = "v2_model"
             return ml_intent
         elif ml_intent:
             # Low confidence - log and fall back to rules
             logger.debug(f"ML intent low confidence: {ml_intent} ({ml_confidence:.3f}) → using rules")
+            self.last_intent_confidence = ml_confidence
+            self.last_intent_method = "v2_model_fallback"
 
         q = query.lower()
 
         # Pre-ECO modifiers: queries about work/history BEFORE ECO override ECO entity
         pre_eco_signals = ["before eco", "before joining", "work history", "prior to", "previously"]
         if any(x in q for x in pre_eco_signals):
-            self.decision_logger.log_intent(query, "cv", confidence=1.0)
+            self.decision_logger.log_intent(request_id, query, "cv", confidence=1.0)
+            self.last_intent_confidence = 1.0
+            self.last_intent_method = "v1_keyword_pre_eco"
             return "cv"
 
         # Profile identity queries: broad summary requests that should surface Bio
         profile_signals = ["full profile", "professional profile", "overview"]
         if any(x in q for x in profile_signals):
-            self.decision_logger.log_intent(query, "profile", confidence=1.0)
+            self.decision_logger.log_intent(request_id, query, "profile", confidence=1.0)
+            self.last_intent_confidence = 1.0
+            self.last_intent_method = "v1_keyword_profile"
             return "profile"
 
         # ECO entity detection — runs after pre-ECO and profile checks
         if "eco" in q or "إيكو" in query or "company" in q or "environmental services" in q:
-            self.decision_logger.log_intent(query, "eco", confidence=1.0)
+            self.decision_logger.log_intent(request_id, query, "eco", confidence=1.0)
+            self.last_intent_confidence = 1.0
+            self.last_intent_method = "v1_keyword_eco"
             return "eco"
 
         # CV-specific signals — only reached if no ECO entity detected above
@@ -207,13 +223,17 @@ class Retriever:
         ]
         cv_triggers_ar = ["سيرة", "تعليم", "خبرة", "مهارات", "شهادات"]
         if any(x in q for x in cv_triggers) or any(x in query for x in cv_triggers_ar):
-            self.decision_logger.log_intent(query, "cv", confidence=1.0)
+            self.decision_logger.log_intent(request_id, query, "cv", confidence=1.0)
+            self.last_intent_confidence = 1.0
+            self.last_intent_method = "v1_keyword_cv"
             return "cv"
 
-        self.decision_logger.log_intent(query, "general", confidence=1.0)
+        self.decision_logger.log_intent(request_id, query, "general", confidence=1.0)
+        self.last_intent_confidence = 1.0
+        self.last_intent_method = "v1_keyword_general"
         return "general"
 
-    def _group_by_document(self, retrieved: List[RetrievedChunk], query_type: str = 'general', query: str = '') -> List[RetrievedChunk]:
+    def _group_by_document(self, retrieved: List[RetrievedChunk], query_type: str = 'general', query: str = '', request_id: str = '') -> List[RetrievedChunk]:
         """Group chunks by document and rank documents before selecting chunks."""
         from collections import defaultdict
 
@@ -284,7 +304,7 @@ class Retriever:
 
         # Log grouped order
         grouped_order = [source for _, source, _ in doc_scores[:3]]
-        self.decision_logger.log_grouped_order(query, grouped_order)
+        self.decision_logger.log_grouped_order(request_id, query, grouped_order)
 
         return selected_chunks
 
@@ -376,6 +396,10 @@ class Retriever:
         if not isinstance(query, str) or not query.strip():
             raise ValueError("Query must be a non-empty string.")
 
+        # Generate unique request ID for this retrieval
+        request_id = str(uuid.uuid4())
+        self.last_request_id = request_id
+
         # Arabic detection and normalization
         is_ar = self._contains_arabic(query)
 
@@ -385,7 +409,7 @@ class Retriever:
         retrieval_pool = self._get_top_k(query)
 
         # Detect query type once for all downstream decisions
-        query_type = self._detect_query_type(query)
+        query_type = self._detect_query_type(query, request_id)
 
         # cv_signal: True only when query_type is 'cv' AND query contains detail terms.
         # Using query_type as the gate ensures ECO queries with shared terms (certifications)
@@ -475,7 +499,7 @@ class Retriever:
             }
             for i, rc in enumerate(retrieved)
         ]
-        self.decision_logger.log_retrieved(query, retrieved_log)
+        self.decision_logger.log_retrieved(request_id, query, retrieved_log)
 
         # Diagnostic: Show all unique sources in retrieval pool
         unique_sources = set(rc.chunk.source for rc in retrieved)
@@ -500,7 +524,7 @@ class Retriever:
 
         retrieved = self._filter_score(retrieved)  # No intent parameter needed
 
-        retrieved = self._group_by_document(retrieved, query_type, query)  # Group by document with type-specific boosting
+        retrieved = self._group_by_document(retrieved, query_type, query, request_id)  # Group by document with type-specific boosting
         source_cap = 1 if cv_signal else MAX_PER_SOURCE
         retrieved = self._diversify(retrieved, max_per_source=source_cap)
 
@@ -515,7 +539,7 @@ class Retriever:
             }
             for i, rc in enumerate(final)
         ]
-        self.decision_logger.log_final_chunks(query, final_chunks_log)
+        self.decision_logger.log_final_chunks(request_id, query, final_chunks_log)
 
         # Aggressive context trimming for Arabic-only queries (test 38)
         if "answer in arabic only" in query.lower():
