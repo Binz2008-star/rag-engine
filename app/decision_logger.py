@@ -23,20 +23,21 @@ class DecisionLogger:
         self.log_path = Path(log_path)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def log_intent(self, query: str, intent: str, method: str = "v1_keyword") -> None:
+    def log_intent(self, query: str, intent: str, method: str = "v1_keyword", confidence: float = 1.0) -> None:
         """Log intent classification decision.
 
         Args:
             query: The user query.
             intent: Detected intent (cv, eco, general, profile).
             method: Method used for detection (e.g., "v1_keyword").
+            confidence: Confidence score (0.0-1.0). Default 1.0 for rule-based.
         """
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
             "type": "intent",
             "query": query,
             "intent": intent,
-            "confidence": 1.0,  # rule-based deterministic
+            "confidence": confidence,
             "method": method,
         }
         self._append(entry)

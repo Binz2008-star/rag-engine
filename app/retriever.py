@@ -20,6 +20,9 @@ from app.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
+# Configuration constants
+INTENT_CONF_THRESHOLD = 0.6
+
 # ── Retrieval parameters ──────────────────────────────────────────────────────
 
 SCORE_THRESHOLD    = 0.35
@@ -168,8 +171,8 @@ class Retriever:
         # Try ML model first with confidence threshold
         ml_intent, ml_confidence = self._predict_intent(query)
 
-        if ml_intent and ml_confidence > 0.6:
-            self.decision_logger.log_intent(query, ml_intent, method="v2_model")
+        if ml_intent and ml_confidence > INTENT_CONF_THRESHOLD:
+            self.decision_logger.log_intent(query, ml_intent, method="v2_model", confidence=float(ml_confidence))
             return ml_intent
         elif ml_intent:
             # Low confidence - log and fall back to rules
@@ -180,18 +183,18 @@ class Retriever:
         # Pre-ECO modifiers: queries about work/history BEFORE ECO override ECO entity
         pre_eco_signals = ["before eco", "before joining", "work history", "prior to", "previously"]
         if any(x in q for x in pre_eco_signals):
-            self.decision_logger.log_intent(query, "cv")
+            self.decision_logger.log_intent(query, "cv", confidence=1.0)
             return "cv"
 
         # Profile identity queries: broad summary requests that should surface Bio
         profile_signals = ["full profile", "professional profile", "overview"]
         if any(x in q for x in profile_signals):
-            self.decision_logger.log_intent(query, "profile")
+            self.decision_logger.log_intent(query, "profile", confidence=1.0)
             return "profile"
 
         # ECO entity detection — runs after pre-ECO and profile checks
         if "eco" in q or "إيكو" in query or "company" in q or "environmental services" in q:
-            self.decision_logger.log_intent(query, "eco")
+            self.decision_logger.log_intent(query, "eco", confidence=1.0)
             return "eco"
 
         # CV-specific signals — only reached if no ECO entity detected above
@@ -204,10 +207,10 @@ class Retriever:
         ]
         cv_triggers_ar = ["سيرة", "تعليم", "خبرة", "مهارات", "شهادات"]
         if any(x in q for x in cv_triggers) or any(x in query for x in cv_triggers_ar):
-            self.decision_logger.log_intent(query, "cv")
+            self.decision_logger.log_intent(query, "cv", confidence=1.0)
             return "cv"
 
-        self.decision_logger.log_intent(query, "general")
+        self.decision_logger.log_intent(query, "general", confidence=1.0)
         return "general"
 
     def _group_by_document(self, retrieved: List[RetrievedChunk], query_type: str = 'general', query: str = '') -> List[RetrievedChunk]:
@@ -381,11 +384,13 @@ class Retriever:
         # Get dynamic TOP_K based on query length (reduce retrieval cost)
         retrieval_pool = self._get_top_k(query)
 
+        # Detect query type once for all downstream decisions
+        query_type = self._detect_query_type(query)
+
         # cv_signal: True only when query_type is 'cv' AND query contains detail terms.
         # Using query_type as the gate ensures ECO queries with shared terms (certifications)
         # and pre-ECO queries both route correctly without independent signal conflicts.
-        _early_query_type = self._detect_query_type(query)
-        cv_signal = (_early_query_type == "cv") and self._has_cv_detail_signal(query)
+        cv_signal = (query_type == "cv") and self._has_cv_detail_signal(query)
 
         queries = self._expand_query(query)
 
@@ -494,10 +499,6 @@ class Retriever:
         # Legacy intent-based source priors removed - using reranking scores only
 
         retrieved = self._filter_score(retrieved)  # No intent parameter needed
-
-        # Detect query type for document-level routing
-        query_type = self._detect_query_type(query)
-        logger.info(f"Query type detected: {query_type}")
 
         retrieved = self._group_by_document(retrieved, query_type, query)  # Group by document with type-specific boosting
         source_cap = 1 if cv_signal else MAX_PER_SOURCE
