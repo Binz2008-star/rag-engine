@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Train intent classification model."""
 
+import argparse
 import json
 import joblib
 from pathlib import Path
@@ -124,10 +125,15 @@ def save_model(model: LogisticRegression, vectorizer: TfidfVectorizer, label_enc
 
 def main():
     """Train intent classification model."""
+    parser = argparse.ArgumentParser(description='Train intent classification model')
+    parser.add_argument('--train', type=str, default='data/intent_dataset_clean.json',
+                        help='Path to training data (JSON or JSONL)')
+    args = parser.parse_args()
+
     print("Training intent classifier...")
 
-    # Load dataset (use cleaned version)
-    dataset_path = Path(__file__).parent.parent / "data" / "intent_dataset_clean.json"
+    # Load dataset
+    dataset_path = Path(args.train)
     queries, intents = load_dataset(dataset_path)
 
     print(f"Dataset loaded: {len(queries)} examples")
