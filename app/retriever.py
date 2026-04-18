@@ -223,7 +223,7 @@ class Retriever:
 
         # Log grouped order
         grouped_order = [source for _, source, _ in doc_scores[:3]]
-        self.decision_logger.log_grouped_order(grouped_order)
+        self.decision_logger.log_grouped_order(query, grouped_order)
 
         return selected_chunks
 
