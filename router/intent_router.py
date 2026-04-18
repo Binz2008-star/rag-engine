@@ -6,7 +6,7 @@ from pathlib import Path
 import joblib
 from sklearn.pipeline import Pipeline as SkPipeline
 
-from app.config import ACTIVE_MODEL_PATH, ROUTER_CONFIDENCE_THRESHOLD
+from app.config import ACTIVE_MODEL_PATH, MODEL_DIR, ROUTER_CONFIDENCE_THRESHOLD
 from app.models import Route
 from router.features import extract_hints
 
