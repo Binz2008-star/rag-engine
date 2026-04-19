@@ -1,24 +1,24 @@
-name: Evaluation Quality Gate
+name: Evaluation Fast Feedback (Dev)
 
+# Fast feedback loop for non-main branches. Runs the strict gate scoring
+# logic BUT bypasses KnowledgeGapAnalyzer via --fast to stay under ~6 min
+# of Ollama work. This workflow is NON-authoritative: merging to main
+# still requires eval_strict.yml to pass.
 on:
   push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+    branches-ignore: [main]
+  workflow_dispatch:
 
 jobs:
   check:
     name: Repo Integrity (Portable)
     runs-on: ubuntu-latest
-    # No pip install — stdlib only. Tests repo structure and file validity.
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.2
 
       - name: Validate eval suite JSON
-        # Validates the suite actually consumed by eval_runner.py and
-        # enforces presence of killer queries protecting the gate.
         shell: bash
         run: |
           python <<'PY'
@@ -50,19 +50,17 @@ jobs:
         run: |
           python -m py_compile eval_runner.py       && echo 'eval_runner.py OK'
           python -m py_compile app/config.py        && echo 'app/config.py OK'
-          python -m py_compile app/pipeline.py     && echo 'app/pipeline.py OK'
+          python -m py_compile app/pipeline.py      && echo 'app/pipeline.py OK'
           python -m py_compile generation/llm.py    && echo 'generation/llm.py OK'
           python -m py_compile evaluation/eval_main.py && echo 'evaluation/eval_main.py OK'
 
-  eval:
-    name: RAG Evaluation (Dev Mode - 95% Gate)
+  eval_fast:
+    name: RAG Evaluation (Fast Mode - Dev Feedback)
     runs-on: ubuntu-latest
-    # Hard ceiling: prevents runaway CI from Ollama hangs / infinite retries.
-    timeout-minutes: 25
+    # Tighter ceiling than strict: --fast + --query-timeout=45 keeps each
+    # query well under 60s even in worst case.
+    timeout-minutes: 20
     env:
-      # 60s covers embed batches of 32 chunks on CPU runners (~2x margin
-      # over observed 20-35s typical). Chat calls bounded independently
-      # by --query-timeout=45 in eval_runner. See eval_strict.yml.
       TIMEOUT: "60"
       MAX_RETRIES: "1"
       CHAT_MODEL: qwen3:8b
@@ -81,6 +79,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Cache Ollama models
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama/models
+          key: ollama-${{ env.CHAT_MODEL }}-${{ env.EMBED_MODEL }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ollama-${{ env.CHAT_MODEL }}-${{ env.EMBED_MODEL }}-
 
       - name: Start Ollama service
         shell: bash
@@ -106,8 +112,8 @@ jobs:
             exit 1
           fi
 
-          ollama pull qwen3:8b
-          ollama pull nomic-embed-text
+          ollama list | grep -q "${CHAT_MODEL}"  || ollama pull "${CHAT_MODEL}"
+          ollama list | grep -q "${EMBED_MODEL}" || ollama pull "${EMBED_MODEL}"
 
       - name: Build FAISS indexes
         timeout-minutes: 8
@@ -115,25 +121,29 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
 
-      - name: Run evaluation (dev mode)
-        # Parallel execution + per-query timeout + fast mode.
-        # See eval_runner.py for flag semantics.
-        timeout-minutes: 12
+      - name: Run fast evaluation
+        # --mode strict + --fast: strict scoring logic, KnowledgeGapAnalyzer
+        # LLM call is bypassed (deterministic CorpusTopicMap signal still
+        # drives missing_documents). Non-authoritative by design — main
+        # merges go through eval_strict.yml which runs without --fast.
+        timeout-minutes: 8
         run: |
           python eval_runner.py \
-            --mode dev \
-            --workers 4 \
+            --mode strict \
+            --workers 2 \
             --query-timeout 45 \
             --fast \
-            --report reports/ci_eval.json
+            --report reports/ci_eval_dev.json
+        env:
+          PYTHONPATH: ${{ github.workspace }}
 
-      - name: Upload evaluation report
+      - name: Upload dev evaluation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eval-report-${{ github.run_id }}
-          path: reports/ci_eval.json
-          retention-days: 30
+          name: eval-dev-report-${{ github.run_id }}
+          path: reports/ci_eval_dev.json
+          retention-days: 7
 
       - name: Upload Ollama log on failure
         if: failure()
@@ -143,3 +153,9 @@ jobs:
           path: /tmp/ollama.log
           retention-days: 7
           if-no-files-found: ignore
+
+      - name: Check pass rate
+        run: python scripts/check_strict_pass.py
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          REPORT_PATH: reports/ci_eval_dev.json

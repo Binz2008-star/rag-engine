@@ -14,10 +14,13 @@ Canonical policy (from evaluation/eval_gate.py):
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
-REPORT_PATH = Path("reports/ci_eval_strict.json")
+# Path is env-overridable so this script works for both strict and dev
+# workflows. Default stays backward-compatible with existing invocations.
+REPORT_PATH = Path(os.environ.get("REPORT_PATH", "reports/ci_eval_strict.json"))
 KILLER_CHECK = "killer_failure"
 
 
