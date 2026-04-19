@@ -37,7 +37,8 @@ def run_training_cycle(build_pipeline: Callable[[Path], object]) -> str:
     eval_result = run_eval(pipeline, BASE_DIR / "data" / "eval_queries.json")
     metrics = eval_result["metrics"]
 
-    decision = gate(metrics)
+    gate_result = gate(metrics)
+    decision = gate_result["decision"]
     status = "staging" if decision == "PROMOTE" else "rejected"
     register_model(
         version=version,
@@ -46,4 +47,7 @@ def run_training_cycle(build_pipeline: Callable[[Path], object]) -> str:
         dataset_hash=dataset_hash,
         status=status,
     )
-    return f"Training completed: version={version}, decision={decision}"
+    return (
+        f"Training completed: version={version}, decision={decision}, "
+        f"failed_checks={gate_result['failed_checks']}"
+    )

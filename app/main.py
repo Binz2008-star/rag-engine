@@ -59,7 +59,7 @@ def create_app() -> FastAPI:
     def query(req: QueryRequest):
         query_id = new_query_id()
         result = service.handle_query(req.query, query_id)
-        return {
+        response = {
             "query_id": result.query_id,
             "intent": result.intent,
             "confidence": result.confidence,
@@ -70,6 +70,15 @@ def create_app() -> FastAPI:
             "sources": [h.source for h in result.retrieval],
             "latency_ms": result.latency_ms,
         }
+        if result.knowledge_gap:
+            response["knowledge_gap"] = {
+                "gap_type": result.knowledge_gap.gap_type,
+                "confidence_if_adversarial": result.knowledge_gap.confidence_if_adversarial,
+                "suggested_action": result.knowledge_gap.suggested_action,
+                "missing_documents": result.knowledge_gap.missing_documents,
+                "missing_confidence": result.knowledge_gap.missing_confidence,
+            }
+        return response
 
     return app
 

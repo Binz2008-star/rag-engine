@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from evaluation.eval_gate import gate
 from evaluation.metrics import compute_metrics
 from evaluation.ocr_check import check_ocr_presence
 
@@ -26,6 +27,7 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
         actual_grounded = getattr(result, "grounded", True)
         actual_failure_type = getattr(result, "failure_type", None)
         actual_latency_ms = getattr(result, "latency_ms", 0)
+        actual_knowledge_gap = getattr(result, "knowledge_gap", None)
 
         intent_correct = actual_intent == item["expected_intent"]
 
@@ -73,6 +75,14 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
                 passed = False
                 failure_reasons.append(f"unexpected failure_type: {actual_failure_type}")
 
+        if "expected_knowledge_gap" in item:
+            if item["expected_knowledge_gap"] and actual_knowledge_gap is None:
+                passed = False
+                failure_reasons.append("expected knowledge_gap to be present, but it was None")
+            elif not item["expected_knowledge_gap"] and actual_knowledge_gap is not None:
+                passed = False
+                failure_reasons.append(f"expected no knowledge_gap, but got: {actual_knowledge_gap}")
+
         expected_refusal = item.get(
             "expected_refusal",
             item.get("expected_answer_exact") == "Insufficient data."
@@ -86,12 +96,18 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
                 "intent_method": actual_method,
                 "grounded": actual_grounded,
                 "failure_type": actual_failure_type,
+                "knowledge_gap": {
+                    "gap_type": actual_knowledge_gap.gap_type if actual_knowledge_gap else None,
+                    "confidence_if_adversarial": actual_knowledge_gap.confidence_if_adversarial if actual_knowledge_gap else None,
+                    "suggested_action": actual_knowledge_gap.suggested_action if actual_knowledge_gap else None,
+                } if actual_knowledge_gap else None,
                 "passed": passed,
                 "failure_reasons": failure_reasons,
                 "latency_ms": actual_latency_ms,
                 "intent_correct": intent_correct,
                 "expected_intent": item["expected_intent"],
                 "expected_refusal": expected_refusal,
+                "killer": bool(item.get("killer", False)),
             }
         )
 
@@ -104,4 +120,11 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
     metrics = compute_metrics(results, ocr_presence_check=ocr_result["ocr_presence_check"])
     metrics["pdf_status"] = ocr_result["pdf_status"]
 
-    return {"metrics": metrics, "results": results}
+    gate_result = gate(metrics, results)
+
+    return {
+        "decision": gate_result["decision"],
+        "failed_checks": gate_result["failed_checks"],
+        "metrics": metrics,
+        "results": results,
+    }

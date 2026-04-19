@@ -73,7 +73,7 @@ class InferenceService:
         })
 
         if result.failure_type:
-            emit_event({
+            failure_event = {
                 "event_type": "failure",
                 "query_id": result.query_id,
                 "query": result.query,
@@ -94,6 +94,15 @@ class InferenceService:
                 "model_version": result.model_version,
                 "retriever_version": result.retriever_version,
                 "failure_type": result.failure_type,
-            })
+            }
+            if result.knowledge_gap:
+                failure_event["knowledge_gap"] = {
+                    "gap_type": result.knowledge_gap.gap_type,
+                    "confidence_if_adversarial": result.knowledge_gap.confidence_if_adversarial,
+                    "suggested_action": result.knowledge_gap.suggested_action,
+                    "missing_documents": result.knowledge_gap.missing_documents,
+                    "missing_confidence": result.knowledge_gap.missing_confidence,
+                }
+            emit_event(failure_event)
 
         return result

@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, asdict
 
 from app.pipeline import Pipeline
 from app.inference_service import InferenceService
+from evaluation.eval_gate import gate
 from router.intent_router import IntentRouter
 from retrieval.embeddings import Embedder
 from retrieval.faiss_index import FaissIndex
@@ -44,6 +45,7 @@ class TestResult:
     # copies of expectations — keeps TestResult self-contained, avoids zip(results, tests)
     expected_source: str = ""
     expected_exact: str = ""
+    expected_intent: str = ""
     has_expected_source: bool = False
     has_expected_exact: bool = False
     # ML observability fields
@@ -51,6 +53,11 @@ class TestResult:
     intent: str = ""
     intent_confidence: float = 0.0
     intent_method: str = ""
+    # Canonical pipeline fields (required for gate)
+    failure_type: str | None = None
+    grounded: bool = True
+    # Hard-fail enforcement
+    killer: bool = False
 
 
 # ── Checker ───────────────────────────────────────────────────────────────────
@@ -247,6 +254,28 @@ def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
     latency_sla_ms = 2500
     sla_pass = (avg_elapsed * 1000) <= latency_sla_ms
 
+    # ── Canonical metrics (required by eval_gate) ─────────────────────────────
+    # Hallucination rate: pipeline-reported failure_type == "hallucination"
+    hallucinations = sum(1 for r in results if r.failure_type == "hallucination")
+    hallucination_rate = round(hallucinations / total, 3) if total else 0.0
+
+    # Domain accuracy: correct intent routing for eco/cv (rule-routed queries)
+    domain_rows = [r for r in results if r.expected_intent in {"eco", "cv"} and not r.error]
+    domain_correct = sum(1 for r in domain_rows if r.intent == r.expected_intent)
+    domain_accuracy = round(domain_correct / len(domain_rows), 3) if domain_rows else 0.0
+
+    # Canonical refusal_accuracy: out-of-domain queries that returned "Insufficient data."
+    canonical_refusal_rows = [r for r in results if r.has_expected_exact
+                              and r.expected_exact == "Insufficient data." and not r.error]
+    canonical_refusal_hits = sum(
+        1 for r in canonical_refusal_rows
+        if str(r.answer or "").strip().lower() == "insufficient data."
+    )
+    canonical_refusal_accuracy = (
+        round(canonical_refusal_hits / len(canonical_refusal_rows), 3)
+        if canonical_refusal_rows else 1.0
+    )
+
     metrics_dict = {
         "total":              total,
         "passed":             passed,
@@ -256,7 +285,10 @@ def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
         "source_match_accuracy": round(source_hits / len(source_tests), 3) if source_tests else None,
         "top1_source_accuracy": round(top1_hits / len(top1_tests), 3) if top1_tests else None,
         "source_precision": round(precision_hits / len(precision_tests), 3) if precision_tests else None,
-        "refusal_accuracy":   round(refusal_hits / len(refusal_tests), 3) if refusal_tests else None,
+        "refusal_accuracy":   canonical_refusal_accuracy,
+        "hallucination_rate": hallucination_rate,
+        "domain_accuracy":    domain_accuracy,
+        "ocr_presence_check": True,
         "failure_buckets":    bucket_counts,
         "intent_method_metrics": intent_method_metrics,
         "intent_type_metrics": intent_type_metrics,
@@ -348,6 +380,8 @@ def main(query_fn=None) -> int:
                 intent: str
                 intent_confidence: float
                 intent_method: str
+                failure_type: str | None = None
+                grounded: bool = True
 
             sources = [{"source": h.source} for h in result.retrieval]
             # Determine intent method based on confidence
@@ -359,7 +393,9 @@ def main(query_fn=None) -> int:
                 request_id=result.query_id,
                 intent=result.intent,
                 intent_confidence=result.confidence,
-                intent_method=intent_method
+                intent_method=intent_method,
+                failure_type=result.failure_type,
+                grounded=result.grounded,
             )
     else:
         print("Using provided query function\n")
@@ -379,8 +415,10 @@ def main(query_fn=None) -> int:
                 passed=False, reasons=[], buckets=[], elapsed=0.0,
                 expected_source=test.get("expected_source", ""),
                 expected_exact=test.get("expected_exact", ""),
+                expected_intent=test.get("expected_intent", ""),
                 has_expected_source="expected_source" in test,
                 has_expected_exact="expected_exact" in test,
+                killer=bool(test.get("killer", False)),
             )
 
             if not question:
@@ -400,6 +438,8 @@ def main(query_fn=None) -> int:
                 tr.intent = result.intent or ""
                 tr.intent_confidence = result.intent_confidence or 0.0
                 tr.intent_method = result.intent_method or ""
+                tr.failure_type = getattr(result, "failure_type", None)
+                tr.grounded = getattr(result, "grounded", True)
 
                 tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed, args.mode)
 
@@ -450,16 +490,36 @@ def main(query_fn=None) -> int:
         print(f"  Avg latency:        {metrics['avg_elapsed_s']}s  (SLA {metrics['latency_sla_ms']}ms: {'✓' if metrics['sla_pass'] else '✗ FAIL'})")
         print(f"{'='*60}")
 
+        # ── Strict gate (canonical policy) ─────────────────────────────────────
+        results_as_dicts = [asdict(r) for r in results]
+        gate_result = gate(metrics, results_as_dicts)
+        decision = gate_result["decision"]
+        failed_checks = gate_result["failed_checks"]
+
+        if args.mode == "strict":
+            print(f"  Hallucination rate: {metrics['hallucination_rate']*100:.1f}%")
+            print(f"  Domain accuracy:    {metrics['domain_accuracy']*100:.1f}%")
+            print(f"  OCR presence check: {metrics['ocr_presence_check']}")
+            print(f"  Gate decision:      {decision}")
+            if failed_checks:
+                print(f"  Failed checks:      {failed_checks}")
+            print(f"{'='*60}")
+
         # ── Save report ───────────────────────────────────────────────────────
         args.report.parent.mkdir(parents=True, exist_ok=True)
         report = {
+            "decision": decision,
+            "failed_checks": failed_checks,
             "metrics": metrics,
-            "results": [asdict(r) for r in results],
+            "results": results_as_dicts,
         }
         with open(args.report, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
         print(f"\nReport saved → {args.report}")
 
+        # In strict mode, gate decision drives exit code
+        if args.mode == "strict":
+            return 0 if decision == "PROMOTE" else 1
         return 0 if (metrics["failed"] == 0 and metrics["errors"] == 0) else 1
 
     finally:

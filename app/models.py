@@ -61,6 +61,15 @@ class RagResponse:
 
 
 @dataclass
+class KnowledgeGap:
+    gap_type: str
+    confidence_if_adversarial: float
+    suggested_action: str
+    missing_documents: list[str] = field(default_factory=list)
+    missing_confidence: float = 0.0
+
+
+@dataclass
 class PipelineResult:
     query_id: str
     query: str
@@ -72,6 +81,7 @@ class PipelineResult:
     answer: str = ""
     grounded: bool = False
     failure_type: str | None = None
+    knowledge_gap: KnowledgeGap | None = None
     latency_ms: int = 0
     model_version: str = ""
     retriever_version: str = ""
