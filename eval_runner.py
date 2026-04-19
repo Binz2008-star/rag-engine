@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from app.config import REFUSAL_MESSAGE
 from app.pipeline import Pipeline
 from app.inference_service import InferenceService
 from evaluation.eval_gate import gate
@@ -103,7 +104,7 @@ def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple
     # Refusal response validation with semantic matching
     if "expected_exact" in test:
         exp = test["expected_exact"]
-        if exp == "Insufficient data.":
+        if exp == REFUSAL_MESSAGE:
             if not is_insufficient_response(answer):
                 buckets.add("refusal_failure")
                 reasons.append(f"expected refusal response, got {answer!r}")
@@ -112,7 +113,7 @@ def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple
             reasons.append(f"expected exact {exp!r}, got {answer!r}")
 
     # Hallucination detection for refusal responses
-    if "expected_exact" in test and test["expected_exact"] == "Insufficient data.":
+    if "expected_exact" in test and test["expected_exact"] == REFUSAL_MESSAGE:
         if is_insufficient_response(answer) and contains_numbers(answer):
             buckets.add("hallucination_risk")
             reasons.append("refusal response contains numbers (hallucination risk)")
@@ -203,9 +204,9 @@ def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
     precision_tests = [r for r in results if r.has_expected_source and not r.error]
     precision_hits = sum("low_source_precision" not in r.buckets for r in precision_tests)
 
-    # Refusal accuracy: tests that expect exactly "Insufficient data."
+    # Refusal accuracy: tests that expect exactly the canonical refusal message.
     refusal_tests = [r for r in results if r.has_expected_exact
-                     and r.expected_exact == "Insufficient data." and not r.error]
+                     and r.expected_exact == REFUSAL_MESSAGE and not r.error]
     refusal_hits  = sum(r.passed for r in refusal_tests)
 
     # Bucket counts
@@ -266,12 +267,13 @@ def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
     domain_correct = sum(1 for r in domain_rows if r.intent == r.expected_intent)
     domain_accuracy = round(domain_correct / len(domain_rows), 3) if domain_rows else 0.0
 
-    # Canonical refusal_accuracy: out-of-domain queries that returned "Insufficient data."
+    # Canonical refusal_accuracy: out-of-domain queries that returned the
+    # canonical refusal message exactly (case-insensitive).
     canonical_refusal_rows = [r for r in results if r.has_expected_exact
-                              and r.expected_exact == "Insufficient data." and not r.error]
+                              and r.expected_exact == REFUSAL_MESSAGE and not r.error]
     canonical_refusal_hits = sum(
         1 for r in canonical_refusal_rows
-        if str(r.answer or "").strip().lower() == "insufficient data."
+        if str(r.answer or "").strip().lower() == REFUSAL_MESSAGE.lower()
     )
     canonical_refusal_accuracy = (
         round(canonical_refusal_hits / len(canonical_refusal_rows), 3)

@@ -22,6 +22,13 @@ MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "4000"))
 TIMEOUT = int(os.getenv("TIMEOUT", "60"))
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
 
+# Canonical refusal message. The LLM system prompt instructs the model to
+# emit exactly this string when it cannot answer from the retrieved
+# context. Test infrastructure and metrics should import this constant
+# instead of hard-coding the literal, so future prompt changes only
+# require updating one place.
+REFUSAL_MESSAGE = "Insufficient data."
+
 INTENT_CLASSES = ["cv", "eco", "general"]
 UNCERTAINTY_LABEL = "uncertain"
 ROUTER_CONFIDENCE_THRESHOLD = 0.55

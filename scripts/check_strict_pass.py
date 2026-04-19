@@ -25,16 +25,30 @@ KILLER_CHECK = "killer_failure"
 
 
 def _failing_killer_queries(results: list) -> list[dict]:
-    """Return results rows flagged as killer that did not pass."""
+    """Return results rows flagged as killer that did not pass.
+
+    Emits a stderr warning when NO rows carry ``killer: true``. This
+    guards against silent regressions in ``eval_runner.py`` that would
+    drop the killer metadata, causing ``_check_killers()`` in the gate
+    to quietly return ``[]`` and a diagnostic block that claims
+    ``0 failing`` on an otherwise rejected run.
+    """
     if not isinstance(results, list):
         return []
-    out: list[dict] = []
-    for row in results:
-        if not isinstance(row, dict):
-            continue
-        if row.get("killer") is True and row.get("passed") is not True:
-            out.append(row)
-    return out
+
+    killer_rows = [
+        row for row in results
+        if isinstance(row, dict) and row.get("killer") is True
+    ]
+
+    if not killer_rows:
+        print(
+            "WARNING: no result rows carry 'killer: true' — "
+            "verify eval_runner.py propagates query metadata to results.",
+            file=sys.stderr,
+        )
+
+    return [row for row in killer_rows if row.get("passed") is not True]
 
 
 def main() -> int:

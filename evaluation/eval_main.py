@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from app.config import REFUSAL_MESSAGE
 from evaluation.eval_gate import gate
 from evaluation.metrics import compute_metrics
 from evaluation.ocr_check import check_ocr_presence
@@ -43,7 +44,20 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
                 f"method mismatch: expected {item['expected_method']}, got {actual_method}"
             )
 
-        if item.get("must_be_grounded", True) and not actual_grounded:
+        # Grounding requirement. A "grounded" answer is one that does not
+        # fabricate content: either it cites the retrieved context or it
+        # is a valid refusal ("Insufficient data."). Refusals count as
+        # grounded because they introduce no unsupported claims — that
+        # is why setting this on a refusal query is redundant, not
+        # contradictory. Default True.
+        #
+        # ``must_not_hallucinate`` is the clearer name for the same
+        # contract and is accepted as an alias; it wins if both are set.
+        must_be_grounded = item.get(
+            "must_not_hallucinate",
+            item.get("must_be_grounded", True),
+        )
+        if must_be_grounded and not actual_grounded:
             passed = False
             failure_reasons.append("not grounded when required")
 
@@ -85,7 +99,7 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
 
         expected_refusal = item.get(
             "expected_refusal",
-            item.get("expected_answer_exact") == "Insufficient data."
+            item.get("expected_answer_exact") == REFUSAL_MESSAGE
         )
 
         results.append(

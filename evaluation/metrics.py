@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.config import REFUSAL_MESSAGE
+
 
 def compute_metrics(results: list[dict], ocr_presence_check: bool = False) -> dict:
     total = len(results)
@@ -10,7 +12,7 @@ def compute_metrics(results: list[dict], ocr_presence_check: bool = False) -> di
     refusal_rows = [row for row in results if row.get("expected_refusal") is True]
     refusal_correct = sum(
         1 for row in refusal_rows
-        if str(row.get("answer", "")).strip().lower() == "insufficient data."
+        if str(row.get("answer", "")).strip().lower() == REFUSAL_MESSAGE.lower()
     )
 
     domain_rows = [row for row in results if row.get("expected_intent") in {"eco", "cv"}]
