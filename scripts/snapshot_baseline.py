@@ -81,7 +81,6 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--label",
         required=True,
-        choices=["before", "after"],
         help="Snapshot name; outputs land under reports/<label>/.",
     )
     parser.add_argument(
