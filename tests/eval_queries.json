@@ -36,10 +36,10 @@
     "query": "What is Roben's experience in environmental operations?",
     "expected_intent": "cv",
     "expected_method": "rule",
-    "expected_refusal": true,
-    "expected_answer_exact": "Insufficient data.",
     "must_be_grounded": true,
-    "expected_failure_type": "retrieval_miss"
+    "must_not_contain": ["appears to be", "can be inferred", "based on context"],
+    "expected_answer_contains": ["environmental"],
+    "todo": "Updated after CV corpus expansion: Roben_Edwan_CV.pdf / Roben_Edwan_CV_Final.docx now contain grounded environmental-operations evidence; grounded answer is the correct behavior."
   },
   {
     "query": "What certifications does the CV mention?",
