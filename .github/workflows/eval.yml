@@ -60,7 +60,10 @@ jobs:
     # Hard ceiling: prevents runaway CI from Ollama hangs / infinite retries.
     timeout-minutes: 25
     env:
-      TIMEOUT: "20"
+      # 60s covers embed batches of 32 chunks on CPU runners (~2x margin
+      # over observed 20-35s typical). Chat calls bounded independently
+      # by --query-timeout=45 in eval_runner. See eval_strict.yml.
+      TIMEOUT: "60"
       MAX_RETRIES: "1"
       CHAT_MODEL: qwen3:8b
       EMBED_MODEL: nomic-embed-text

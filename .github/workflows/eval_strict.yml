@@ -63,10 +63,22 @@ jobs:
     # against Ollama hangs, indefinite HTTP blocks, and zombie retries.
     timeout-minutes: 25
     env:
-      # Short per-call HTTP timeout — with retries and backoff, this keeps
-      # a single stuck call below ~10s worst case.
-      TIMEOUT: "20"
-      # Disable retry fanout in CI; eval_runner enforces its own timeout.
+      # Per-call HTTP timeout (seconds). Must cover an embedding batch of
+      # 32 chunks against nomic-embed-text on a CPU-only GitHub runner.
+      # Observed batch-18 completes in <20s, so batch-32 extrapolates to
+      # 20-35s typical. 60 gives ~2x margin without masking real hangs.
+      #
+      # LLM chat calls are bounded independently by --query-timeout=45
+      # inside eval_runner; this ceiling only affects build_indexes and
+      # embedding during grounding.
+      #
+      # Escalation path if 60 still fails: add BATCH_SIZE env override
+      # in app/config.py and set BATCH_SIZE=8 here, rather than raising
+      # TIMEOUT further.
+      TIMEOUT: "60"
+      # One attempt only. eval_runner enforces its own per-query timeout
+      # and build_indexes has no retry-recovery path; more attempts just
+      # amplify hangs.
       MAX_RETRIES: "1"
       CHAT_MODEL: qwen3:8b
       EMBED_MODEL: nomic-embed-text
