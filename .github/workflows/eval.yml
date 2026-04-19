@@ -17,14 +17,34 @@ jobs:
         uses: actions/checkout@v4.2.2
 
       - name: Validate eval suite JSON
+        # Validates the suite actually consumed by eval_runner.py and
+        # enforces presence of killer queries protecting the gate.
+        shell: bash
         run: |
-          python -c "
-          import json, sys
-          data = json.load(open('data/adversarial_eval_queries.json', encoding='utf-8'))
-          assert isinstance(data, dict) and 'queries' in data, 'adversarial_eval_queries.json is malformed'
-          assert len(data['queries']) > 0, 'adversarial_eval_queries.json is empty'
-          print(f'adversarial_eval_queries.json OK — {len(data[\"queries\"])} tests')
-          "
+          python <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("tests/eval_queries.json")
+          assert path.exists(), f"{path} not found"
+
+          with path.open(encoding="utf-8") as f:
+              data = json.load(f)
+
+          assert isinstance(data, list), f"{path} must be a JSON array"
+          assert data, f"{path} is empty"
+
+          missing_query = [i for i, q in enumerate(data) if not (q.get("query") or q.get("question"))]
+          assert not missing_query, f"Queries without a 'query'/'question' field at indices: {missing_query}"
+
+          killers = [q for q in data if q.get("killer") is True]
+          assert killers, (
+              f"{path} must define at least one killer query; "
+              "removing them silently weakens the canonical gate."
+          )
+
+          print(f"{path} OK — {len(data)} queries ({len(killers)} killer)")
+          PY
 
       - name: Syntax check (py_compile)
         run: |
@@ -37,6 +57,13 @@ jobs:
   eval:
     name: RAG Evaluation (Dev Mode - 95% Gate)
     runs-on: ubuntu-latest
+    # Hard ceiling: prevents runaway CI from Ollama hangs / infinite retries.
+    timeout-minutes: 25
+    env:
+      TIMEOUT: "20"
+      MAX_RETRIES: "1"
+      CHAT_MODEL: qwen3:8b
+      EMBED_MODEL: nomic-embed-text
 
     steps:
       - name: Checkout
@@ -80,17 +107,22 @@ jobs:
           ollama pull nomic-embed-text
 
       - name: Build FAISS indexes
+        timeout-minutes: 8
         run: python scripts/build_indexes.py
         env:
           PYTHONPATH: ${{ github.workspace }}
-          CHAT_MODEL: qwen3:8b
-          EMBED_MODEL: nomic-embed-text
 
       - name: Run evaluation (dev mode)
-        run: python eval_runner.py --mode dev --report reports/ci_eval.json
-        env:
-          CHAT_MODEL: qwen3:8b
-          EMBED_MODEL: nomic-embed-text
+        # Parallel execution + per-query timeout + fast mode.
+        # See eval_runner.py for flag semantics.
+        timeout-minutes: 12
+        run: |
+          python eval_runner.py \
+            --mode dev \
+            --workers 4 \
+            --query-timeout 45 \
+            --fast \
+            --report reports/ci_eval.json
 
       - name: Upload evaluation report
         if: always()
@@ -99,3 +131,12 @@ jobs:
           name: eval-report-${{ github.run_id }}
           path: reports/ci_eval.json
           retention-days: 30
+
+      - name: Upload Ollama log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-log-${{ github.run_id }}
+          path: /tmp/ollama.log
+          retention-days: 7
+          if-no-files-found: ignore

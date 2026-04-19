@@ -17,14 +17,36 @@ jobs:
         uses: actions/checkout@v4.2.2
 
       - name: Validate eval suite JSON
+        # The suite consumed by eval_runner.py lives at tests/eval_queries.json
+        # and is a JSON array (not the legacy adversarial dict). We also
+        # enforce presence of at least one killer query so nobody can silently
+        # remove the hard-fail signal that the gate depends on.
+        shell: bash
         run: |
-          python -c "
-          import json, sys
-          data = json.load(open('data/adversarial_eval_queries.json', encoding='utf-8'))
-          assert isinstance(data, dict) and 'queries' in data, 'adversarial_eval_queries.json is malformed'
-          assert len(data['queries']) > 0, 'adversarial_eval_queries.json is empty'
-          print(f'adversarial_eval_queries.json OK — {len(data[\"queries\"])} tests')
-          "
+          python <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("tests/eval_queries.json")
+          assert path.exists(), f"{path} not found"
+
+          with path.open(encoding="utf-8") as f:
+              data = json.load(f)
+
+          assert isinstance(data, list), f"{path} must be a JSON array"
+          assert data, f"{path} is empty"
+
+          missing_query = [i for i, q in enumerate(data) if not (q.get("query") or q.get("question"))]
+          assert not missing_query, f"Queries without a 'query'/'question' field at indices: {missing_query}"
+
+          killers = [q for q in data if q.get("killer") is True]
+          assert killers, (
+              f"{path} must define at least one killer query; "
+              "removing them silently weakens the canonical gate."
+          )
+
+          print(f"{path} OK — {len(data)} queries ({len(killers)} killer)")
+          PY
 
       - name: Syntax check (py_compile)
         run: |
@@ -37,6 +59,17 @@ jobs:
   eval_strict:
     name: RAG Evaluation (Strict Mode - 100% Gate)
     runs-on: ubuntu-latest
+    # Hard ceiling: no CI run is ever allowed to exceed this. Protects
+    # against Ollama hangs, indefinite HTTP blocks, and zombie retries.
+    timeout-minutes: 25
+    env:
+      # Short per-call HTTP timeout — with retries and backoff, this keeps
+      # a single stuck call below ~10s worst case.
+      TIMEOUT: "20"
+      # Disable retry fanout in CI; eval_runner enforces its own timeout.
+      MAX_RETRIES: "1"
+      CHAT_MODEL: qwen3:8b
+      EMBED_MODEL: nomic-embed-text
 
     steps:
       - name: Checkout
@@ -80,17 +113,25 @@ jobs:
           ollama pull nomic-embed-text
 
       - name: Build FAISS indexes
+        timeout-minutes: 8
         run: python scripts/build_indexes.py
         env:
           PYTHONPATH: ${{ github.workspace }}
-          CHAT_MODEL: qwen3:8b
-          EMBED_MODEL: nomic-embed-text
 
       - name: Run strict evaluation
-        run: python eval_runner.py --mode strict --report reports/ci_eval_strict.json
-        env:
-          CHAT_MODEL: qwen3:8b
-          EMBED_MODEL: nomic-embed-text
+        # Step-level ceiling in addition to the per-query timeout. Parallel
+        # execution (--workers 4) gives ~4× speedup on I/O-bound Ollama
+        # calls; --query-timeout 45 hard-stops any single stuck query;
+        # --fast skips the KnowledgeGapAnalyzer LLM call (deterministic
+        # CorpusTopicMap signal still drives missing_documents).
+        timeout-minutes: 12
+        run: |
+          python eval_runner.py \
+            --mode strict \
+            --workers 4 \
+            --query-timeout 45 \
+            --fast \
+            --report reports/ci_eval_strict.json
 
       - name: Upload strict evaluation report
         if: always()
@@ -99,6 +140,15 @@ jobs:
           name: eval-strict-report-${{ github.run_id }}
           path: reports/ci_eval_strict.json
           retention-days: 30
+
+      - name: Upload Ollama log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-log-${{ github.run_id }}
+          path: /tmp/ollama.log
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Check strict pass rate
         run: python scripts/check_strict_pass.py

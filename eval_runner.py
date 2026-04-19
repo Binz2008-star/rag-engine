@@ -10,10 +10,12 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
 
 from app.pipeline import Pipeline
 from app.inference_service import InferenceService
@@ -321,6 +323,12 @@ def main(query_fn=None) -> int:
                         help="Run only tests matching this suite (e.g. baseline_en, feature_ar)")
     parser.add_argument("--mode", type=str, default="dev", choices=["dev", "strict"],
                         help="Evaluation mode: dev (relaxed) or strict (requires grounded answers)")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Number of parallel workers (1 = sequential). Recommended 4-8 for local Ollama.")
+    parser.add_argument("--query-timeout", type=float, default=90.0,
+                        help="Hard timeout per query in seconds. Prevents hangs on stuck LLM calls.")
+    parser.add_argument("--fast", action="store_true",
+                        help="Disable KnowledgeGapAnalyzer LLM calls during eval (keeps deterministic CorpusTopicMap signal).")
     args = parser.parse_args()
 
     if not EVAL_QUERIES_PATH.exists():
@@ -343,8 +351,15 @@ def main(query_fn=None) -> int:
         print("ERROR: eval_queries.json is empty.", file=sys.stderr)
         return 2
 
+    # Fast mode — short-circuit KnowledgeGapAnalyzer's LLM call.
+    # The deterministic CorpusTopicMap still runs and produces missing_documents.
+    if args.fast:
+        os.environ["KGAP_BYPASS_LLM"] = "1"
+        print("Fast mode: KnowledgeGapAnalyzer LLM calls disabled\n")
+
     # Use provided query function or default to new Pipeline architecture
     service = None
+    pipeline = None
     if query_fn is None:
         print("Initializing components...")
         router = IntentRouter.from_active_model()
@@ -402,68 +417,113 @@ def main(query_fn=None) -> int:
 
     results: list[TestResult] = []
 
-    try:
-        for i, test in enumerate(tests, 1):
-            question = test.get("question") or test.get("query", "")
-            question = str(question).strip()
-            print(f"[{i}/{len(tests)}] {question or '(no question)'}")
+    def _build_test_result(idx: int, test: dict) -> tuple[TestResult, str]:
+        question = test.get("question") or test.get("query", "")
+        question = str(question).strip()
+        tr = TestResult(
+            test_id=idx,
+            question=question,
+            answer="", sources=[],
+            passed=False, reasons=[], buckets=[], elapsed=0.0,
+            expected_source=test.get("expected_source", ""),
+            expected_exact=test.get("expected_exact", ""),
+            expected_intent=test.get("expected_intent", ""),
+            has_expected_source="expected_source" in test,
+            has_expected_exact="expected_exact" in test,
+            killer=bool(test.get("killer", False)),
+        )
+        return tr, question
 
-            tr = TestResult(
-                test_id=i,
-                question=question,
-                answer="", sources=[],
-                passed=False, reasons=[], buckets=[], elapsed=0.0,
-                expected_source=test.get("expected_source", ""),
-                expected_exact=test.get("expected_exact", ""),
-                expected_intent=test.get("expected_intent", ""),
-                has_expected_source="expected_source" in test,
-                has_expected_exact="expected_exact" in test,
-                killer=bool(test.get("killer", False)),
-            )
-
-            if not question:
-                tr.error = "missing 'question' or 'query' field"
+    def _run_single(idx: int, test: dict) -> TestResult:
+        tr, question = _build_test_result(idx, test)
+        if not question:
+            tr.error = "missing 'question' or 'query' field"
+            tr.buckets = ["error"]
+            return tr
+        try:
+            t1 = time.perf_counter()
+            result = query_fn(question)
+            tr.elapsed = time.perf_counter() - t1
+            tr.answer = result.answer or ""
+            tr.sources = [s["source"] for s in result.sources]
+            tr.request_id = result.request_id or ""
+            tr.intent = result.intent or ""
+            tr.intent_confidence = result.intent_confidence or 0.0
+            tr.intent_method = result.intent_method or ""
+            tr.failure_type = getattr(result, "failure_type", None)
+            tr.grounded = getattr(result, "grounded", True)
+            tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed, args.mode)
+        except Exception as exc:
+            tr.error = str(exc)
+            if "Embedding failure" in str(exc) or "embedding" in str(exc).lower():
+                tr.buckets = ["infra_failure"]
+            else:
                 tr.buckets = ["error"]
+        return tr
+
+    def _print_result(tr: TestResult, total_count: int) -> None:
+        print(f"[{tr.test_id}/{total_count}] {tr.question or '(no question)'}")
+        if tr.error:
+            print(f"  ✗ ERROR ({tr.elapsed:.2f}s) — {tr.error}")
+            return
+        preview = tr.answer[:120] + ("..." if len(tr.answer) > 120 else "")
+        print(f"  Answer ({tr.elapsed:.2f}s): {preview}")
+        print(f"  Sources: {tr.sources}")
+        if tr.passed:
+            print("  ✓ PASS")
+        else:
+            print(f"  ✗ FAIL — {'; '.join(tr.reasons)}")
+            if tr.request_id:
+                print(f"  request_id: {tr.request_id}")
+
+    try:
+        workers = max(1, int(args.workers))
+        total_count = len(tests)
+
+        if workers == 1:
+            # Sequential path — still enforces per-query timeout via a 1-worker pool.
+            for i, test in enumerate(tests, 1):
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(_run_single, i, test)
+                    try:
+                        tr = future.result(timeout=args.query_timeout)
+                    except FuturesTimeoutError:
+                        tr, _ = _build_test_result(i, test)
+                        tr.error = f"query timeout after {args.query_timeout:.0f}s"
+                        tr.elapsed = args.query_timeout
+                        tr.buckets = ["timeout"]
+                _print_result(tr, total_count)
                 results.append(tr)
-                print("  ✗ SKIP — missing 'question' or 'query' field")
-                continue
-
-            try:
-                t1 = time.perf_counter()
-                result = query_fn(question)
-                tr.elapsed = time.perf_counter() - t1
-                tr.answer = result.answer or ""
-                tr.sources = [s["source"] for s in result.sources]
-                tr.request_id = result.request_id or ""
-                tr.intent = result.intent or ""
-                tr.intent_confidence = result.intent_confidence or 0.0
-                tr.intent_method = result.intent_method or ""
-                tr.failure_type = getattr(result, "failure_type", None)
-                tr.grounded = getattr(result, "grounded", True)
-
-                tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed, args.mode)
-
-                preview = tr.answer[:120] + ("..." if len(tr.answer) > 120 else "")
-                print(f"  Answer ({tr.elapsed:.2f}s): {preview}")
-                print(f"  Sources: {tr.sources}")
-
-                if tr.passed:
-                    print("  ✓ PASS")
-                else:
-                    print(f"  ✗ FAIL — {'; '.join(tr.reasons)}")
-                    if tr.request_id:
-                        print(f"  request_id: {tr.request_id}")
-
-            except Exception as exc:
-                tr.error = str(exc)
-                # Classify embedding failures as infra_failure
-                if "Embedding failure" in str(exc) or "embedding" in str(exc).lower():
-                    tr.buckets = ["infra_failure"]
-                else:
-                    tr.buckets = ["error"]
-                print(f"  ✗ ERROR — {exc}")
-            finally:
-                results.append(tr)
+        else:
+            # Parallel path — submit all, collect in order with per-task timeout.
+            indexed: dict[int, TestResult] = {}
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {pool.submit(_run_single, i, test): (i, test)
+                           for i, test in enumerate(tests, 1)}
+                try:
+                    for future in as_completed(futures, timeout=args.query_timeout * total_count):
+                        i, test = futures[future]
+                        try:
+                            tr = future.result(timeout=args.query_timeout)
+                        except FuturesTimeoutError:
+                            tr, _ = _build_test_result(i, test)
+                            tr.error = f"query timeout after {args.query_timeout:.0f}s"
+                            tr.elapsed = args.query_timeout
+                            tr.buckets = ["timeout"]
+                        indexed[i] = tr
+                        _print_result(tr, total_count)
+                except FuturesTimeoutError:
+                    # Global deadline — fill in any unfinished futures as timeouts.
+                    for future, (i, test) in futures.items():
+                        if future.done() or i in indexed:
+                            continue
+                        tr, _ = _build_test_result(i, test)
+                        tr.error = f"global deadline timeout after {args.query_timeout:.0f}s"
+                        tr.elapsed = args.query_timeout
+                        tr.buckets = ["timeout"]
+                        indexed[i] = tr
+            # Preserve input order for the report.
+            results = [indexed[i] for i in sorted(indexed)]
 
         # ── Metrics ───────────────────────────────────────────────────────────
         metrics = compute_metrics(results, args.mode)
@@ -523,7 +583,7 @@ def main(query_fn=None) -> int:
         return 0 if (metrics["failed"] == 0 and metrics["errors"] == 0) else 1
 
     finally:
-        if pipeline is not None:
+        if pipeline is not None and hasattr(pipeline, "close"):
             pipeline.close()
 
 

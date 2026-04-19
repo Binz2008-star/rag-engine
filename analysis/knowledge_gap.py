@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import time
 import requests
@@ -26,13 +27,29 @@ _FALLBACK = KnowledgeGap(
 
 
 class KnowledgeGapAnalyzer:
-    """Analyzes knowledge gaps when retrieval fails."""
+    """Analyzes knowledge gaps when retrieval fails.
 
-    def __init__(self, llm) -> None:
+    Set ``bypass_llm=True`` (or export ``KGAP_BYPASS_LLM=1``) to skip the
+    remote LLM call and return the deterministic fallback immediately. This
+    is used during fast evaluation runs where the downstream
+    ``CorpusTopicMap`` signal is sufficient and the extra LLM round-trip
+    would dominate latency.
+    """
+
+    def __init__(self, llm, *, bypass_llm: bool | None = None) -> None:
         self.llm = llm
         self._cache: dict[str, KnowledgeGap] = {}
+        if bypass_llm is None:
+            bypass_llm = os.environ.get("KGAP_BYPASS_LLM", "").strip() in {"1", "true", "True"}
+        self.bypass_llm = bool(bypass_llm)
 
     def analyze(self, query: str, intent: str, normalized_query: str) -> KnowledgeGap:
+        if self.bypass_llm:
+            return KnowledgeGap(
+                gap_type=_FALLBACK.gap_type,
+                confidence_if_adversarial=_FALLBACK.confidence_if_adversarial,
+                suggested_action=_FALLBACK.suggested_action,
+            )
         key = hashlib.md5(f"{intent}:{normalized_query}".encode()).hexdigest()
         if key in self._cache:
             return self._cache[key]

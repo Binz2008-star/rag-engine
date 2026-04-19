@@ -38,7 +38,16 @@ def _run(cmd: list[str], *, stdout_path: Path | None = None) -> int:
     return result.returncode
 
 
-def snapshot(label: str, *, reports_dir: Path, min_queries: int, min_misses: int) -> int:
+def snapshot(
+    label: str,
+    *,
+    reports_dir: Path,
+    min_queries: int,
+    min_misses: int,
+    workers: int = 1,
+    query_timeout: float = 90.0,
+    fast: bool = False,
+) -> int:
     out_dir = reports_dir / label
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -49,10 +58,17 @@ def snapshot(label: str, *, reports_dir: Path, min_queries: int, min_misses: int
 
     python = sys.executable
 
-    rc_eval = _run(
-        [python, "eval_runner.py", "--mode", "strict", "--report", str(eval_report)],
-        stdout_path=eval_stdout,
-    )
+    eval_cmd = [
+        python, "eval_runner.py",
+        "--mode", "strict",
+        "--report", str(eval_report),
+        "--workers", str(workers),
+        "--query-timeout", str(query_timeout),
+    ]
+    if fast:
+        eval_cmd.append("--fast")
+
+    rc_eval = _run(eval_cmd, stdout_path=eval_stdout)
     rc_drift = _run([
         python, "-m", "analysis.drift_detector",
         "--min-queries", str(min_queries),
@@ -91,6 +107,23 @@ def _main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--min-queries", type=int, default=5)
     parser.add_argument("--min-misses", type=int, default=3)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="Parallel workers passed to eval_runner. Default 4 for faster snapshots.",
+    )
+    parser.add_argument(
+        "--query-timeout",
+        type=float,
+        default=60.0,
+        help="Per-query hard timeout (seconds) passed to eval_runner.",
+    )
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Skip KnowledgeGapAnalyzer LLM calls during eval (keeps CorpusTopicMap signal).",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -99,6 +132,9 @@ def _main(argv: list[str] | None = None) -> int:
         reports_dir=args.reports_dir,
         min_queries=args.min_queries,
         min_misses=args.min_misses,
+        workers=args.workers,
+        query_timeout=args.query_timeout,
+        fast=args.fast,
     )
 
 
