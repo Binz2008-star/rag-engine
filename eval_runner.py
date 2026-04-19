@@ -21,6 +21,11 @@ from app.config import REFUSAL_MESSAGE
 from app.pipeline import Pipeline
 from app.inference_service import InferenceService
 from evaluation.eval_gate import gate
+from evaluation.refusal import (
+    contains_arabic,
+    contains_numbers,
+    is_insufficient_response,
+)
 from router.intent_router import IntentRouter
 from retrieval.embeddings import Embedder
 from retrieval.faiss_index import FaissIndex
@@ -64,25 +69,9 @@ class TestResult:
 
 
 # ── Checker ───────────────────────────────────────────────────────────────────
-
-def is_insufficient_response(answer: str) -> bool:
-    """Check if answer is a refusal/insufficient data response using semantic matching."""
-    keywords = [
-        "insufficient", "not enough", "no data", "no information", "not found",
-        "i don't have", "cannot find", "no available data", "i don't know",
-        "not available", "cannot provide", "unable to find", "no information available"
-    ]
-    return any(k in answer.lower() for k in keywords)
-
-
-def contains_arabic(text: str) -> bool:
-    """Check if text contains Arabic characters."""
-    return any('\u0600' <= c <= '\u06FF' for c in text)
-
-
-def contains_numbers(text: str) -> bool:
-    """Check if text contains numeric digits."""
-    return any(char.isdigit() for char in text)
+# Text predicates (is_insufficient_response / contains_arabic /
+# contains_numbers) live in evaluation/refusal.py so eval_main, metrics,
+# and this runner all share one definition of "refusal".
 
 
 def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple[bool, list[str], list[str]]:

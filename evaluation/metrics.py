@@ -1,9 +1,24 @@
 from __future__ import annotations
 
-from app.config import REFUSAL_MESSAGE
+from evaluation.refusal import is_insufficient_response
 
 
 def compute_metrics(results: list[dict], ocr_presence_check: bool = False) -> dict:
+    """Compute canonical evaluation metrics over result rows.
+
+    Args:
+        results: per-query result dicts. Must carry ``passed``,
+            ``failure_type``, ``expected_refusal``, ``answer``,
+            ``expected_intent``, ``intent``, and ``latency_ms``. Rows
+            MAY also carry a pre-computed ``intent_correct`` flag.
+        ocr_presence_check: default is ``False`` on purpose — the gate
+            is fail-closed on this signal, so a caller that forgets to
+            pass it gets a REJECT rather than a silent pass.
+
+    Refusal accuracy uses ``is_insufficient_response`` (semantic match)
+    so training-path metrics align with ``eval_runner.py``; exact-match
+    would diverge whenever the LLM paraphrases the refusal.
+    """
     total = len(results)
     passed = sum(1 for row in results if row.get("passed") is True)
     hallucinations = sum(1 for row in results if row.get("failure_type") == "hallucination")
@@ -12,11 +27,18 @@ def compute_metrics(results: list[dict], ocr_presence_check: bool = False) -> di
     refusal_rows = [row for row in results if row.get("expected_refusal") is True]
     refusal_correct = sum(
         1 for row in refusal_rows
-        if str(row.get("answer", "")).strip().lower() == REFUSAL_MESSAGE.lower()
+        if is_insufficient_response(str(row.get("answer", "")))
     )
 
     domain_rows = [row for row in results if row.get("expected_intent") in {"eco", "cv"}]
-    domain_correct = sum(1 for row in domain_rows if row.get("intent_correct") is True)
+    # Defensive: accept pre-computed ``intent_correct`` (produced by
+    # eval_main.py) OR derive it from ``intent`` vs ``expected_intent``
+    # (matches eval_runner.py TestResult.asdict() output).
+    domain_correct = sum(
+        1 for row in domain_rows
+        if row.get("intent_correct") is True
+        or (row.get("intent") and row.get("intent") == row.get("expected_intent"))
+    )
 
     avg_latency_ms = round(
         sum(float(row.get("latency_ms", 0)) for row in results) / total, 1
