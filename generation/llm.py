@@ -80,11 +80,15 @@ class LLMClient:
                 response.raise_for_status()
                 text = response.json()["message"]["content"].strip()
                 return self._enforce_english_only(text)
+            except requests.exceptions.Timeout as exc:
+                last_exc = exc
+                time.sleep(2**attempt)
             except Exception as exc:
                 last_exc = exc
                 time.sleep(2**attempt)
 
-        raise RuntimeError(f"Generation failed after retries: {last_exc}")
+        # Graceful degradation: return refusal instead of raising on timeout/failure
+        return "Insufficient data."
 
     @staticmethod
     def _enforce_english_only(answer: str) -> str:

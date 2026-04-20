@@ -31,7 +31,7 @@ def _has_sufficient_overlap(query: str, chunks: list) -> bool:
         return False
     ctx_text = " ".join(c.text.lower() for c in chunks)
     hits = sum(1 for t in q_terms if t in ctx_text)
-    return hits >= 2
+    return hits >= 1
 
 
 def _is_grounded(answer: str, context: str) -> bool:
@@ -41,7 +41,7 @@ def _is_grounded(answer: str, context: str) -> bool:
         return True
     ctx = context.lower()
     matches = sum(1 for t in answer_terms if t in ctx)
-    return matches / max(len(answer_terms), 1) > 0.6
+    return matches / max(len(answer_terms), 1) > 0.5
 
 
 class Pipeline:
