@@ -164,20 +164,19 @@ jobs:
         # and must exercise KnowledgeGapAnalyzer end-to-end; bypassing it
         # would make the green gate meaningless for that subsystem.
         #
-        # --workers 2: GitHub-hosted runners have 2 cores. Higher worker
-        # counts add scheduling noise without real I/O parallelism gain.
-        #
-        # --query-timeout 90: double the dev value (45) to absorb the
-        # extra LLM round-trip the analyzer adds on refusal paths.
-        timeout-minutes: 18
+        # --workers 1: CPU-only runner - sequential avoids core contention.
+        # --query-timeout 120: CPU inference needs more time.
+        # timeout-minutes: 45: 38 queries + LLM calls on CPU is slow.
+        timeout-minutes: 45
         run: |
           python eval_runner.py \
             --mode strict \
-            --workers 2 \
-            --query-timeout 90 \
+            --workers 1 \
+            --query-timeout 120 \
             --report reports/ci_eval_strict.json
         env:
           PYTHONPATH: ${{ github.workspace }}
+          TIMEOUT: "120"
 
       - name: Upload strict evaluation report
         if: always()
