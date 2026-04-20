@@ -40,6 +40,18 @@ DEFAULT_REPORT_PATH = Path(__file__).parent / "reports" / f"eval_{int(time.time(
 # ── Result types ──────────────────────────────────────────────────────────────
 
 @dataclass
+class QueryResult:
+    answer: str
+    sources: list[dict]
+    request_id: str
+    intent: str
+    intent_confidence: float
+    intent_method: str
+    failure_type: str | None = None
+    grounded: bool = True
+
+
+@dataclass
 class TestResult:
     test_id: int
     question: str
@@ -378,17 +390,6 @@ def main(query_fn=None) -> int:
         def query_fn(question: str):
             result = service.handle_query(question, query_id=f"eval_{int(time.time()*1000)}")
             # Convert to expected format
-            @dataclass
-            class QueryResult:
-                answer: str
-                sources: list[dict]
-                request_id: str
-                intent: str
-                intent_confidence: float
-                intent_method: str
-                failure_type: str | None = None
-                grounded: bool = True
-
             sources = [{"source": h.source} for h in result.retrieval]
             # Determine intent method based on confidence
             intent_method = "rules" if result.confidence >= 0.85 else "v2_model"
