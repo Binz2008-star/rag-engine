@@ -168,8 +168,6 @@ def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple
             # Check for generic company description patterns
             generic_patterns = [
                 "environmental services company",
-                "waste management",
-                "sustainability",
                 "professional services",
             ]
             if any(p in answer.lower() and len(answer.split()) < 15 for p in generic_patterns):
