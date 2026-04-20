@@ -57,6 +57,26 @@ class Pipeline:
         t0 = time.perf_counter()
         normalized_query = normalize_query(query)
 
+        # Refuse empty or very short queries
+        if len(normalized_query.strip()) < 3:
+            elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            return PipelineResult(
+                query_id=query_id,
+                query=query,
+                normalized_query=normalized_query,
+                intent="general",
+                confidence=1.0,
+                intent_method="rule",
+                retrieval=[],
+                answer=REFUSAL_MESSAGE,
+                grounded=True,
+                failure_type="retrieval_miss",
+                knowledge_gap=None,
+                latency_ms=elapsed_ms,
+                model_version=self.model_version,
+                retriever_version=self.retriever_version,
+            )
+
         # Refuse sensitive queries without routing or retrieval
         if _is_sensitive_query(query):
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
