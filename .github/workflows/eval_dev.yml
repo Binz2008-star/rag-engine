@@ -122,9 +122,9 @@ jobs:
 
           # Pull models and log digests (platform-specific, may differ from local)
           ollama pull "${CHAT_MODEL}"
-          ACTUAL_CHAT=$(ollama show "${CHAT_MODEL}" --verbose 2>/dev/null | grep -i "^digest" | awk '{print $2}')
+          ACTUAL_CHAT=$(ollama show "${CHAT_MODEL}" --verbose 2>/dev/null | grep -i "digest" | awk '{print $NF}' || true)
           ollama pull "${EMBED_MODEL}"
-          ACTUAL_EMBED=$(ollama show "${EMBED_MODEL}" --verbose 2>/dev/null | grep -i "^digest" | awk '{print $2}')
+          ACTUAL_EMBED=$(ollama show "${EMBED_MODEL}" --verbose 2>/dev/null | grep -i "digest" | awk '{print $NF}' || true)
 
           echo "qwen3:8b digest on runner:        $ACTUAL_CHAT"
           echo "nomic-embed-text digest on runner: $ACTUAL_EMBED"
