@@ -27,6 +27,9 @@ def normalize_query(text: str) -> str:
         text = normalize_arabic(text)
     text = text.lower()
     text = re.sub(r"\s+", " ", text)
+    # Unify ECO variants
+    text = text.replace("ايكو", "eco")
+    text = text.replace("إيكو", "eco")
     return text.strip()
 
 

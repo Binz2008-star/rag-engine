@@ -24,6 +24,26 @@ def _is_sensitive_query(query: str) -> bool:
     return any(p in q for p in _SENSITIVE_PATTERNS)
 
 
+def _has_sufficient_overlap(query: str, chunks: list) -> bool:
+    """Check if query has sufficient term overlap with retrieved chunks."""
+    q_terms = set(query.lower().split())
+    if not q_terms:
+        return False
+    ctx_text = " ".join(c.text.lower() for c in chunks)
+    hits = sum(1 for t in q_terms if t in ctx_text)
+    return hits >= 2
+
+
+def _is_grounded(answer: str, context: str) -> bool:
+    """Check if answer terms are grounded in context."""
+    answer_terms = set(answer.lower().split())
+    if not answer_terms:
+        return True
+    ctx = context.lower()
+    matches = sum(1 for t in answer_terms if t in ctx)
+    return matches / max(len(answer_terms), 1) > 0.6
+
+
 class Pipeline:
     def __init__(self, router, embedder, retriever, llm, reranker: Reranker | None = None):
         self.router = router
@@ -145,6 +165,26 @@ class Pipeline:
                 retriever_version=self.retriever_version,
             )
 
+        # Hard grounding gate: reject if insufficient overlap
+        if not _has_sufficient_overlap(normalized_query, hits):
+            elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            return PipelineResult(
+                query_id=query_id,
+                query=query,
+                normalized_query=normalized_query,
+                intent=route.intent,
+                confidence=route.confidence,
+                intent_method=route.intent_method,
+                retrieval=hits,
+                answer="Insufficient data.",
+                grounded=True,
+                failure_type="retrieval_miss",
+                knowledge_gap=None,
+                latency_ms=elapsed_ms,
+                model_version=self.model_version,
+                retriever_version=self.retriever_version,
+            )
+
         answer = self.llm.generate(normalized_query, hits)
         normalized_answer = answer.strip().lower()
 
@@ -172,6 +212,15 @@ class Pipeline:
             grounded = check_grounding(answer, hits, self.embedder.embed_batch)
             failure_type = None if grounded else "hallucination"
             knowledge_gap = None
+
+            # Post-generation grounding validation
+            if grounded:
+                context = " ".join(h.text for h in hits)
+                if not _is_grounded(answer, context):
+                    answer = "Insufficient data."
+                    grounded = True
+                    failure_type = "hallucination"
+                    knowledge_gap = None
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         return PipelineResult(
