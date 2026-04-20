@@ -34,16 +34,6 @@ def _has_sufficient_overlap(query: str, chunks: list) -> bool:
     return hits >= 1
 
 
-def _is_grounded(answer: str, context: str) -> bool:
-    """Check if answer terms are grounded in context."""
-    answer_terms = set(answer.lower().split())
-    if not answer_terms:
-        return True
-    ctx = context.lower()
-    matches = sum(1 for t in answer_terms if t in ctx)
-    return matches / max(len(answer_terms), 1) > 0.5
-
-
 class Pipeline:
     def __init__(self, router, embedder, retriever, llm, reranker: Reranker | None = None):
         self.router = router
@@ -209,18 +199,19 @@ class Pipeline:
             failure_type = "retrieval_miss"
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
         else:
+            # Authoritative grounding: same logic as evaluator (sentence-level
+            # semantic cosine at 0.60). If the evaluator would reject this
+            # answer as ungrounded, the product must also reject it.
+            # Unifying the two removes split-brain between runtime and eval.
             grounded = check_grounding(answer, hits, self.embedder.embed_batch)
-            failure_type = None if grounded else "hallucination"
-            knowledge_gap = None
-
-            # Post-generation grounding validation
-            if grounded:
-                context = " ".join(h.text for h in hits)
-                if not _is_grounded(answer, context):
-                    answer = "Insufficient data."
-                    grounded = True
-                    failure_type = "hallucination"
-                    knowledge_gap = None
+            if not grounded:
+                answer = "Insufficient data."
+                grounded = True
+                failure_type = "retrieval_miss"
+                knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
+            else:
+                failure_type = None
+                knowledge_gap = None
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
         return PipelineResult(
