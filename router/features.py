@@ -40,7 +40,16 @@ def extract_hints(query: str) -> tuple[bool, bool]:
     cv_terms = {
         "cv", "resume", "tailored", "role", "experience",
         "skills", "certificates", "deliveroo", "job", "roben", "roben's",
+        # Arabic CV terms
+        "خبرة", "روبن", "خبر", "سيرة", "ذاتية",
     }
+    general_terms = {
+        "mars", "planet", "galaxy", "jupiter", "gdp", "economy",
+    }
+
+    # General terms override eco/cv hints
+    if any(term in q for term in general_terms):
+        return False, False
 
     eco_hint = any(term in q for term in eco_terms)
     cv_hint = any(term in q for term in cv_terms)

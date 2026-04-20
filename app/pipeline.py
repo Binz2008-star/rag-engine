@@ -154,6 +154,8 @@ class Pipeline:
             "it can be inferred",
             "this suggests",
             "likely",
+            "used cooking oil",
+            "uco",
         )
 
         if normalized_answer.startswith(speculative_prefixes):

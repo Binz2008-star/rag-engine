@@ -14,7 +14,28 @@ EXPECTED_DOC_MATCHERS = {
 }
 
 
+def sanitize_text(text: str) -> str:
+    """Remove OCR artifacts: emojis and high Unicode characters."""
+    # Remove emojis and symbols (Unicode ranges for common emojis/symbols)
+    cleaned = "".join(
+        c for c in text
+        if not (
+            (ord(c) >= 0x1F600 and ord(c) <= 0x1F64F)  # Emoticons
+            or (ord(c) >= 0x1F300 and ord(c) <= 0x1F5FF)  # Misc Symbols
+            or (ord(c) >= 0x1F680 and ord(c) <= 0x1F6FF)  # Transport & Map
+            or (ord(c) >= 0x1F1E0 and ord(c) <= 0x1F1FF)  # Flags
+            or (ord(c) >= 0x2600 and ord(c) <= 0x26FF)    # Misc symbols
+            or (ord(c) >= 0x2700 and ord(c) <= 0x27BF)    # Dingbats
+            or (ord(c) >= 0xFE00 and ord(c) <= 0xFE0F)    # Variation Selectors
+            or (ord(c) >= 0x1F900 and ord(c) <= 0x1F9FF)  # Supplemental Symbols
+            or ord(c) > 0x2000  # Remove very high Unicode characters
+        )
+    )
+    return cleaned
+
+
 def chunk_text(text: str, source: str, path: str, doc_type: str) -> list[Chunk]:
+    text = sanitize_text(text)
     text = " ".join(text.split())
     chunks: list[Chunk] = []
     start = 0
