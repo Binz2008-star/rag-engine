@@ -10,7 +10,6 @@ from router.features import normalize_query
 from generation.grounding import check_grounding
 from retrieval.reranker import Reranker
 from analysis.corpus_topic_map import CorpusTopicMap
-from analysis.knowledge_gap import KnowledgeGapAnalyzer
 
 
 _SENSITIVE_PATTERNS = [
@@ -35,13 +34,28 @@ def _has_sufficient_overlap(query: str, chunks: list) -> bool:
 
 
 class Pipeline:
-    def __init__(self, router, embedder, retriever, llm, reranker: Reranker | None = None):
+    def __init__(
+        self,
+        router,
+        embedder,
+        retriever,
+        llm,
+        reranker: Reranker | None = None,
+        knowledge_gap_analyzer=None,
+    ):
         self.router = router
         self.embedder = embedder
         self.retriever = retriever
         self.llm = llm
         self.reranker = reranker
-        self.knowledge_gap_analyzer = KnowledgeGapAnalyzer(llm)
+        # Lazy-import the analyzer only when the caller does not inject one.
+        # analysis.knowledge_gap imports `requests`, which is intentionally
+        # absent from the lightweight CI lane; keeping this import off the
+        # module path lets `import app.pipeline` succeed without requests.
+        if knowledge_gap_analyzer is None:
+            from analysis.knowledge_gap import KnowledgeGapAnalyzer
+            knowledge_gap_analyzer = KnowledgeGapAnalyzer(llm)
+        self.knowledge_gap_analyzer = knowledge_gap_analyzer
         self.corpus_topic_map = CorpusTopicMap(retriever.indexes)
 
         if ACTIVE_MODEL_PATH.exists():

@@ -19,9 +19,10 @@ Contract:
 from __future__ import annotations
 
 import re
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
-from retrieval.faiss_index import FaissIndex
+if TYPE_CHECKING:
+    from retrieval.faiss_index import FaissIndex
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
