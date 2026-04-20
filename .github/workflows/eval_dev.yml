@@ -161,6 +161,7 @@ jobs:
             --report reports/ci_eval_dev.json
         env:
           PYTHONPATH: ${{ github.workspace }}
+          TIMEOUT: "120"
 
       - name: Upload dev evaluation report
         if: always()
