@@ -20,24 +20,37 @@ on any drift from the v1.0 contract.
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
 import numpy as np
-import pytest
 
-from app.models import RetrievalHit, Route
+from app.models import KnowledgeGap, RetrievalHit, Route
 
 
 # --------------------------------------------------------------------------- #
-# Minimal fakes to construct Pipeline without Ollama / FAISS                  #
+# Minimal fakes to construct Pipeline without Ollama / FAISS / requests       #
 # --------------------------------------------------------------------------- #
 
 
 class _FakeRouter:
     def route(self, normalized_query: str) -> Route:
         return Route(intent="eco", confidence=1.0, intent_method="rule")
+
+
+class _FakeKnowledgeGapAnalyzer:
+    """
+    Injected so the Pipeline never lazy-imports analysis.knowledge_gap
+    (which pulls in the `requests` runtime dep absent from the
+    lightweight CI lane).
+    """
+
+    def analyze(self, query: str, intent: str, normalized_query: str) -> KnowledgeGap:
+        return KnowledgeGap(
+            gap_type="missing_information",
+            confidence_if_adversarial=0.0,
+            suggested_action="add_relevant_documents",
+        )
 
 
 class _FakeEmbedder:
@@ -83,14 +96,8 @@ def _hit(text: str, score: float = 0.9) -> RetrievalHit:
 
 
 # --------------------------------------------------------------------------- #
-# Fixtures                                                                    #
+# Pipeline construction                                                       #
 # --------------------------------------------------------------------------- #
-
-
-@pytest.fixture(autouse=True)
-def _bypass_knowledge_gap_llm(monkeypatch):
-    """KnowledgeGapAnalyzer would call Ollama on refusal paths; bypass it."""
-    monkeypatch.setenv("KGAP_BYPASS_LLM", "1")
 
 
 def _build_pipeline(llm_answer: str, context_text: str = "ECO provides wastewater services."):
@@ -107,6 +114,7 @@ def _build_pipeline(llm_answer: str, context_text: str = "ECO provides wastewate
         retriever=retriever,
         llm=llm,
         reranker=None,
+        knowledge_gap_analyzer=_FakeKnowledgeGapAnalyzer(),
     )
 
 
