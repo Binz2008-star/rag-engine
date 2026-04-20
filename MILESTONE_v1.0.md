@@ -20,6 +20,9 @@ When `check_grounding` rejected an answer inside the pipeline, the ungrounded te
 
 **Fix:** `check_grounding()` is now the authoritative runtime gate. On rejection the answer is converted to `Insufficient data.` and classified as `retrieval_miss`. The redundant weaker `_is_grounded` layer is removed.
 
+> **Classification note:** `retrieval_miss` is an operational label.
+> Some cases classified as `retrieval_miss` are in fact generation-grounding failures (semantic mismatch), not pure retrieval recall issues.
+
 ### Supporting changes landed in the same milestone
 
 - System-role prompt isolation (prompt-injection defense)
@@ -39,12 +42,24 @@ When `check_grounding` rejected an answer inside the pipeline, the ungrounded te
 |---|---|
 | Runtime and evaluator agree on "grounded" | `check_grounding()` called in both paths |
 | Ungrounded outputs never ship | pipeline converts to `Insufficient data.` on rejection |
-| No hallucination under strict eval | evaluator cosine 0.60 gate + zero-hallucination policy |
+| Hallucination rate = 0.0% under `strict_eval_v_current_corpus` | evaluator cosine 0.60 gate + zero-hallucination policy |
 | No prompt-injection content leakage | system-role isolation in `generation/llm.py` |
 | Sensitive queries refused before routing leak | pre-routing filter in `app/pipeline.py` |
 | OCR regressions blocked | `evaluation/ocr_check.py` fail-closed check |
 | Model drift in CI detected | pinned Ollama digests + digest log on runner |
 | Silent eval-suite weakening prevented | `scripts/check_strict_pass.py` killer-row warning |
+
+Guarantees apply to the current corpus, evaluation suite, and model version unless re-validated.
+
+---
+
+## Failure policy
+
+- On any grounding failure → **fail closed**
+- Output is replaced with: `Insufficient data.`
+- System does not degrade to best-effort answers
+
+This policy is enforced by making `check_grounding()` the sole authoritative runtime gate.
 
 ---
 
@@ -74,6 +89,18 @@ Any change to the above must be accompanied by:
 | OCR presence check | PASS |
 | Domain accuracy | 96% (above 95% threshold) |
 | Refusal accuracy | 100% |
+
+---
+
+## Environment contract
+
+- Chat model: `qwen2:1.5b` (Ollama, digest `500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41`)
+- Embedding model: `nomic-embed-text` (Ollama, digest `0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f`)
+- Runner: GitHub Actions `ubuntu-latest` (CPU-only)
+- Index snapshot: corpus at commit `6cd0015`
+- Eval suite: `strict_eval_v_current_corpus` (38 queries, 10 killers)
+
+This baseline is only guaranteed reproducible under the above environment. Swapping the chat model, embedding model, corpus snapshot, or eval suite invalidates the numeric claims in this document; the frozen surfaces above still apply as policy but must be re-verified.
 
 ---
 
