@@ -97,6 +97,12 @@ jobs:
           trap 'echo "--- Ollama log ---"; cat /tmp/ollama.log || true' ERR
 
           curl -fsSL https://ollama.com/install.sh | sh
+
+          # install.sh starts ollama as systemd service automatically.
+          # Stop it before starting our custom version with logging.
+          sudo systemctl stop ollama 2>/dev/null || true
+          sudo systemctl disable ollama 2>/dev/null || true
+
           nohup ollama serve >/tmp/ollama.log 2>&1 &
 
           for i in {1..30}; do
