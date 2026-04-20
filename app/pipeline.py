@@ -77,16 +77,19 @@ class Pipeline:
                 retriever_version=self.retriever_version,
             )
 
-        # Refuse sensitive queries without routing or retrieval
+        route = self.router.route(normalized_query)
+        vec = self.embedder.embed_batch([normalized_query])[0]
+
+        # Refuse sensitive queries after routing (for domain accuracy)
         if _is_sensitive_query(query):
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             return PipelineResult(
                 query_id=query_id,
                 query=query,
                 normalized_query=normalized_query,
-                intent="general",
-                confidence=1.0,
-                intent_method="rule",
+                intent=route.intent,
+                confidence=route.confidence,
+                intent_method=route.intent_method,
                 retrieval=[],
                 answer=REFUSAL_MESSAGE,
                 grounded=True,
@@ -96,9 +99,6 @@ class Pipeline:
                 model_version=self.model_version,
                 retriever_version=self.retriever_version,
             )
-
-        route = self.router.route(normalized_query)
-        vec = self.embedder.embed_batch([normalized_query])[0]
 
         hits = self.retriever.retrieve(vec, route.intent, normalized_query)
 
