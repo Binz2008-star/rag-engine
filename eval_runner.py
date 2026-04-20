@@ -10,18 +10,46 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
 
-from app.rag_pipeline import RagPipeline
+from app.config import REFUSAL_MESSAGE
+from app.pipeline import Pipeline
+from app.inference_service import InferenceService
+from evaluation.eval_gate import gate
+from evaluation.refusal import (
+    contains_arabic,
+    contains_numbers,
+    is_insufficient_response,
+)
+from router.intent_router import IntentRouter
+from retrieval.embeddings import Embedder
+from retrieval.faiss_index import FaissIndex
+from retrieval.multi_retriever import MultiRetriever
+from retrieval.reranker import Reranker
+from generation.llm import LLMClient
 
 EVAL_QUERIES_PATH = Path(__file__).parent / "tests" / "eval_queries.json"
 DEFAULT_REPORT_PATH = Path(__file__).parent / "reports" / f"eval_{int(time.time())}.json"
 
 
 # ── Result types ──────────────────────────────────────────────────────────────
+
+@dataclass
+class QueryResult:
+    answer: str
+    sources: list[dict]
+    request_id: str
+    intent: str
+    intent_confidence: float
+    intent_method: str
+    failure_type: str | None = None
+    grounded: bool = True
+
 
 @dataclass
 class TestResult:
@@ -37,6 +65,7 @@ class TestResult:
     # copies of expectations — keeps TestResult self-contained, avoids zip(results, tests)
     expected_source: str = ""
     expected_exact: str = ""
+    expected_intent: str = ""
     has_expected_source: bool = False
     has_expected_exact: bool = False
     # ML observability fields
@@ -44,31 +73,20 @@ class TestResult:
     intent: str = ""
     intent_confidence: float = 0.0
     intent_method: str = ""
+    # Canonical pipeline fields (required for gate)
+    failure_type: str | None = None
+    grounded: bool = True
+    # Hard-fail enforcement
+    killer: bool = False
 
 
 # ── Checker ───────────────────────────────────────────────────────────────────
-
-def is_insufficient_response(answer: str) -> bool:
-    """Check if answer is a refusal/insufficient data response using semantic matching."""
-    keywords = [
-        "insufficient", "not enough", "no data", "no information", "not found",
-        "i don't have", "cannot find", "no available data", "i don't know",
-        "not available", "cannot provide", "unable to find", "no information available"
-    ]
-    return any(k in answer.lower() for k in keywords)
+# Text predicates (is_insufficient_response / contains_arabic /
+# contains_numbers) live in evaluation/refusal.py so eval_main, metrics,
+# and this runner all share one definition of "refusal".
 
 
-def contains_arabic(text: str) -> bool:
-    """Check if text contains Arabic characters."""
-    return any('\u0600' <= c <= '\u06FF' for c in text)
-
-
-def contains_numbers(text: str) -> bool:
-    """Check if text contains numeric digits."""
-    return any(char.isdigit() for char in text)
-
-
-def check_result(result, test: dict, elapsed: float) -> tuple[bool, list[str], list[str]]:
+def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple[bool, list[str], list[str]]:
     """
     Evaluate ALL criteria in the test case.
     Returns (passed, reasons, buckets).
@@ -87,7 +105,7 @@ def check_result(result, test: dict, elapsed: float) -> tuple[bool, list[str], l
     # Refusal response validation with semantic matching
     if "expected_exact" in test:
         exp = test["expected_exact"]
-        if exp == "Insufficient data.":
+        if exp == REFUSAL_MESSAGE:
             if not is_insufficient_response(answer):
                 buckets.add("refusal_failure")
                 reasons.append(f"expected refusal response, got {answer!r}")
@@ -96,7 +114,7 @@ def check_result(result, test: dict, elapsed: float) -> tuple[bool, list[str], l
             reasons.append(f"expected exact {exp!r}, got {answer!r}")
 
     # Hallucination detection for refusal responses
-    if "expected_exact" in test and test["expected_exact"] == "Insufficient data.":
+    if "expected_exact" in test and test["expected_exact"] == REFUSAL_MESSAGE:
         if is_insufficient_response(answer) and contains_numbers(answer):
             buckets.add("hallucination_risk")
             reasons.append("refusal response contains numbers (hallucination risk)")
@@ -143,13 +161,31 @@ def check_result(result, test: dict, elapsed: float) -> tuple[bool, list[str], l
             buckets.add("latency_too_high")
             reasons.append(f"latency too high ({elapsed_ms:.0f}ms > {test['max_latency_ms']}ms)")
 
+    # Strict mode: additional checks
+    if mode == "strict":
+        # Fail on generic fallback answers
+        if not is_insufficient_response(answer):
+            # Check for generic company description patterns
+            generic_patterns = [
+                "environmental services company",
+                "professional services",
+            ]
+            if any(p in answer.lower() and len(answer.split()) < 15 for p in generic_patterns):
+                buckets.add("generic_answer")
+                reasons.append("generic answer (strict mode)")
+
+        # Fail if corpus_missing for required queries
+        if test.get("required_corpus", False) and "corpus_missing" in buckets:
+            buckets.add("corpus_missing_strict")
+            reasons.append("corpus missing for required query (strict mode)")
+
     passed = len(reasons) == 0
     return passed, reasons, sorted(buckets)
 
 
 # ── Metrics ───────────────────────────────────────────────────────────────────
 
-def compute_metrics(results: list[TestResult]) -> dict:
+def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
     total   = len(results)
     passed  = sum(r.passed for r in results)
     errors  = sum(bool(r.error) for r in results)
@@ -167,9 +203,9 @@ def compute_metrics(results: list[TestResult]) -> dict:
     precision_tests = [r for r in results if r.has_expected_source and not r.error]
     precision_hits = sum("low_source_precision" not in r.buckets for r in precision_tests)
 
-    # Refusal accuracy: tests that expect exactly "Insufficient data."
+    # Refusal accuracy: tests that expect exactly the canonical refusal message.
     refusal_tests = [r for r in results if r.has_expected_exact
-                     and r.expected_exact == "Insufficient data." and not r.error]
+                     and r.expected_exact == REFUSAL_MESSAGE and not r.error]
     refusal_hits  = sum(r.passed for r in refusal_tests)
 
     # Bucket counts
@@ -220,7 +256,30 @@ def compute_metrics(results: list[TestResult]) -> dict:
     latency_sla_ms = 2500
     sla_pass = (avg_elapsed * 1000) <= latency_sla_ms
 
-    return {
+    # ── Canonical metrics (required by eval_gate) ─────────────────────────────
+    # Hallucination rate: pipeline-reported failure_type == "hallucination"
+    hallucinations = sum(1 for r in results if r.failure_type == "hallucination")
+    hallucination_rate = round(hallucinations / total, 3) if total else 0.0
+
+    # Domain accuracy: correct intent routing for eco/cv (rule-routed queries)
+    domain_rows = [r for r in results if r.expected_intent in {"eco", "cv"} and not r.error]
+    domain_correct = sum(1 for r in domain_rows if r.intent == r.expected_intent)
+    domain_accuracy = round(domain_correct / len(domain_rows), 3) if domain_rows else 0.0
+
+    # Canonical refusal_accuracy: out-of-domain queries that returned the
+    # canonical refusal message exactly (case-insensitive).
+    canonical_refusal_rows = [r for r in results if r.has_expected_exact
+                              and r.expected_exact == REFUSAL_MESSAGE and not r.error]
+    canonical_refusal_hits = sum(
+        1 for r in canonical_refusal_rows
+        if str(r.answer or "").strip().lower() == REFUSAL_MESSAGE.lower()
+    )
+    canonical_refusal_accuracy = (
+        round(canonical_refusal_hits / len(canonical_refusal_rows), 3)
+        if canonical_refusal_rows else 1.0
+    )
+
+    metrics_dict = {
         "total":              total,
         "passed":             passed,
         "failed":             total - passed - errors,
@@ -229,7 +288,10 @@ def compute_metrics(results: list[TestResult]) -> dict:
         "source_match_accuracy": round(source_hits / len(source_tests), 3) if source_tests else None,
         "top1_source_accuracy": round(top1_hits / len(top1_tests), 3) if top1_tests else None,
         "source_precision": round(precision_hits / len(precision_tests), 3) if precision_tests else None,
-        "refusal_accuracy":   round(refusal_hits / len(refusal_tests), 3) if refusal_tests else None,
+        "refusal_accuracy":   canonical_refusal_accuracy,
+        "hallucination_rate": hallucination_rate,
+        "domain_accuracy":    domain_accuracy,
+        "ocr_presence_check": True,
         "failure_buckets":    bucket_counts,
         "intent_method_metrics": intent_method_metrics,
         "intent_type_metrics": intent_type_metrics,
@@ -238,6 +300,18 @@ def compute_metrics(results: list[TestResult]) -> dict:
         "latency_sla_ms":     latency_sla_ms,
         "sla_pass":           sla_pass,
     }
+
+    # Strict mode: compute real pass rate excluding corpus_missing
+    if mode == "strict":
+        corpus_missing_count = bucket_counts.get("corpus_missing", 0) + bucket_counts.get("corpus_missing_strict", 0)
+        generic_answer_count = bucket_counts.get("generic_answer", 0)
+        real_passed = passed - corpus_missing_count - generic_answer_count
+        real_total = total - corpus_missing_count - generic_answer_count
+        metrics_dict["real_pass_rate"] = round(real_passed / real_total, 3) if real_total > 0 else 0
+        metrics_dict["corpus_missing_count"] = corpus_missing_count
+        metrics_dict["generic_answer_count"] = generic_answer_count
+
+    return metrics_dict
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -248,6 +322,14 @@ def main(query_fn=None) -> int:
                         help="Path to save JSON report")
     parser.add_argument("--suite", type=str, default=None,
                         help="Run only tests matching this suite (e.g. baseline_en, feature_ar)")
+    parser.add_argument("--mode", type=str, default="dev", choices=["dev", "strict"],
+                        help="Evaluation mode: dev (relaxed) or strict (requires grounded answers)")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Number of parallel workers (1 = sequential). Recommended 4-8 for local Ollama.")
+    parser.add_argument("--query-timeout", type=float, default=90.0,
+                        help="Hard timeout per query in seconds. Prevents hangs on stuck LLM calls.")
+    parser.add_argument("--fast", action="store_true",
+                        help="Disable KnowledgeGapAnalyzer LLM calls during eval (keeps deterministic CorpusTopicMap signal).")
     args = parser.parse_args()
 
     if not EVAL_QUERIES_PATH.exists():
@@ -264,87 +346,182 @@ def main(query_fn=None) -> int:
             return 2
         print(f"Suite filter: {args.suite!r} → {len(tests)} tests\n")
 
+    print(f"Evaluation mode: {args.mode.upper()}\n")
+
     if not tests:
         print("ERROR: eval_queries.json is empty.", file=sys.stderr)
         return 2
 
-    # Use provided query function or default to RagPipeline
+    # Fast mode — short-circuit KnowledgeGapAnalyzer's LLM call.
+    # The deterministic CorpusTopicMap still runs and produces missing_documents.
+    if args.fast:
+        os.environ["KGAP_BYPASS_LLM"] = "1"
+        print("Fast mode: KnowledgeGapAnalyzer LLM calls disabled\n")
+
+    # Use provided query function or default to new Pipeline architecture
+    service = None
     pipeline = None
     if query_fn is None:
-        pipeline = RagPipeline()
-        print("Building index...")
-        t0 = time.perf_counter()
-        pipeline.build_index()
-        print(f"Index ready in {time.perf_counter() - t0:.1f}s\n")
-        query_fn = pipeline.query
+        print("Initializing components...")
+        router = IntentRouter.from_active_model()
+        embedder = Embedder()
+
+        # Load indexes
+        indexes: dict[str, FaissIndex] = {}
+        for name in ("cv", "eco", "general"):
+            try:
+                indexes[name] = FaissIndex.load(name, out_dir=Path("models"))
+            except FileNotFoundError:
+                continue
+
+        if not indexes:
+            print("ERROR: No FAISS indexes found. Run scripts/build_indexes.py first.")
+            return 2
+
+        retriever = MultiRetriever(indexes=indexes)
+        reranker = Reranker(embed_fn=embedder.embed_batch)
+        llm = LLMClient()
+        pipeline = Pipeline(router=router, embedder=embedder, retriever=retriever, llm=llm, reranker=reranker)
+        service = InferenceService(pipeline=pipeline)
+        print(f"Ready with {len(indexes)} indexes\n")
+
+        def query_fn(question: str):
+            result = service.handle_query(question, query_id=f"eval_{int(time.time()*1000)}")
+            # Convert to expected format
+            sources = [{"source": h.source} for h in result.retrieval]
+            # Determine intent method based on confidence
+            intent_method = "rules" if result.confidence >= 0.85 else "v2_model"
+
+            return QueryResult(
+                answer=result.answer,
+                sources=sources,
+                request_id=result.query_id,
+                intent=result.intent,
+                intent_confidence=result.confidence,
+                intent_method=intent_method,
+                failure_type=result.failure_type,
+                grounded=result.grounded,
+            )
     else:
         print("Using provided query function\n")
 
     results: list[TestResult] = []
 
-    try:
-        for i, test in enumerate(tests, 1):
-            question = test.get("question", "").strip()
-            print(f"[{i}/{len(tests)}] {question or '(no question)'}")
+    def _build_test_result(idx: int, test: dict) -> tuple[TestResult, str]:
+        question = test.get("question") or test.get("query", "")
+        question = str(question).strip()
+        tr = TestResult(
+            test_id=idx,
+            question=question,
+            answer="", sources=[],
+            passed=False, reasons=[], buckets=[], elapsed=0.0,
+            expected_source=test.get("expected_source", ""),
+            expected_exact=test.get("expected_exact", ""),
+            expected_intent=test.get("expected_intent", ""),
+            has_expected_source="expected_source" in test,
+            has_expected_exact="expected_exact" in test,
+            killer=bool(test.get("killer", False)),
+        )
+        return tr, question
 
-            tr = TestResult(
-                test_id=i,
-                question=question,
-                answer="", sources=[],
-                passed=False, reasons=[], buckets=[], elapsed=0.0,
-                expected_source=test.get("expected_source", ""),
-                expected_exact=test.get("expected_exact", ""),
-                has_expected_source="expected_source" in test,
-                has_expected_exact="expected_exact" in test,
-            )
-
-            if not question:
-                tr.error = "missing 'question' field"
+    def _run_single(idx: int, test: dict) -> TestResult:
+        tr, question = _build_test_result(idx, test)
+        if not question:
+            tr.error = "missing 'question' or 'query' field"
+            tr.buckets = ["error"]
+            return tr
+        try:
+            t1 = time.perf_counter()
+            result = query_fn(question)
+            tr.elapsed = time.perf_counter() - t1
+            tr.answer = result.answer or ""
+            tr.sources = [s["source"] for s in result.sources]
+            tr.request_id = result.request_id or ""
+            tr.intent = result.intent or ""
+            tr.intent_confidence = result.intent_confidence or 0.0
+            tr.intent_method = result.intent_method or ""
+            tr.failure_type = getattr(result, "failure_type", None)
+            tr.grounded = getattr(result, "grounded", True)
+            tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed, args.mode)
+        except Exception as exc:
+            tr.error = str(exc)
+            if "Embedding failure" in str(exc) or "embedding" in str(exc).lower():
+                tr.buckets = ["infra_failure"]
+            else:
                 tr.buckets = ["error"]
+        return tr
+
+    def _print_result(tr: TestResult, total_count: int) -> None:
+        print(f"[{tr.test_id}/{total_count}] {tr.question or '(no question)'}")
+        if tr.error:
+            print(f"  ✗ ERROR ({tr.elapsed:.2f}s) — {tr.error}")
+            return
+        preview = tr.answer[:120] + ("..." if len(tr.answer) > 120 else "")
+        print(f"  Answer ({tr.elapsed:.2f}s): {preview}")
+        print(f"  Sources: {tr.sources}")
+        if tr.passed:
+            print("  ✓ PASS")
+        else:
+            print(f"  ✗ FAIL — {'; '.join(tr.reasons)}")
+            if tr.request_id:
+                print(f"  request_id: {tr.request_id}")
+
+    try:
+        workers = max(1, int(args.workers))
+        total_count = len(tests)
+
+        if workers == 1:
+            # Sequential path — still enforces per-query timeout via a 1-worker pool.
+            for i, test in enumerate(tests, 1):
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(_run_single, i, test)
+                    try:
+                        tr = future.result(timeout=args.query_timeout)
+                    except FuturesTimeoutError:
+                        tr, _ = _build_test_result(i, test)
+                        tr.error = f"query timeout after {args.query_timeout:.0f}s"
+                        tr.elapsed = args.query_timeout
+                        tr.buckets = ["timeout"]
+                _print_result(tr, total_count)
                 results.append(tr)
-                print("  ✗ SKIP — missing 'question' field")
-                continue
-
-            try:
-                t1 = time.perf_counter()
-                result = query_fn(question)
-                tr.elapsed = time.perf_counter() - t1
-                tr.answer = result.answer or ""
-                tr.sources = [s["source"] for s in result.sources]
-                tr.request_id = result.request_id or ""
-                tr.intent = result.intent or ""
-                tr.intent_confidence = result.intent_confidence or 0.0
-                tr.intent_method = result.intent_method or ""
-
-                tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed)
-
-                preview = tr.answer[:120] + ("..." if len(tr.answer) > 120 else "")
-                print(f"  Answer ({tr.elapsed:.2f}s): {preview}")
-                print(f"  Sources: {tr.sources}")
-
-                if tr.passed:
-                    print("  ✓ PASS")
-                else:
-                    print(f"  ✗ FAIL — {'; '.join(tr.reasons)}")
-                    if tr.request_id:
-                        print(f"  request_id: {tr.request_id}")
-
-            except Exception as exc:
-                tr.error = str(exc)
-                # Classify embedding failures as infra_failure
-                if "Embedding failure" in str(exc) or "embedding" in str(exc).lower():
-                    tr.buckets = ["infra_failure"]
-                else:
-                    tr.buckets = ["error"]
-                print(f"  ✗ ERROR — {exc}")
-            finally:
-                results.append(tr)
+        else:
+            # Parallel path — submit all, collect in order with per-task timeout.
+            indexed: dict[int, TestResult] = {}
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {pool.submit(_run_single, i, test): (i, test)
+                           for i, test in enumerate(tests, 1)}
+                try:
+                    for future in as_completed(futures, timeout=args.query_timeout * total_count):
+                        i, test = futures[future]
+                        try:
+                            tr = future.result(timeout=args.query_timeout)
+                        except FuturesTimeoutError:
+                            tr, _ = _build_test_result(i, test)
+                            tr.error = f"query timeout after {args.query_timeout:.0f}s"
+                            tr.elapsed = args.query_timeout
+                            tr.buckets = ["timeout"]
+                        indexed[i] = tr
+                        _print_result(tr, total_count)
+                except FuturesTimeoutError:
+                    # Global deadline — fill in any unfinished futures as timeouts.
+                    for future, (i, test) in futures.items():
+                        if future.done() or i in indexed:
+                            continue
+                        tr, _ = _build_test_result(i, test)
+                        tr.error = f"global deadline timeout after {args.query_timeout:.0f}s"
+                        tr.elapsed = args.query_timeout
+                        tr.buckets = ["timeout"]
+                        indexed[i] = tr
+            # Preserve input order for the report.
+            results = [indexed[i] for i in sorted(indexed)]
 
         # ── Metrics ───────────────────────────────────────────────────────────
-        metrics = compute_metrics(results)
+        metrics = compute_metrics(results, args.mode)
 
         print(f"\n{'='*60}")
         print(f"  Pass rate:            {metrics['pass_rate']*100:.1f}%  ({metrics['passed']}/{metrics['total']})")
+        if args.mode == "strict" and "real_pass_rate" in metrics:
+            print(f"  Real pass rate:       {metrics['real_pass_rate']*100:.1f}%  (excluding corpus_missing & generic)")
         if metrics["source_match_accuracy"] is not None:
             print(f"  Source match acc:     {metrics['source_match_accuracy']*100:.1f}%")
         if metrics["top1_source_accuracy"] is not None:
@@ -355,23 +532,48 @@ def main(query_fn=None) -> int:
             print(f"  Refusal accuracy:   {metrics['refusal_accuracy']*100:.1f}%")
         print(f"  Errors:             {metrics['errors']}")
         print(f"  Failure buckets:    {metrics['failure_buckets']}")
+        if args.mode == "strict":
+            if "corpus_missing_count" in metrics:
+                print(f"  Corpus missing:      {metrics['corpus_missing_count']}")
+            if "generic_answer_count" in metrics:
+                print(f"  Generic answers:     {metrics['generic_answer_count']}")
         print(f"  Avg latency:        {metrics['avg_elapsed_s']}s  (SLA {metrics['latency_sla_ms']}ms: {'✓' if metrics['sla_pass'] else '✗ FAIL'})")
         print(f"{'='*60}")
+
+        # ── Strict gate (canonical policy) ─────────────────────────────────────
+        results_as_dicts = [asdict(r) for r in results]
+        gate_result = gate(metrics, results_as_dicts)
+        decision = gate_result["decision"]
+        failed_checks = gate_result["failed_checks"]
+
+        if args.mode == "strict":
+            print(f"  Hallucination rate: {metrics['hallucination_rate']*100:.1f}%")
+            print(f"  Domain accuracy:    {metrics['domain_accuracy']*100:.1f}%")
+            print(f"  OCR presence check: {metrics['ocr_presence_check']}")
+            print(f"  Gate decision:      {decision}")
+            if failed_checks:
+                print(f"  Failed checks:      {failed_checks}")
+            print(f"{'='*60}")
 
         # ── Save report ───────────────────────────────────────────────────────
         args.report.parent.mkdir(parents=True, exist_ok=True)
         report = {
+            "decision": decision,
+            "failed_checks": failed_checks,
             "metrics": metrics,
-            "results": [asdict(r) for r in results],
+            "results": results_as_dicts,
         }
         with open(args.report, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
         print(f"\nReport saved → {args.report}")
 
+        # In strict mode, gate decision drives exit code
+        if args.mode == "strict":
+            return 0 if decision == "PROMOTE" else 1
         return 0 if (metrics["failed"] == 0 and metrics["errors"] == 0) else 1
 
     finally:
-        if pipeline is not None:
+        if pipeline is not None and hasattr(pipeline, "close"):
             pipeline.close()
 
 

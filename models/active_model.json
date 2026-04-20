@@ -1,0 +1,11 @@
+{
+  "version": "intent_bootstrap",
+  "path": "intent_bootstrap.joblib",
+  "status": "active",
+  "dataset_hash": "56d8119a62c8c92a05e245527af4d704",
+  "metrics": {
+    "pass_rate": 1.0,
+    "hallucination_rate": 0.0
+  },
+  "threshold": 0.6
+}

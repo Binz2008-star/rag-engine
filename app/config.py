@@ -1,48 +1,51 @@
-"""Central configuration for RAG Assistant v1."""
+from __future__ import annotations
 
 import os
 from pathlib import Path
 
-BASE_DIR = Path(r"D:\AI\assistant")
-DATA_RAW_DIR = BASE_DIR / "data" / "raw"
-DATA_PROCESSED_DIR = BASE_DIR / "data" / "processed"
-STORAGE_DIR = BASE_DIR / "storage"
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = Path(os.getenv("DATA_DIR", str(BASE_DIR / "data" / "raw")))
+LOG_DIR = BASE_DIR / "logs"
+MODEL_DIR = BASE_DIR / "models"
+MODEL_REGISTRY_PATH = MODEL_DIR / "registry.jsonl"
+ACTIVE_MODEL_PATH = MODEL_DIR / "active_model.json"
 
-# Ollama settings
-OLLAMA_BASE_URL = "http://localhost:11434/api"
-CHAT_MODEL = "robin-assistant"
-EMBED_MODEL = "nomic-embed-text"
+# Event storage
+EVENT_DB_PATH = LOG_DIR / "events.db"
+INDEX_DIR = MODEL_DIR
 
-# Chunking settings
-CHUNK_SIZE = 900
+# Ollama configuration
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3")
+MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "4000"))
+TIMEOUT = int(os.getenv("TIMEOUT", "60"))
+MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
+
+# Canonical refusal message. The LLM system prompt instructs the model to
+# emit exactly this string when it cannot answer from the retrieved
+# context. Test infrastructure and metrics should import this constant
+# instead of hard-coding the literal, so future prompt changes only
+# require updating one place.
+REFUSAL_MESSAGE = "Insufficient data."
+
+INTENT_CLASSES = ["cv", "eco", "general"]
+UNCERTAINTY_LABEL = "uncertain"
+ROUTER_CONFIDENCE_THRESHOLD = 0.55
+
+THRESHOLDS_BY_INTENT = {
+    "cv": 0.40,
+    "eco": 0.38,
+    "general": 0.35,
+    "uncertain": 0.30,
+}
+
+TOP_K = 5
+CHUNK_SIZE = 700
 CHUNK_OVERLAP = 120
+BATCH_SIZE = 32
 
-# Retrieval settings
-TOP_K = 8
-MAX_CONTEXT_CHARS = 3000
+TRAINING_TRIGGER_FAILURE_COUNT = 10
+MIN_QUERY_LENGTH = 3
 
-# Reranking settings (v1.4)
-RERANK_ENABLED = True  # Re-enabled for v0.1.1 patch with hybrid score fusion
-RERANK_SEMANTIC_WEIGHT = 0.65
-RERANK_LEXICAL_WEIGHT = 0.20
-RERANK_PHRASE_WEIGHT = 0.08
-RERANK_SOURCE_PRIOR_WEIGHT = 0.07
-
-# Performance settings
-TIMEOUT = 10
-MAX_RETRIES = 3
-BATCH_SIZE = 1
-NUM_PREDICT = 120
-
-# File handling
-SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".html"}
-
-# Storage files
-FAISS_INDEX_PATH = STORAGE_DIR / "faiss.index"
-METADATA_PATH = STORAGE_DIR / "metadata.json"
-DATA_HASH_PATH = STORAGE_DIR / "data.hash"
-
-# Runtime mode
-# False (default) = eval mode: deterministic enforcement active
-# True            = production mode: raw LLM output, no forced keywords
-PRODUCTION_MODE: bool = os.getenv("PRODUCTION_MODE", "false").lower() == "true"
+EVENT_SCHEMA_VERSION = "1.0"

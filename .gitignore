@@ -139,3 +139,23 @@ reports/
 .faiss.index
 data.hash
 metadata.json
+
+# Built model/index artifacts
+models/*.faiss
+
+# Storage/runtime artifacts
+logs/*.jsonl
+logs/*.db
+logs/*.sqlite
+logs/*.sqlite3
+
+# Local audit/debug scratch
+audit_*.py
+check_events*.py
+corpus_gap_report.py
+extract_failures.py
+retrieval_audit.py
+truth_table_post_fix.md
+
+# Optional local eval scratch
+# tests/eval_queries.json - removed for CI compatibility

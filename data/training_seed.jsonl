@@ -1,0 +1,6 @@
+{"query": "What are Robin's skills", "label": "cv"}
+{"query": "Tell me about Robin's experience", "label": "cv"}
+{"query": "What is Eco", "label": "eco"}
+{"query": "Tell me about Eco company", "label": "eco"}
+{"query": "Hello", "label": "general"}
+{"query": "What can you help with", "label": "general"}

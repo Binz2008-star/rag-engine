@@ -1,0 +1,202 @@
+name: Evaluation Quality Gate (Strict)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: Repo Integrity (Portable)
+    runs-on: ubuntu-latest
+    # No pip install — stdlib only. Tests repo structure and file validity.
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate eval suite JSON
+        # The suite consumed by eval_runner.py lives at tests/eval_queries.json
+        # and is a JSON array (not the legacy adversarial dict). We also
+        # enforce presence of at least one killer query so nobody can silently
+        # remove the hard-fail signal that the gate depends on.
+        shell: bash
+        run: |
+          python <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("tests/eval_queries.json")
+          assert path.exists(), f"{path} not found"
+
+          with path.open(encoding="utf-8") as f:
+              data = json.load(f)
+
+          assert isinstance(data, list), f"{path} must be a JSON array"
+          assert data, f"{path} is empty"
+
+          missing_query = [i for i, q in enumerate(data) if not (q.get("query") or q.get("question"))]
+          assert not missing_query, f"Queries without a 'query'/'question' field at indices: {missing_query}"
+
+          killers = [q for q in data if q.get("killer") is True]
+          assert killers, (
+              f"{path} must define at least one killer query; "
+              "removing them silently weakens the canonical gate."
+          )
+
+          print(f"{path} OK — {len(data)} queries ({len(killers)} killer)")
+          PY
+
+      - name: Syntax check (py_compile)
+        run: |
+          python -m py_compile eval_runner.py       && echo 'eval_runner.py OK'
+          python -m py_compile app/config.py        && echo 'app/config.py OK'
+          python -m py_compile app/pipeline.py     && echo 'app/pipeline.py OK'
+          python -m py_compile generation/llm.py    && echo 'generation/llm.py OK'
+          python -m py_compile evaluation/eval_main.py && echo 'evaluation/eval_main.py OK'
+
+  eval_strict:
+    name: RAG Evaluation (Strict Mode - 100% Gate)
+    runs-on: ubuntu-latest
+    # Hard ceiling. Strict runs WITHOUT --fast, so KnowledgeGapAnalyzer
+    # makes a real LLM call on every refusal — budget accordingly.
+    timeout-minutes: 35
+    env:
+      # 60s covers embed batches of 32 chunks on CPU runners (~2x margin
+      # over observed 20-35s typical). Chat LLM calls are bounded by
+      # --query-timeout=90 inside eval_runner (raised from 45 to absorb
+      # the extra KnowledgeGapAnalyzer round-trip that --fast would skip).
+      #
+      # Escalation if 60 still fails: add BATCH_SIZE env override in
+      # app/config.py and set BATCH_SIZE=8 here, rather than raising
+      # TIMEOUT further.
+      TIMEOUT: "60"
+      # Single attempt. eval_runner enforces its own per-query timeout;
+      # retries would only amplify Ollama hangs.
+      MAX_RETRIES: "1"
+      CHAT_MODEL: qwen2:1.5b
+      CHAT_MODEL_DIGEST: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
+      EMBED_MODEL: nomic-embed-text
+      EMBED_MODEL_DIGEST: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Cache Ollama models
+        # Saves ~3-5 min per run. Key includes requirements.txt hash so a
+        # dependency bump (which may require different model behavior)
+        # invalidates the cache, avoiding stale-state false greens.
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama/models
+          key: ollama-${{ env.CHAT_MODEL }}-${{ env.EMBED_MODEL }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ollama-${{ env.CHAT_MODEL }}-${{ env.EMBED_MODEL }}-
+
+      - name: Start Ollama service
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'echo "--- Ollama log ---"; cat /tmp/ollama.log || true' ERR
+
+          curl -fsSL https://ollama.com/install.sh | sh
+
+          # install.sh starts ollama as systemd service automatically.
+          # Stop it before starting our custom version with logging.
+          sudo systemctl stop ollama 2>/dev/null || true
+          sudo systemctl disable ollama 2>/dev/null || true
+
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
+
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then
+              echo "Ollama is ready"
+              break
+            fi
+            echo "Waiting for Ollama... ($i)"
+            sleep 2
+          done
+
+          if ! curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then
+            echo "Ollama failed to start"
+            cat /tmp/ollama.log || true
+            exit 1
+          fi
+
+          # Pull models and log digests (platform-specific, may differ from local)
+          ollama pull "${CHAT_MODEL}"
+          ACTUAL_CHAT=$(ollama list | grep "${CHAT_MODEL}" | awk '{print $2}' || true)
+          ollama pull "${EMBED_MODEL}"
+          ACTUAL_EMBED=$(ollama list | grep "${EMBED_MODEL}" | awk '{print $2}' || true)
+
+          echo "qwen2:1.5b digest on runner:       $ACTUAL_CHAT"
+          echo "nomic-embed-text digest on runner: $ACTUAL_EMBED"
+          echo "Expected chat:  ${{ env.CHAT_MODEL_DIGEST }}"
+          echo "Expected embed: ${{ env.EMBED_MODEL_DIGEST }}"
+
+          if [ "$ACTUAL_CHAT" != "${{ env.CHAT_MODEL_DIGEST }}" ]; then
+            echo "WARNING: qwen2:1.5b digest mismatch — update CHAT_MODEL_DIGEST in workflow"
+          fi
+          if [ "$ACTUAL_EMBED" != "${{ env.EMBED_MODEL_DIGEST }}" ]; then
+            echo "WARNING: nomic-embed-text digest mismatch — update EMBED_MODEL_DIGEST in workflow"
+          fi
+
+      - name: Build FAISS indexes
+        timeout-minutes: 8
+        run: python scripts/build_indexes.py
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Run strict evaluation
+        # --fast is deliberately OMITTED. Strict CI is the source of truth
+        # and must exercise KnowledgeGapAnalyzer end-to-end; bypassing it
+        # would make the green gate meaningless for that subsystem.
+        #
+        # --workers 1: CPU-only runner - sequential avoids core contention.
+        # --query-timeout 120: CPU inference needs more time.
+        # timeout-minutes: 45: 38 queries + LLM calls on CPU is slow.
+        timeout-minutes: 45
+        run: |
+          python eval_runner.py \
+            --mode strict \
+            --workers 1 \
+            --query-timeout 120 \
+            --report reports/ci_eval_strict.json
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          TIMEOUT: "120"
+
+      - name: Upload strict evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-strict-report-${{ github.run_id }}
+          path: reports/ci_eval_strict.json
+          retention-days: 30
+
+      - name: Upload Ollama log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-log-${{ github.run_id }}
+          path: /tmp/ollama.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Check strict pass rate
+        run: python scripts/check_strict_pass.py
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          REPORT_PATH: reports/ci_eval_strict.json

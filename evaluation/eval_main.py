@@ -1,0 +1,144 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from app.config import REFUSAL_MESSAGE
+from evaluation.eval_gate import gate
+from evaluation.metrics import compute_metrics
+from evaluation.ocr_check import check_ocr_presence
+
+
+def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bool = False) -> dict:
+    data = json.loads(eval_path.read_text(encoding="utf-8"))
+    tests = data.get("queries", [])
+    results: list[dict] = []
+
+    if strict and data_dir is None:
+        raise ValueError("strict eval requires data_dir for OCR precheck")
+
+    for item in tests:
+        result = pipeline.run(item["query"], query_id=f"eval-{len(results) + 1}")
+        passed = True
+        failure_reasons = []
+
+        actual_method = getattr(result, "intent_method", None)
+        actual_intent = getattr(result, "intent", None)
+        actual_answer = getattr(result, "answer", "")
+        actual_grounded = getattr(result, "grounded", True)
+        actual_failure_type = getattr(result, "failure_type", None)
+        actual_latency_ms = getattr(result, "latency_ms", 0)
+        actual_knowledge_gap = getattr(result, "knowledge_gap", None)
+
+        intent_correct = actual_intent == item["expected_intent"]
+
+        if not intent_correct:
+            passed = False
+            failure_reasons.append(
+                f"intent mismatch: expected {item['expected_intent']}, got {actual_intent}"
+            )
+
+        if "expected_method" in item and actual_method != item["expected_method"]:
+            passed = False
+            failure_reasons.append(
+                f"method mismatch: expected {item['expected_method']}, got {actual_method}"
+            )
+
+        # Grounding requirement. A "grounded" answer is one that does not
+        # fabricate content: either it cites the retrieved context or it
+        # is a valid refusal ("Insufficient data."). Refusals count as
+        # grounded because they introduce no unsupported claims — that
+        # is why setting this on a refusal query is redundant, not
+        # contradictory. Default True.
+        #
+        # ``must_not_hallucinate`` is the clearer name for the same
+        # contract and is accepted as an alias; it wins if both are set.
+        must_be_grounded = item.get(
+            "must_not_hallucinate",
+            item.get("must_be_grounded", True),
+        )
+        if must_be_grounded and not actual_grounded:
+            passed = False
+            failure_reasons.append("not grounded when required")
+
+        for phrase in item.get("must_not_contain", []):
+            if phrase.lower() in actual_answer.lower():
+                passed = False
+                failure_reasons.append(f"contains forbidden phrase: '{phrase}'")
+
+        if "expected_answer_exact" in item and actual_answer != item["expected_answer_exact"]:
+            passed = False
+            failure_reasons.append(
+                f"answer mismatch: expected '{item['expected_answer_exact']}', got '{actual_answer}'"
+            )
+
+        if "expected_answer_contains" in item:
+            for term in item["expected_answer_contains"]:
+                if term.lower() not in actual_answer.lower():
+                    passed = False
+                    failure_reasons.append(f"missing expected term: '{term}'")
+
+        if "expected_failure_type" in item:
+            expected = item["expected_failure_type"]
+            if expected is not None and actual_failure_type != expected:
+                passed = False
+                failure_reasons.append(
+                    f"failure_type mismatch: expected {expected}, got {actual_failure_type}"
+                )
+            elif expected is None and actual_failure_type is not None:
+                passed = False
+                failure_reasons.append(f"unexpected failure_type: {actual_failure_type}")
+
+        if "expected_knowledge_gap" in item:
+            if item["expected_knowledge_gap"] and actual_knowledge_gap is None:
+                passed = False
+                failure_reasons.append("expected knowledge_gap to be present, but it was None")
+            elif not item["expected_knowledge_gap"] and actual_knowledge_gap is not None:
+                passed = False
+                failure_reasons.append(f"expected no knowledge_gap, but got: {actual_knowledge_gap}")
+
+        expected_refusal = item.get(
+            "expected_refusal",
+            item.get("expected_answer_exact") == REFUSAL_MESSAGE
+        )
+
+        results.append(
+            {
+                "query": item["query"],
+                "answer": actual_answer,
+                "intent": actual_intent,
+                "intent_method": actual_method,
+                "grounded": actual_grounded,
+                "failure_type": actual_failure_type,
+                "knowledge_gap": {
+                    "gap_type": actual_knowledge_gap.gap_type if actual_knowledge_gap else None,
+                    "confidence_if_adversarial": actual_knowledge_gap.confidence_if_adversarial if actual_knowledge_gap else None,
+                    "suggested_action": actual_knowledge_gap.suggested_action if actual_knowledge_gap else None,
+                } if actual_knowledge_gap else None,
+                "passed": passed,
+                "failure_reasons": failure_reasons,
+                "latency_ms": actual_latency_ms,
+                "intent_correct": intent_correct,
+                "expected_intent": item["expected_intent"],
+                "expected_refusal": expected_refusal,
+                "killer": bool(item.get("killer", False)),
+            }
+        )
+
+    ocr_result = {"ocr_presence_check": True, "pdf_status": {}}
+    if data_dir is not None:
+        ocr_result = check_ocr_presence(data_dir)
+    elif strict:
+        ocr_result = {"ocr_presence_check": False, "pdf_status": {"error": "OCR precheck not run"}}
+
+    metrics = compute_metrics(results, ocr_presence_check=ocr_result["ocr_presence_check"])
+    metrics["pdf_status"] = ocr_result["pdf_status"]
+
+    gate_result = gate(metrics, results)
+
+    return {
+        "decision": gate_result["decision"],
+        "failed_checks": gate_result["failed_checks"],
+        "metrics": metrics,
+        "results": results,
+    }
