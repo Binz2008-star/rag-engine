@@ -129,7 +129,7 @@ def test_run_eval_promotes_clean_run(tmp_path):
         "general q": _refusal_result("general q", "general"),
     })
 
-    report = run_eval(pipeline, _write_queries(tmp_path, queries))
+    report = run_eval(pipeline, _write_queries(tmp_path, queries), data_dir=None, strict=False)
 
     assert report["decision"] == "PROMOTE"
     assert report["failed_checks"] == []
@@ -147,7 +147,7 @@ def test_run_eval_rejects_on_hallucination(tmp_path):
         "eco q": _hallucinated_result("eco q", "eco"),
     })
 
-    report = run_eval(pipeline, _write_queries(tmp_path, queries))
+    report = run_eval(pipeline, _write_queries(tmp_path, queries), data_dir=None, strict=False)
 
     assert report["decision"] == "REJECT"
     assert "hallucination_rate" in report["failed_checks"]
@@ -164,7 +164,7 @@ def test_run_eval_rejects_on_refusal_failure(tmp_path):
         "general q": _ok_result("general q", "general"),  # wrong: answers instead of refusing
     })
 
-    report = run_eval(pipeline, _write_queries(tmp_path, queries))
+    report = run_eval(pipeline, _write_queries(tmp_path, queries), data_dir=None, strict=False)
 
     assert report["decision"] == "REJECT"
     assert "refusal_accuracy" in report["failed_checks"]
@@ -180,7 +180,7 @@ def test_run_eval_rejects_on_domain_miss(tmp_path):
         "eco q": _ok_result("eco q", "general"),  # wrong intent
     })
 
-    report = run_eval(pipeline, _write_queries(tmp_path, queries))
+    report = run_eval(pipeline, _write_queries(tmp_path, queries), data_dir=None, strict=False)
 
     assert report["decision"] == "REJECT"
     assert "domain_accuracy" in report["failed_checks"]
@@ -203,7 +203,7 @@ def test_run_eval_rejects_when_killer_query_fails(tmp_path):
         "killer q":  _ok_result("killer q", "general"),
     })
 
-    report = run_eval(pipeline, _write_queries(tmp_path, queries))
+    report = run_eval(pipeline, _write_queries(tmp_path, queries), data_dir=None, strict=False)
 
     assert report["decision"] == "REJECT"
     assert "killer_failure" in report["failed_checks"]
@@ -225,7 +225,7 @@ def test_run_eval_promotes_when_killer_query_refuses_correctly(tmp_path):
         "killer q":  _refusal_result("killer q", "general"),
     })
 
-    report = run_eval(pipeline, _write_queries(tmp_path, queries))
+    report = run_eval(pipeline, _write_queries(tmp_path, queries), data_dir=None, strict=False)
 
     assert report["decision"] == "PROMOTE"
     assert "killer_failure" not in report["failed_checks"]
@@ -247,21 +247,15 @@ def _run_check_script() -> subprocess.CompletedProcess:
 
 
 @pytest.fixture
-def _isolated_report():
-    """Back up and restore any existing report around the test."""
-    backup = None
-    if REPORT_PATH.exists():
-        backup = REPORT_PATH.read_bytes()
-    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    yield
-    if backup is not None:
-        REPORT_PATH.write_bytes(backup)
-    elif REPORT_PATH.exists():
-        REPORT_PATH.unlink()
+def _isolated_report(tmp_path, monkeypatch):
+    """Use isolated temp path for report to avoid race conditions."""
+    report = tmp_path / "ci_eval_strict.json"
+    monkeypatch.setenv("REPORT_PATH", str(report))
+    return report
 
 
 def test_check_strict_pass_exits_zero_on_promote(_isolated_report):
-    REPORT_PATH.write_text(json.dumps({
+    _isolated_report.write_text(json.dumps({
         "decision": "PROMOTE",
         "failed_checks": [],
         "metrics": {
@@ -280,7 +274,7 @@ def test_check_strict_pass_exits_zero_on_promote(_isolated_report):
 
 
 def test_check_strict_pass_exits_nonzero_on_reject(_isolated_report):
-    REPORT_PATH.write_text(json.dumps({
+    _isolated_report.write_text(json.dumps({
         "decision": "REJECT",
         "failed_checks": ["hallucination_rate"],
         "metrics": {
@@ -301,7 +295,7 @@ def test_check_strict_pass_exits_nonzero_on_reject(_isolated_report):
 
 def test_check_strict_pass_fails_if_decision_missing(_isolated_report):
     """Report without 'decision' must fail with exit 2 (not silently pass)."""
-    REPORT_PATH.write_text(json.dumps({
+    _isolated_report.write_text(json.dumps({
         "metrics": {"pass_rate": 1.0},
     }), encoding="utf-8")
 
