@@ -64,7 +64,9 @@ jobs:
       TIMEOUT: "60"
       MAX_RETRIES: "1"
       CHAT_MODEL: qwen3:8b
+      CHAT_MODEL_DIGEST: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
       EMBED_MODEL: nomic-embed-text
+      EMBED_MODEL_DIGEST: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
 
     steps:
       - name: Checkout
@@ -112,8 +114,24 @@ jobs:
             exit 1
           fi
 
-          ollama list | grep -q "${CHAT_MODEL}"  || ollama pull "${CHAT_MODEL}"
-          ollama list | grep -q "${EMBED_MODEL}" || ollama pull "${EMBED_MODEL}"
+          # Pull models and verify pinned digests to ensure reproducible behavior
+          ollama pull "${CHAT_MODEL}"
+          ACTUAL=$(ollama show "${CHAT_MODEL}" --verbose 2>/dev/null | grep -i digest | awk '{print $2}')
+          EXPECTED="${CHAT_MODEL_DIGEST}"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "ERROR: model digest mismatch. Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+          echo "${CHAT_MODEL} digest verified: $ACTUAL"
+
+          ollama pull "${EMBED_MODEL}"
+          ACTUAL=$(ollama show "${EMBED_MODEL}" --verbose 2>/dev/null | grep -i digest | awk '{print $2}')
+          EXPECTED="${EMBED_MODEL_DIGEST}"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "ERROR: model digest mismatch. Expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+          echo "${EMBED_MODEL} digest verified: $ACTUAL"
 
       - name: Build FAISS indexes
         timeout-minutes: 8
