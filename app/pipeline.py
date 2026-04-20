@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import time
 
-from app.config import ACTIVE_MODEL_PATH
+from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE
 from app.models import KnowledgeGap, PipelineResult
 from app.utils import stable_hash
 from router.features import normalize_query
@@ -11,6 +11,17 @@ from generation.grounding import check_grounding
 from retrieval.reranker import Reranker
 from analysis.corpus_topic_map import CorpusTopicMap
 from analysis.knowledge_gap import KnowledgeGapAnalyzer
+
+
+_SENSITIVE_PATTERNS = [
+    "uranium", "enrichment", "nuclear plant", "nuclear power station",
+    "radioactive", "biological weapon", "chemical weapon",
+]
+
+
+def _is_sensitive_query(query: str) -> bool:
+    q = query.lower()
+    return any(p in q for p in _SENSITIVE_PATTERNS)
 
 
 class Pipeline:
@@ -45,6 +56,27 @@ class Pipeline:
     def run(self, query: str, query_id: str) -> PipelineResult:
         t0 = time.perf_counter()
         normalized_query = normalize_query(query)
+
+        # Refuse sensitive queries without routing or retrieval
+        if _is_sensitive_query(query):
+            elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            return PipelineResult(
+                query_id=query_id,
+                query=query,
+                normalized_query=normalized_query,
+                intent="general",
+                confidence=1.0,
+                intent_method="rule",
+                retrieval=[],
+                answer=REFUSAL_MESSAGE,
+                grounded=True,
+                failure_type="retrieval_miss",
+                knowledge_gap=None,
+                latency_ms=elapsed_ms,
+                model_version=self.model_version,
+                retriever_version=self.retriever_version,
+            )
+
         route = self.router.route(normalized_query)
         vec = self.embedder.embed_batch([normalized_query])[0]
 
