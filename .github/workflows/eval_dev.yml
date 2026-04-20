@@ -149,13 +149,15 @@ jobs:
         # LLM call is bypassed (deterministic CorpusTopicMap signal still
         # drives missing_documents). Non-authoritative by design — main
         # merges go through eval_strict.yml which runs without --fast.
+        # --suite baseline_en: run only 10 baseline queries for fast feedback.
         timeout-minutes: 8
         run: |
           python eval_runner.py \
             --mode strict \
             --workers 2 \
-            --query-timeout 45 \
+            --query-timeout 30 \
             --fast \
+            --suite baseline_en \
             --report reports/ci_eval_dev.json
         env:
           PYTHONPATH: ${{ github.workspace }}
