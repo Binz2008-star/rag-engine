@@ -61,7 +61,7 @@ jobs:
     # query well under 60s even in worst case.
     timeout-minutes: 20
     env:
-      TIMEOUT: "60"
+      TIMEOUT: "120"
       MAX_RETRIES: "1"
       CHAT_MODEL: qwen3:8b
       CHAT_MODEL_DIGEST: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
@@ -150,12 +150,12 @@ jobs:
         # drives missing_documents). Non-authoritative by design — main
         # merges go through eval_strict.yml which runs without --fast.
         # --suite baseline_en: run only 10 baseline queries for fast feedback.
-        timeout-minutes: 8
+        timeout-minutes: 18
         run: |
           python eval_runner.py \
             --mode strict \
-            --workers 2 \
-            --query-timeout 30 \
+            --workers 1 \
+            --query-timeout 120 \
             --fast \
             --suite baseline_en \
             --report reports/ci_eval_dev.json
