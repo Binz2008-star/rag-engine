@@ -63,7 +63,7 @@ jobs:
     env:
       TIMEOUT: "120"
       MAX_RETRIES: "1"
-      CHAT_MODEL: qwen3:1.5b
+      CHAT_MODEL: qwen2:1.5b
       CHAT_MODEL_DIGEST: 500a1f067a9f782620b40bee6f7b0c89e17ae61f686b92c24933e4ca4b2b8b41
       EMBED_MODEL: nomic-embed-text
       EMBED_MODEL_DIGEST: 0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f
@@ -126,13 +126,13 @@ jobs:
           ollama pull "${EMBED_MODEL}"
           ACTUAL_EMBED=$(ollama list | grep "${EMBED_MODEL}" | awk '{print $2}' || true)
 
-          echo "qwen3:1.5b digest on runner:       $ACTUAL_CHAT"
+          echo "qwen2:1.5b digest on runner:       $ACTUAL_CHAT"
           echo "nomic-embed-text digest on runner: $ACTUAL_EMBED"
           echo "Expected chat:  ${{ env.CHAT_MODEL_DIGEST }}"
           echo "Expected embed: ${{ env.EMBED_MODEL_DIGEST }}"
 
           if [ "$ACTUAL_CHAT" != "${{ env.CHAT_MODEL_DIGEST }}" ]; then
-            echo "WARNING: qwen3:1.5b digest mismatch — update CHAT_MODEL_DIGEST in workflow"
+            echo "WARNING: qwen2:1.5b digest mismatch — update CHAT_MODEL_DIGEST in workflow"
           fi
           if [ "$ACTUAL_EMBED" != "${{ env.EMBED_MODEL_DIGEST }}" ]; then
             echo "WARNING: nomic-embed-text digest mismatch — update EMBED_MODEL_DIGEST in workflow"
