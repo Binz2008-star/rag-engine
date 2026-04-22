@@ -1,108 +1,155 @@
-# RAG Assistant API
+# API Overview
 
-FastAPI wrapper around the **eval-certified** pipeline
-(`app.pipeline.Pipeline` + `app.inference_service.InferenceService`). No
-pipeline logic is reimplemented — the gateway only exposes HTTP, applies
-CORS, and shapes responses. This guarantees that a PASS on the strict
-evaluation gate predicts the behaviour users see via HTTP.
+## Base URL
+Local development default:
+
+```text
+http://localhost:8000
+```
 
 ## Endpoints
 
-| Method | Path          | Description                                     |
-| ------ | ------------- | ----------------------------------------------- |
-| GET    | `/api/health` | Liveness + pipeline readiness + index count     |
-| POST   | `/api/query`  | Run a question through the evaluated pipeline   |
+### `POST /api/query`
 
-Streaming is intentionally not exposed. `Pipeline.run()` returns a fully
-formed result; a synthetic token stream would bypass the pipeline's
-grounding gate and re-duplicate policy checks, reintroducing the exact
-runtime/eval drift this service is designed to eliminate.
+Grounded RAG question answering.
 
-### Response schema (`POST /api/query`)
+#### Request
+
+```json
+{
+  "question": "What does ECO do?",
+  "session_id": "s1",
+  "user_id": "u1"
+}
+```
+
+#### Response
 
 ```json
 {
   "answer": "string",
   "sources": [
-    { "source": "file.pdf", "chunk_id": "c_12", "doc_type": "pdf", "score": 0.82 }
+    {
+      "source": "string",
+      "chunk_id": "string",
+      "doc_type": "string",
+      "score": 0.0
+    }
   ],
-  "latency_ms": 2244,
-  "wall_ms": 2280,
-  "request_id": "api_1713694112084",
-  "intent": "eco",
-  "intent_confidence": 1.0,
-  "intent_method": "rules",
-  "intent_method_raw": "rule",
+  "latency_ms": 0,
+  "wall_ms": 0,
+  "request_id": "string",
+  "intent": "string",
+  "intent_confidence": 0.0,
+  "intent_method": "string",
+  "intent_method_raw": "string",
   "grounded": true,
   "failure_type": null,
-  "model_version": "v1.0.0",
-  "retriever_version": "v1_a3f2c19d"
+  "model_version": "string",
+  "retriever_version": "string"
 }
 ```
 
-`latency_ms` is what the pipeline measures internally (the value the eval
-gate sees). `wall_ms` is the API wall-clock including the thread hop and
-JSON serialisation. No split retrieval/generation timings are reported
-because the canonical pipeline does not record them — inventing split
-values would fabricate data.
+### `POST /api/trading/analyze`
 
-## Run
+Trading analysis shell endpoint.
 
-From the project root (`d:\AI\assistant`), using the same venv you use
-for the RAG app and CI:
+#### Request
 
-```powershell
-# 1. Install the API-only extras into the existing venv
-pip install -r api\requirements.txt
-
-# 2. (Optional) override API-side env
-Copy-Item api\.env.example api\.env
-
-# 3. Make sure the indexes exist (same artefacts used by eval_runner.py)
-python scripts\build_indexes.py
-
-# 4. Launch
-uvicorn server.main:app --reload --host 0.0.0.0 --port 8000 --app-dir api
+```json
+{
+  "question": "Analyze EURUSD on H1",
+  "session_id": "s1",
+  "user_id": "u1"
+}
 ```
 
-Swagger UI: <http://localhost:8000/docs>
+#### Response
 
-## Smoke test
-
-```powershell
-# Health
-curl http://localhost:8000/api/health
-
-# Query (defaults to the qwen2:1.5b chat model configured in the project root .env)
-curl -X POST http://localhost:8000/api/query `
-  -H "Content-Type: application/json" `
-  -d '{"question":"What does ECO do?"}'
+```json
+{
+  "capability": "trading",
+  "intent": "analyze",
+  "market": "forex",
+  "asset": "EURUSD",
+  "timeframe": "H1",
+  "prompt": "Analyze EURUSD on H1",
+  "status": "accepted"
+}
 ```
 
-## Acceptance test: eval/product parity
+### `POST /api/agent/analyze`
 
-The only meaningful proof that CI and the product are aligned is a cold
-run where a query passed by `eval_runner.py` returns byte-identical
-`answer` + `sources` through `/api/query`:
+Agent analysis shell endpoint.
 
-```powershell
-# 1. Run the strict eval offline
-python eval_runner.py --mode strict --report reports\ci_eval_strict.json
+#### Request
 
-# 2. Pick a PROMOTE-eligible query (e.g. "What is Eco company?") and
-#    POST it against a fresh API boot. Diff the answer + sources against
-#    the entry in reports\ci_eval_strict.json.
+```json
+{
+  "question": "Create a plan to add scheduled task support",
+  "session_id": "s1",
+  "user_id": "u1"
+}
 ```
 
-If the two disagree, treat it as a P0: the API has drifted from the
-evaluated pipeline.
+#### Response
 
-## Notes
+```json
+{
+  "capability": "agent",
+  "intent": "plan",
+  "prompt": "Create a plan to add scheduled task support",
+  "summary": "This request looks like a planning or orchestration request.",
+  "suggested_tools": ["planner", "capability_router"],
+  "status": "accepted"
+}
+```
 
-- The API package is `server` (not `app`) to avoid a name clash with the
-  parent project's `app` package, which the gateway imports from directly.
-- Ollama / chat-model configuration is owned by `app.config` and consumed
-  by `generation.llm.LLMClient`. Do not redefine it in `api/.env`.
-- Pipeline initialisation is async-safe: blocking calls run via
-  `asyncio.to_thread` so FastAPI's event loop stays responsive under
-  concurrent requests.
+### `GET /api/health`
+
+Basic service readiness.
+
+### `GET /api/system/health`
+
+Extended dependency and service health report.
+
+## Buffered streaming
+
+The RAG API includes a policy-safe buffered streaming path.
+
+Design constraints:
+
+* canonical RAG behavior remains authoritative
+* no ungrounded partial output is sent to the client
+* tokens are emitted only after validation succeeds
+
+This preserves grounded-only product behavior while still allowing streamed rendering after validation.
+
+## Service modules added
+
+* `context_service.py`
+* `interaction_log_service.py`
+* `capability_router.py`
+* `health_guardian.py`
+* `trading_service.py`
+* `agent_service.py`
+
+## Important boundaries
+
+### RAG
+
+* real answer path
+* grounded-only
+* refusal-aware
+
+### Trading
+
+* shell only
+* classification only
+* no execution
+
+### Agent
+
+* shell only
+* classification only
+* no autonomous runtime yet
