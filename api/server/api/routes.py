@@ -27,6 +27,8 @@ from ..schemas import (
     TaskResponse,
     TradingAnalyzeRequest,
     TradingAnalyzeResponse,
+    TradingRuntimeRequest,
+    TradingRuntimeResponse,
 )
 from ..services.agent_executor import AgentExecutor
 from ..services.agent_service import AgentService
@@ -155,6 +157,16 @@ def _general_chat_service(request: Request) -> GeneralChatService:
     return service
 
 
+def _trading_runtime_service(request: Request):
+    service = getattr(request.app.state, "trading_runtime_service", None)
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Trading runtime service not initialised",
+        )
+    return service
+
+
 @router.get(
     "/health",
     response_model=HealthResponse,
@@ -256,6 +268,63 @@ async def trading_analyze(
         timeframe=result.timeframe,
         prompt=result.prompt,
         status=result.status,
+    )
+
+
+@router.post(
+    "/trading/runtime/dry-run",
+    response_model=TradingRuntimeResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def trading_runtime_dry_run(
+    payload: TradingRuntimeRequest,
+    request: Request,
+) -> TradingRuntimeResponse:
+    settings = get_settings()
+    runtime_service = _trading_runtime_service(request)
+
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question is empty")
+    if len(question) > settings.max_question_length:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Question exceeds max length "
+                f"({settings.max_question_length} chars)"
+            ),
+        )
+
+    try:
+        result = await runtime_service.run_dry_analysis(
+            question=question,
+            session_id=payload.session_id,
+            user_id=payload.user_id,
+        )
+    except Exception as exc:
+        logger.exception("Trading runtime dry-run failed")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal error while processing trading runtime dry-run"
+        ) from exc
+
+    return TradingRuntimeResponse(
+        capability="trading",
+        intent="runtime_analysis",
+        status="ok" if result.get("accepted") else "rejected",
+        execution_mode=result.get("execution_mode", "dry_run"),
+        market=result.get("market"),
+        asset=result.get("asset"),
+        timeframe=result.get("timeframe"),
+        risk_approved=result.get("risk_approved", False),
+        risk_summary=result.get("risk_reason"),
+        execution_summary=result.get("execution_summary"),
+        normalized_symbol=result.get("normalized_symbol"),
+        warnings=result.get("warnings", []),
     )
 
 

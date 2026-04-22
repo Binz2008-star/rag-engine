@@ -162,3 +162,24 @@ class ExecuteTaskResponse(BaseModel):
     output: str
     started_at: float
     finished_at: float
+
+
+class TradingRuntimeRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    session_id: str | None = None
+    user_id: str | None = None
+
+
+class TradingRuntimeResponse(BaseModel):
+    capability: str
+    intent: str
+    status: str
+    execution_mode: str
+    market: str | None = None
+    asset: str | None = None
+    timeframe: str | None = None
+    risk_approved: bool
+    risk_summary: str | None = None
+    execution_summary: dict[str, Any] | None = None
+    normalized_symbol: str | None = None
+    warnings: list[str] = Field(default_factory=list)

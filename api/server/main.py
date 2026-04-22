@@ -23,6 +23,8 @@ from .infra.ollama_health import OllamaUnavailableError, check_ollama  # noqa: E
 from .services.agent_service import AgentService  # noqa: E402
 from .services.agent_executor import AgentExecutor  # noqa: E402
 from .services.capability_router import CapabilityRouter  # noqa: E402
+from .services.general_chat_service import GeneralChatService  # noqa: E402
+from .services.execution_guard import ExecutionGuard  # noqa: E402
 from .services.context_service import ContextService  # noqa: E402
 from .services.health_guardian import HealthGuardian  # noqa: E402
 from .services.interaction_log_service import InteractionLogService  # noqa: E402
@@ -30,6 +32,10 @@ from .services.rag_service import RagService  # noqa: E402
 from .services.scheduler_service import SchedulerService  # noqa: E402
 from .services.task_store import TaskStore  # noqa: E402
 from .services.trading_service import TradingService  # noqa: E402
+from .services.trading_execution_service import ShellExecutionService  # noqa: E402
+from .services.trading_risk_service import ShellRiskService  # noqa: E402
+from .services.trading_exchange_client import ShellExchangeClient  # noqa: E402
+from .services.trading_runtime_service import TradingRuntimeService  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +60,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.trading_service = TradingService()
     app.state.agent_service = AgentService()
     app.state.task_store = TaskStore()
+    app.state.execution_guard = ExecutionGuard(app.state.task_store)
     app.state.scheduler_service = SchedulerService()
     app.state.agent_executor = AgentExecutor()
+    app.state.general_chat_service = GeneralChatService()
+
+    # Trading runtime services (dry-run only, no live exchange credentials)
+    app.state.trading_exchange_client = ShellExchangeClient()
+    app.state.trading_execution_service = ShellExecutionService()
+    app.state.trading_risk_service = ShellRiskService()
+    app.state.trading_runtime_service = TradingRuntimeService(
+        execution_service=app.state.trading_execution_service,
+        risk_service=app.state.trading_risk_service,
+        exchange_client=app.state.trading_exchange_client,
+    )
 
     try:
         await check_ollama(
