@@ -6,6 +6,7 @@ import { postDispatch } from "@/lib/api";
 import type {
     AgentAnalyzeResponse,
     DispatchResponse,
+    GeneralChatResponse,
     QueryResponse,
     TradingAnalyzeResponse,
 } from "@/lib/types";
@@ -142,6 +143,10 @@ function asAgentPayload(payload: Record<string, unknown>): AgentAnalyzeResponse 
   return payload as unknown as AgentAnalyzeResponse;
 }
 
+function asGeneralPayload(payload: Record<string, unknown>): GeneralChatResponse {
+  return payload as unknown as GeneralChatResponse;
+}
+
 function buildAssistantMessage(response: DispatchResponse): AssistantMessage {
   if (response.status !== "ok") {
     return {
@@ -167,6 +172,16 @@ function buildAssistantMessage(response: DispatchResponse): AssistantMessage {
       role: "assistant",
       kind: "agent",
       agent: asAgentPayload(response.payload),
+    };
+  }
+
+  if (response.kind === "general_chat") {
+    const general = asGeneralPayload(response.payload);
+    return {
+      id: makeId(),
+      role: "assistant",
+      kind: "text",
+      content: general.answer,
     };
   }
 

@@ -99,6 +99,52 @@ class DecisionLogger:
         }
         self._append(entry)
 
+    def log_shadow_comparison(
+        self,
+        request_id: str,
+        query: str,
+        primary_sources: list[str],
+        advanced_sources: list[str] | None,
+        primary_intent: str,
+        advanced_intent: str | None,
+        shadow_metadata: dict | None,
+    ) -> None:
+        """Log shadow mode comparison between primary and advanced retrieval.
+
+        Args:
+            request_id: Unique identifier for this request.
+            query: The user query.
+            primary_sources: List of sources from primary retrieval.
+            advanced_sources: List of sources from advanced retrieval (if available).
+            primary_intent: Intent from primary classification.
+            advanced_intent: Intent from advanced classification (if available).
+            shadow_metadata: Additional metadata from shadow retrieval execution.
+        """
+        # Calculate overlap
+        primary_set = set(primary_sources)
+        advanced_set = set(advanced_sources) if advanced_sources else set()
+        overlap = list(primary_set & advanced_set)
+        primary_only = list(primary_set - advanced_set)
+        advanced_only = list(advanced_set - primary_set)
+
+        entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "request_id": request_id,
+            "schema_version": 1,
+            "type": "shadow_comparison",
+            "query": query,
+            "primary_sources": primary_sources,
+            "advanced_sources": advanced_sources,
+            "overlap": overlap,
+            "primary_only": primary_only,
+            "advanced_only": advanced_only,
+            "primary_intent": primary_intent,
+            "advanced_intent": advanced_intent,
+            "intent_match": primary_intent == advanced_intent if advanced_intent else None,
+            "shadow_metadata": shadow_metadata,
+        }
+        self._append(entry)
+
     def _append(self, entry: dict[str, Any]) -> None:
         """Append entry to JSONL log file."""
         try:

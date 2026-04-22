@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 import logging
+from datetime import datetime
 from typing import Optional, Dict, Any
 
 from .trading_runtime_types import (
@@ -22,8 +23,8 @@ from .trading_runtime_types import (
     Signal,
     SignalDirection,
     ExecutionRequest,
-    RiskParameters,
 )
+from .trading_risk_service import RiskParameters
 
 logger = logging.getLogger(__name__)
 
@@ -72,21 +73,28 @@ class TradingRuntimeMapper:
         # Try crypto pairs
         for pair, (base, quote) in TradingRuntimeMapper.CRYPTO_PAIRS.items():
             if pair in question_upper:
-                return Symbol(base=base, quote=quote, exchange="binance")
+                return Symbol(base=base, quote=quote, exchange="spot")
 
-        # Fallback: try to extract any 6+ letter uppercase sequence
-        match = re.search(r"([A-Z]{6,})", question_upper)
-        if match:
+        # Fallback: try to extract 6-8 letter uppercase sequence (common crypto ticker length)
+        # Exclude common words like ANALYZE by checking against a blacklist
+        matches = re.finditer(r"\b([A-Z]{6,8})\b", question_upper)
+        blacklist = ["ANALYZE", "ANALYSIS", "TRADING", "MARKET", "FOREX", "CRYPTO"]
+        for match in matches:
             symbol_str = match.group(1)
-            # Heuristic: first 3-4 chars are base, rest are quote
-            if len(symbol_str) == 6:
-                return Symbol(base=symbol_str[:3], quote=symbol_str[3:], exchange="binance")
-            elif len(symbol_str) == 7:
-                return Symbol(base=symbol_str[:4], quote=symbol_str[3:], exchange="binance")
+            # Skip common non-symbol words
+            if symbol_str not in blacklist:
+                # Heuristic: first 3-4 chars are base, rest are quote (non-overlapping)
+                if len(symbol_str) == 6:
+                    return Symbol(base=symbol_str[:3], quote=symbol_str[3:], exchange="spot")
+                elif len(symbol_str) == 7:
+                    return Symbol(base=symbol_str[:4], quote=symbol_str[4:], exchange="spot")
+                elif len(symbol_str) == 8:
+                    return Symbol(base=symbol_str[:4], quote=symbol_str[4:], exchange="spot")
 
-        # Default fallback
-        logger.warning(f"Could not parse symbol from question: {question}")
-        return Symbol(base="BTC", quote="USDT", exchange="binance")
+        # Default fallback - shell-only placeholder for unknown symbols
+        # This is a safe default for dry-run mode only and should not be used in production
+        logger.warning(f"Could not parse symbol from question: {question}, using shell-only fallback BTC/USDT")
+        return Symbol(base="BTC", quote="USDT", exchange="spot")
 
     @staticmethod
     def parse_timeframe(question: str) -> Timeframe:
@@ -191,7 +199,10 @@ class TradingRuntimeMapper:
             confidence=confidence,
             symbol=symbol,
             timeframe=timeframe,
+            timestamp=datetime.utcnow(),
             entry_price=entry_price,
+            stop_loss=None,
+            take_profit=None,
             reason="Inferred from trading analysis question",
             metadata={"source": "question_mapping", "original_question": question},
         )
@@ -212,8 +223,18 @@ class TradingRuntimeMapper:
 
         Returns:
             ExecutionRequest model
+
+        Raises:
+            ValueError: If signal direction is NEUTRAL (cannot create execution request without explicit direction)
         """
         signal = TradingRuntimeMapper.question_to_signal(question, analysis_result)
+
+        # Reject neutral signals - execution requires explicit direction
+        if signal.direction == SignalDirection.NEUTRAL:
+            raise ValueError(
+                "Cannot create execution request from neutral signal. "
+                "Question must contain explicit buy/long or sell/short bias."
+            )
 
         # Determine order side from signal direction
         side = OrderSide.BUY if signal.direction == SignalDirection.LONG else OrderSide.SELL

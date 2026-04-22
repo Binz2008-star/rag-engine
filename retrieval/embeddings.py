@@ -6,7 +6,7 @@ import time
 import numpy as np
 import requests
 
-from app.config import EMBED_MODEL, MAX_RETRIES, OLLAMA_BASE_URL, TIMEOUT
+from app.config import EMBED_MODEL, MAX_RETRIES, OLLAMA_BASE_URL, SENTENCE_TRANSFORMER_MODEL, TIMEOUT, USE_SENTENCE_TRANSFORMERS
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,17 @@ class Embedder:
         self.model = model
         self.timeout = timeout
         self.session = requests.Session()
+        self._sentence_transformer = None
+
+        # Initialize sentence-transformer if enabled
+        if USE_SENTENCE_TRANSFORMERS:
+            try:
+                from sentence_transformers import SentenceTransformer
+                self._sentence_transformer = SentenceTransformer(SENTENCE_TRANSFORMER_MODEL)
+                logger.info("Initialized sentence-transformer model: %s", SENTENCE_TRANSFORMER_MODEL)
+            except Exception as exc:
+                logger.warning("Failed to initialize sentence-transformer: %s", exc)
+                self._sentence_transformer = None
 
     def warmup(self) -> None:
         try:
@@ -36,6 +47,28 @@ class Embedder:
         if not texts:
             raise ValueError("embed_batch called with empty input")
 
+        # Use sentence-transformer if enabled and available
+        if self._sentence_transformer is not None:
+            try:
+                started = time.perf_counter()
+                embeddings = self._sentence_transformer.encode(texts, convert_to_numpy=True)
+                arr = np.array(embeddings, dtype=np.float32)
+                norms = np.linalg.norm(arr, axis=1, keepdims=True)
+                norms = np.where(norms == 0, 1.0, norms)
+
+                elapsed_ms = int((time.perf_counter() - started) * 1000)
+                logger.info(
+                    "Sentence-transformer embedding batch succeeded model=%s count=%d latency_ms=%d",
+                    SENTENCE_TRANSFORMER_MODEL,
+                    len(texts),
+                    elapsed_ms,
+                )
+
+                return arr / norms
+            except Exception as exc:
+                logger.warning("Sentence-transformer embedding failed, falling back to Ollama: %s", exc)
+
+        # Fallback to Ollama
         last_exc: Exception | None = None
 
         for attempt in range(MAX_RETRIES):

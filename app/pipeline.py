@@ -4,7 +4,7 @@ import json
 import time
 from typing import Any, Iterator
 
-from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE
+from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE, USE_ADVANCED_RETRIEVAL_SHADOW
 from app.models import KnowledgeGap, PipelineResult
 from app.utils import stable_hash
 from router.features import normalize_query
@@ -29,6 +29,10 @@ def _has_sufficient_overlap(query: str, chunks: list) -> bool:
     q_terms = set(query.lower().split())
     if not q_terms:
         return False
+    # Non-Latin queries (Arabic, etc.) cannot match English corpus text by term
+    # overlap — skip the gate and let the grounding cosine check decide instead.
+    if not any("a" <= c <= "z" for c in query.lower()):
+        return True
     ctx_text = " ".join(c.text.lower() for c in chunks)
     hits = sum(1 for t in q_terms if t in ctx_text)
     return hits >= 1
@@ -49,6 +53,8 @@ class Pipeline:
         self.retriever = retriever
         self.llm = llm
         self.reranker = reranker
+
+        # Shadow retriever is initialized externally (e.g., in eval_runner) to avoid circular import
         # Lazy-import the analyzer only when the caller does not inject one.
         # analysis.knowledge_gap imports `requests`, which is intentionally
         # absent from the lightweight CI lane; keeping this import off the

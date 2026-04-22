@@ -15,6 +15,7 @@ class Capability(StrEnum):
     TRADING = "trading"
     AGENT = "agent"
     ADMIN = "admin"
+    GENERAL = "general"
     UNKNOWN = "unknown"
 
 
@@ -40,10 +41,22 @@ class CapabilityRouter:
             "forex",
             "crypto",
             "btc",
+            "eth",
             "xauusd",
             "eurusd",
+            "gbpusd",
+            "gold",
+            "silver",
+            "oil",
+            "nasdaq",
             "strategy",
             "backtest",
+            "analyze",
+            "analysis",
+            "chart",
+            "candlestick",
+            "trend",
+            "timeframe",
             "تداول",
             "صفقة",
             "شراء",
@@ -74,27 +87,17 @@ class CapabilityRouter:
             "plan",
             "roadmap",
             "steps",
-            "workflow",
-            "architecture",
-            "strategy",
             "remind",
             "reminder",
             "schedule",
             "scheduled",
-            "daily",
-            "weekly",
             "tomorrow",
             "todo",
             "task",
             "remember",
             "recall",
-            "memory",
-            "context",
             "خطة",
             "خطوات",
-            "سير العمل",
-            "معمارية",
-            "استراتيجية",
             "ذكرني",
             "تذكير",
             "جدولة",
@@ -103,8 +106,22 @@ class CapabilityRouter:
             "غدًا",
             "مهمة",
             "تذكر",
-            "ذاكرة",
-            "سياق",
+        }
+        self._general_keywords = {
+            # Greetings
+            "hi",
+            "hello",
+            "hey",
+            "good morning",
+            "good evening",
+            "how are you",
+            "thanks",
+            "thank you",
+            # Help/meta — strict meta-questions only, not document Q&A verbs
+            "what can you do",
+            "your capabilities",
+            "who are you",
+            "explain yourself",
         }
 
     def route(self, question: str) -> CapabilityRoute:
@@ -135,6 +152,16 @@ class CapabilityRouter:
                 capability=Capability.AGENT,
                 reason=f"matched {agent_hits} agent keyword(s)",
                 confidence=min(0.99, 0.55 + (0.08 * agent_hits)),
+            )
+
+        general_hits = sum(
+            1 for keyword in self._general_keywords if keyword in normalized
+        )
+        if general_hits > 0:
+            return CapabilityRoute(
+                capability=Capability.GENERAL,
+                reason=f"matched {general_hits} general keyword(s)",
+                confidence=min(0.99, 0.55 + (0.08 * general_hits)),
             )
 
         admin_hits = sum(

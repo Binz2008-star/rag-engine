@@ -33,12 +33,20 @@ class TradingService:
             "eurusd",
             "xauusd",
             "btcusd",
+            "gbpusd",
             "btc",
             "eth",
-            "gold",
             "nasdaq",
             "spx",
             "us30",
+            "oil",
+            "silver",
+        }
+        # English common names → canonical ticker
+        self._asset_aliases: dict[str, str] = {
+            "gold": "XAUUSD",
+            "silver": "XAGUSD",
+            "oil": "USOIL",
         }
 
     def analyze(self, question: str) -> TradingAnalysisResult:
@@ -71,6 +79,9 @@ class TradingService:
         return TradingIntent.UNKNOWN
 
     def _detect_asset(self, text: str) -> str | None:
+        for alias, ticker in self._asset_aliases.items():
+            if alias in text:
+                return ticker
         for asset in self._assets:
             if asset in text:
                 return asset.upper()
@@ -86,6 +97,12 @@ class TradingService:
         for timeframe in self._timeframes:
             if timeframe in text:
                 return timeframe.upper()
+        if "daily" in text:
+            return "D1"
+        if "weekly" in text:
+            return "W1"
+        if "hourly" in text:
+            return "H1"
         if "ساعة" in text:
             return "H1"
         if "4 ساعات" in text or "اربع ساعات" in text:
