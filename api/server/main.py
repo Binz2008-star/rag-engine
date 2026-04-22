@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Schedule RAG initialization as background task
     import asyncio
-    rag_init_task = asyncio.create_task(init_rag_service())
+    app.state.rag_init_task = asyncio.create_task(init_rag_service())
 
     # Initialize scheduler worker (but don't start yet)
     app.state.scheduler_worker = SchedulerWorker(
@@ -118,7 +118,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async def start_scheduler_after_rag():
         try:
             # Wait for RAG init to complete (or fail gracefully)
-            await rag_init_task
+            await app.state.rag_init_task
             logger.info("RAG initialization complete, starting scheduler worker")
         except Exception:
             logger.warning("RAG initialization failed, starting scheduler worker in degraded mode")
@@ -139,15 +139,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        if app.state.rag_service is not None:
-            logger.info("Shutting down RAG service")
-            await app.state.rag_service.shutdown()
-
+        # Shutdown scheduler worker cooperatively
         logger.info("Shutting down scheduler worker")
+        if app.state.scheduler_worker is not None:
+            app.state.scheduler_worker.stop()
         if app.state.scheduler_task is not None:
             app.state.scheduler_task.cancel()
             try:
                 await app.state.scheduler_task
+            except asyncio.CancelledError:
+                pass
+
+        # Shutdown RAG service
+        if app.state.rag_service is not None:
+            logger.info("Shutting down RAG service")
+            await app.state.rag_service.shutdown()
+
+        # Cancel RAG init task if still running
+        if app.state.rag_init_task is not None and not app.state.rag_init_task.done():
+            logger.info("Cancelling RAG initialization task")
+            app.state.rag_init_task.cancel()
+            try:
+                await app.state.rag_init_task
             except asyncio.CancelledError:
                 pass
 

@@ -35,6 +35,12 @@ class SchedulerWorker:
         self._guard = execution_guard
         self._executor = agent_executor
         self._execution_semaphore = threading.Semaphore(MAX_CONCURRENT_EXECUTIONS)
+        self._stop_event = threading.Event()
+
+    def stop(self) -> None:
+        """Signal the worker to stop cooperatively."""
+        logger.info("Scheduler worker stop requested")
+        self._stop_event.set()
 
     def _calculate_backoff(self, retry_count: int) -> float:
         """Calculate exponential backoff with jitter."""
@@ -94,7 +100,7 @@ class SchedulerWorker:
     def run_forever(self) -> None:
         logger.info("Scheduler worker started")
         try:
-            while True:
+            while not self._stop_event.is_set():
                 now = time.time()
                 next_run_time = None
 
@@ -115,14 +121,18 @@ class SchedulerWorker:
                         if next_run_time is None or item.run_at < next_run_time:
                             next_run_time = item.run_at
 
-                # Sleep until next task is due or default interval
+                # Sleep until next task is due or default interval, with stop check
                 if next_run_time is not None:
                     sleep_duration = max(0, next_run_time - now)
                     sleep_duration = min(sleep_duration, 1.0)  # Cap at 1 second max
                 else:
                     sleep_duration = 1.0  # Default polling interval
 
-                time.sleep(sleep_duration)
+                # Check stop event during sleep for faster shutdown
+                if self._stop_event.wait(timeout=sleep_duration):
+                    break
         except Exception:
             logger.exception("Scheduler worker loop failed")
             raise
+        finally:
+            logger.info("Scheduler worker stopped")
