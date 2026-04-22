@@ -7,28 +7,11 @@ import {
     useState,
 } from "react";
 
-import { postAgentAnalyze, postQuery, postTradingAnalyze } from "@/lib/api";
+import { postDispatch } from "@/lib/api";
 import type { AgentAnalyzeResponse, TradingAnalyzeResponse } from "@/lib/types";
 
 const SESSION_ID = "web-session-1";
 const USER_ID = "web-user-1";
-
-const TRADING_TERMS = [
-  "trade", "trading", "signal", "buy", "sell", "stop loss", "take profit",
-  "lot size", "risk reward", "forex", "crypto", "btc", "xauusd", "eurusd",
-  "strategy", "backtest",
-  "تداول", "صفقة", "شراء", "بيع", "وقف", "هدف", "مخاطرة", "ذهب", "يورو",
-  "دولار", "بتكوين", "كريبتو", "استراتيجية", "تحليل", "حلل",
-];
-
-const AGENT_TERMS = [
-  "plan", "roadmap", "steps", "workflow", "architecture", "strategy",
-  "remind", "reminder", "schedule", "scheduled", "daily", "weekly",
-  "tomorrow", "todo", "task", "remember", "recall", "memory", "context",
-  "خطة", "خطوات", "سير العمل", "معمارية", "استراتيجية",
-  "ذكرني", "تذكير", "جدولة", "يومي", "أسبوعي", "غدًا", "مهمة",
-  "تذكر", "ذاكرة", "سياق",
-];
 
 type AssistantMessage =
   | { id: string; role: "assistant"; kind: "text"; content: string }
@@ -38,16 +21,6 @@ type AssistantMessage =
 
 type UserMessage = { id: string; role: "user"; kind: "text"; content: string };
 type Message = UserMessage | AssistantMessage;
-
-function isTradingPrompt(input: string): boolean {
-  const normalized = input.toLowerCase().trim();
-  return TRADING_TERMS.some((term) => normalized.includes(term));
-}
-
-function isAgentPrompt(input: string): boolean {
-  const normalized = input.toLowerCase().trim();
-  return AGENT_TERMS.some((term) => normalized.includes(term));
-}
 
 function makeId(): string {
   return crypto.randomUUID();
@@ -199,44 +172,34 @@ export default function ChatShell() {
       setIsLoading(true);
 
       try {
-        if (isTradingPrompt(question)) {
-          const result = await postTradingAnalyze({
-            question,
-            session_id: SESSION_ID,
-            user_id: USER_ID,
-          });
-
-          setMessages((prev) => [
-            ...prev,
-            { id: makeId(), role: "assistant", kind: "trading", trading: result },
-          ]);
-          return;
-        }
-
-        if (isAgentPrompt(question)) {
-          const result = await postAgentAnalyze({
-            question,
-            session_id: SESSION_ID,
-            user_id: USER_ID,
-          });
-
-          setMessages((prev) => [
-            ...prev,
-            { id: makeId(), role: "assistant", kind: "agent", agent: result },
-          ]);
-          return;
-        }
-
-        const result = await postQuery({
+        const result = await postDispatch({
           question,
           session_id: SESSION_ID,
           user_id: USER_ID,
         });
 
-        setMessages((prev) => [
-          ...prev,
-          { id: makeId(), role: "assistant", kind: "text", content: result.answer },
-        ]);
+        if (result.capability === "rag") {
+          const answer = result.data.answer as string;
+          setMessages((prev) => [
+            ...prev,
+            { id: makeId(), role: "assistant", kind: "text", content: answer },
+          ]);
+        } else if (result.capability === "trading") {
+          setMessages((prev) => [
+            ...prev,
+            { id: makeId(), role: "assistant", kind: "trading", trading: result.data as TradingAnalyzeResponse },
+          ]);
+        } else if (result.capability === "agent") {
+          setMessages((prev) => [
+            ...prev,
+            { id: makeId(), role: "assistant", kind: "agent", agent: result.data as AgentAnalyzeResponse },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            { id: makeId(), role: "assistant", kind: "error", content: `Unknown capability: ${result.capability}` },
+          ]);
+        }
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Request failed unexpectedly.";

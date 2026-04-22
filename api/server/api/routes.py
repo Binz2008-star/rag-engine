@@ -10,6 +10,8 @@ from ..core.config import get_settings
 from ..schemas import (
     AgentAnalyzeRequest,
     AgentAnalyzeResponse,
+    DispatchRequest,
+    DispatchResponse,
     ErrorResponse,
     HealthResponse,
     QueryRequest,
@@ -342,3 +344,79 @@ async def query(payload: QueryRequest, request: Request) -> QueryResponse:
             logger.warning("Failed to append interaction log", exc_info=True)
 
     return QueryResponse(**response_payload)
+
+
+@router.post(
+    "/dispatch",
+    response_model=DispatchResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def dispatch(payload: DispatchRequest, request: Request) -> DispatchResponse:
+    settings = get_settings()
+    capability_router = _capability_router(request)
+    rag_service = _rag_service(request)
+    trading_service = _trading_service(request)
+    agent_service = _agent_service(request)
+
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question is empty")
+    if len(question) > settings.max_question_length:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Question exceeds max length "
+                f"({settings.max_question_length} chars)"
+            ),
+        )
+
+    route = capability_router.route(question)
+
+    try:
+        if route.capability == Capability.RAG:
+            result = await rag_service.query(question)
+            return DispatchResponse(
+                capability="rag",
+                data=dict(result),
+            )
+        elif route.capability == Capability.TRADING:
+            result = trading_service.analyze(question=question)
+            return DispatchResponse(
+                capability="trading",
+                data={
+                    "intent": result.intent,
+                    "market": result.market,
+                    "asset": result.asset,
+                    "timeframe": result.timeframe,
+                    "prompt": result.prompt,
+                    "status": result.status,
+                },
+            )
+        elif route.capability == Capability.AGENT:
+            result = agent_service.analyze(question=question)
+            return DispatchResponse(
+                capability="agent",
+                data={
+                    "intent": result.intent,
+                    "prompt": result.prompt,
+                    "summary": result.summary,
+                    "suggested_tools": result.suggested_tools,
+                    "status": result.status,
+                },
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Capability {route.capability} not supported",
+            )
+    except PipelineNotReadyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Dispatch failed")
+        raise HTTPException(
+            status_code=500, detail="Internal error while processing request"
+        ) from exc

@@ -13,6 +13,7 @@ from enum import StrEnum
 class Capability(StrEnum):
     RAG = "rag"
     TRADING = "trading"
+    AGENT = "agent"
     ADMIN = "admin"
     UNKNOWN = "unknown"
 
@@ -69,6 +70,42 @@ class CapabilityRouter:
             "مقاييس",
             "تشخيص",
         }
+        self._agent_keywords = {
+            "plan",
+            "roadmap",
+            "steps",
+            "workflow",
+            "architecture",
+            "strategy",
+            "remind",
+            "reminder",
+            "schedule",
+            "scheduled",
+            "daily",
+            "weekly",
+            "tomorrow",
+            "todo",
+            "task",
+            "remember",
+            "recall",
+            "memory",
+            "context",
+            "خطة",
+            "خطوات",
+            "سير العمل",
+            "معمارية",
+            "استراتيجية",
+            "ذكرني",
+            "تذكير",
+            "جدولة",
+            "يومي",
+            "أسبوعي",
+            "غدًا",
+            "مهمة",
+            "تذكر",
+            "ذاكرة",
+            "سياق",
+        }
 
     def route(self, question: str) -> CapabilityRoute:
         normalized = " ".join(question.lower().split())
@@ -88,6 +125,16 @@ class CapabilityRouter:
                 capability=Capability.TRADING,
                 reason=f"matched {trading_hits} trading keyword(s)",
                 confidence=min(0.99, 0.55 + (0.08 * trading_hits)),
+            )
+
+        agent_hits = sum(
+            1 for keyword in self._agent_keywords if keyword in normalized
+        )
+        if agent_hits > 0:
+            return CapabilityRoute(
+                capability=Capability.AGENT,
+                reason=f"matched {agent_hits} agent keyword(s)",
+                confidence=min(0.99, 0.55 + (0.08 * agent_hits)),
             )
 
         admin_hits = sum(

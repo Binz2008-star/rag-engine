@@ -84,3 +84,14 @@ class SystemHealthResponse(BaseModel):
     pipeline_ready: bool
     index_count: int | None = None
     guardian: dict[str, object]
+
+
+class DispatchRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    session_id: str | None = None
+    user_id: str | None = None
+
+
+class DispatchResponse(BaseModel):
+    capability: str
+    data: dict[str, Any]
