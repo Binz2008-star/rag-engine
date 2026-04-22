@@ -144,14 +144,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        logger.info("Shutting down RAG service")
-        await service.shutdown()
-
+        # Shutdown scheduler worker cooperatively
         logger.info("Shutting down scheduler worker")
+        if app.state.scheduler_worker is not None:
+            app.state.scheduler_worker.stop()
         if app.state.scheduler_task is not None:
             app.state.scheduler_task.cancel()
             try:
                 await app.state.scheduler_task
+            except asyncio.CancelledError:
+                pass
+
+        # Shutdown RAG service
+        if app.state.rag_service is not None:
+            logger.info("Shutting down RAG service")
+            await app.state.rag_service.shutdown()
+
+        # Cancel RAG init task if still running
+        if app.state.rag_init_task is not None and not app.state.rag_init_task.done():
+            logger.info("Cancelling RAG initialization task")
+            app.state.rag_init_task.cancel()
+            try:
+                await app.state.rag_init_task
             except asyncio.CancelledError:
                 pass
 
