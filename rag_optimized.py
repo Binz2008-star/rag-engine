@@ -148,7 +148,19 @@ class OllamaClient:
     def __init__(self, base_url: str = OLLAMA_BASE_URL, timeout: int = TIMEOUT):
         self.base_url = base_url
         self.timeout = timeout
+        self._new_session()
+
+    def _new_session(self) -> None:
+        try:
+            if hasattr(self, "session"):
+                self.session.close()
+        except Exception:
+            pass
         self.session = requests.Session()
+
+    def _reset_after_failure(self, exc: Exception) -> None:
+        logger.warning("Resetting HTTP session after failure: %s", exc)
+        self._new_session()
 
     def _check_ollama(self) -> None:
         try:
@@ -182,49 +194,40 @@ class OllamaClient:
                 return arr
             except Exception as e:
                 logger.warning(f"Embed attempt {attempt + 1}/{MAX_RETRIES}: {e}")
+                self._reset_after_failure(e)
                 if attempt == MAX_RETRIES - 1:
                     raise
                 time.sleep(2 ** attempt)
         # This line should never be reached due to the raise in the last attempt
         raise RuntimeError("Failed to embed after all retries")
 
-    def chat(self, prompt: str, model: str = CHAT_MODEL, stream: bool = True) -> str:
+    def chat(self, prompt: str, model: str = CHAT_MODEL, stream: bool = False) -> str:
         for attempt in range(MAX_RETRIES):
             try:
                 r = self.session.post(
                     f"{self.base_url}/chat",
                     json={
                         "model": model,
-                        "stream": stream,
+                        "stream": False,
                         "messages": [{"role": "user", "content": prompt}],
                         "options": {
-                            "temperature": 0.1,
-                            "top_p": 0.9,
+                            "temperature": 0,
+                            "top_k": 1,
+                            "top_p": 1,
+                            "seed": 42,
+                            "num_ctx": 4096,
                             "num_predict": NUM_PREDICT,
                         },
                     },
-                    stream=stream,
+                    stream=False,
                     timeout=self.timeout,
                 )
                 r.raise_for_status()
-                if stream:
-                    output = ""
-                    for line in r.iter_lines():
-                        if not line:
-                            continue
-                        try:
-                            token = json.loads(line).get("message", {}).get("content", "")
-                        except json.JSONDecodeError:
-                            continue
-                        print(token, end="", flush=True)
-                        output += token
-                    print()
-                    return output
-                else:
-                    data = r.json()
-                    return data.get("message", {}).get("content") or data["message"]["content"]
+                data = r.json()
+                return data.get("message", {}).get("content") or data["message"]["content"]
             except Exception as e:
                 logger.warning(f"Chat attempt {attempt + 1}/{MAX_RETRIES}: {e}")
+                self._reset_after_failure(e)
                 if attempt == MAX_RETRIES - 1:
                     raise
                 time.sleep(2 ** attempt)

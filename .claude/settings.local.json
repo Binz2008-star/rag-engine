@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(ollama list *)",
+      "PowerShell($env:CHAT_MODEL = \"robin-assistant\"; python -c \"from app.config import CHAT_MODEL; print\\(CHAT_MODEL\\)\")",
+      "PowerShell($env:CHAT_MODEL = \"robin-assistant\"; for \\($i=1; $i -le 5; $i++\\) { python eval_runner.py --report \"reports\\\\eval_det_$i.json\" })",
+      "Bash(ollama show *)"
+    ]
+  }
+}
