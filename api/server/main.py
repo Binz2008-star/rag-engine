@@ -30,6 +30,7 @@ from .services.health_guardian import HealthGuardian  # noqa: E402
 from .services.interaction_log_service import InteractionLogService  # noqa: E402
 from .services.rag_service import RagService  # noqa: E402
 from .services.scheduler_service import SchedulerService  # noqa: E402
+from .services.scheduler_worker import SchedulerWorker  # noqa: E402
 from .services.task_store import TaskStore  # noqa: E402
 from .services.trading_service import TradingService  # noqa: E402
 from .services.trading_execution_service import ShellExecutionService  # noqa: E402
@@ -93,11 +94,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception:
         logger.exception("Pipeline startup failed - API will report degraded")
 
+    # Initialize and start scheduler worker in background
+    app.state.scheduler_worker = SchedulerWorker(
+        task_store=app.state.task_store,
+        scheduler_service=app.state.scheduler_service,
+        execution_guard=app.state.execution_guard,
+        agent_executor=app.state.agent_executor,
+    )
+
+    async def run_scheduler_worker():
+        try:
+            await asyncio.to_thread(app.state.scheduler_worker.run_forever)
+        except asyncio.CancelledError:
+            logger.info("Scheduler worker cancelled during shutdown")
+        except Exception:
+            logger.exception("Scheduler worker failed unexpectedly")
+
+    scheduler_task = asyncio.create_task(run_scheduler_worker())
+
     try:
         yield
     finally:
         logger.info("Shutting down RAG service")
         await service.shutdown()
+
+        logger.info("Shutting down scheduler worker")
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app() -> FastAPI:
