@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class QueryRequest(BaseModel):
@@ -65,6 +65,13 @@ class AgentAnalyzeResponse(BaseModel):
     status: str
 
 
+class GeneralChatResponse(BaseModel):
+    capability: str
+    intent: str
+    answer: str
+    status: str
+
+
 class HealthResponse(BaseModel):
     status: str
     pipeline_ready: bool
@@ -107,6 +114,16 @@ class CreateTaskRequest(BaseModel):
     session_id: str | None = None
     user_id: str | None = None
 
+    @field_validator("title", "prompt", "intent", mode="before")
+    @classmethod
+    def _strip_and_require_nonempty(cls, v: object) -> object:
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                raise ValueError("must not be blank")
+            return stripped
+        return v
+
 
 class TaskResponse(BaseModel):
     task_id: str
@@ -118,6 +135,9 @@ class TaskResponse(BaseModel):
     user_id: str | None = None
     created_at: float
     updated_at: float
+    error_message: str | None = None
+    last_run_started_at: float | None = None
+    last_run_finished_at: float | None = None
 
 
 class ScheduleTaskRequest(BaseModel):

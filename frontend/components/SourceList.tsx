@@ -1,11 +1,11 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import type { Source } from "@/lib/types";
+import type { SourceItem } from "@/lib/types";
 import { truncate } from "@/lib/utils";
 
 interface SourceListProps {
-  sources: Source[];
+  sources: SourceItem[];
 }
 
 export function SourceList({ sources }: SourceListProps) {

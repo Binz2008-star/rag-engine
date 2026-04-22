@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -16,6 +17,7 @@ from ..schemas import (
     ErrorResponse,
     ExecuteTaskRequest,
     ExecuteTaskResponse,
+    GeneralChatResponse,
     HealthResponse,
     QueryRequest,
     QueryResponse,
@@ -28,6 +30,8 @@ from ..schemas import (
 )
 from ..services.agent_executor import AgentExecutor
 from ..services.agent_service import AgentService
+from ..services.execution_guard import ExecutionGuard
+from ..services.general_chat_service import GeneralChatService
 from ..services.capability_router import Capability, CapabilityRouter
 from ..services.context_service import ContextService, InteractionRecord
 from ..services.health_guardian import HealthGuardian
@@ -127,6 +131,26 @@ def _agent_executor(request: Request) -> AgentExecutor:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Agent executor not initialised",
+        )
+    return service
+
+
+def _execution_guard(request: Request) -> ExecutionGuard:
+    service: ExecutionGuard | None = getattr(request.app.state, "execution_guard", None)
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Execution guard not initialised",
+        )
+    return service
+
+
+def _general_chat_service(request: Request) -> GeneralChatService:
+    service: GeneralChatService | None = getattr(request.app.state, "general_chat_service", None)
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="General chat service not initialised",
         )
     return service
 
@@ -400,6 +424,7 @@ async def dispatch(payload: DispatchRequest, request: Request) -> DispatchRespon
     rag_service = _rag_service(request)
     trading_service = _trading_service(request)
     agent_service = _agent_service(request)
+    general_chat_service = _general_chat_service(request)
     context_service = _context_service(request)
     interaction_log_service = _interaction_log_service(request)
 
@@ -419,6 +444,12 @@ async def dispatch(payload: DispatchRequest, request: Request) -> DispatchRespon
     request_started = time.time()
     request_id = str(uuid.uuid4())
     session_id = (payload.session_id or "").strip()
+
+    if route.capability == Capability.ADMIN:
+        raise HTTPException(
+            status_code=400,
+            detail="Admin capability is not exposed on this endpoint.",
+        )
 
     try:
         if route.capability == Capability.TRADING:
@@ -455,6 +486,32 @@ async def dispatch(payload: DispatchRequest, request: Request) -> DispatchRespon
                     "status": result.status,
                 },
             )
+
+        if route.capability == Capability.GENERAL:
+            try:
+                result = await general_chat_service.chat(question)
+                if result.status != "ok":
+                    raise HTTPException(status_code=500, detail=result.answer)
+                return DispatchResponse(
+                    capability="general",
+                    kind="general_chat",
+                    status="ok",
+                    request_id=request_id,
+                    payload={
+                        "capability": result.capability,
+                        "intent": result.intent,
+                        "answer": result.answer,
+                        "status": result.status,
+                    },
+                )
+            except HTTPException:
+                raise
+            except Exception as exc:
+                logger.exception("General chat failed")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"General chat failed: {exc}",
+                ) from exc
 
         result = await rag_service.query(question)
         response_payload = dict(result)
@@ -552,6 +609,9 @@ async def create_agent_task(
         user_id=task.user_id,
         created_at=task.created_at,
         updated_at=task.updated_at,
+        error_message=task.error_message,
+        last_run_started_at=task.last_run_started_at,
+        last_run_finished_at=task.last_run_finished_at,
     )
 
 
@@ -577,6 +637,9 @@ async def list_agent_tasks(
             user_id=task.user_id,
             created_at=task.created_at,
             updated_at=task.updated_at,
+            error_message=task.error_message,
+            last_run_started_at=task.last_run_started_at,
+            last_run_finished_at=task.last_run_finished_at,
         )
         for task in tasks
     ]
@@ -602,8 +665,14 @@ async def schedule_agent_task(
     if task is None:
         raise HTTPException(status_code=400, detail="Task not found")
 
+    try:
+        updated = task_store.set_scheduled(payload.task_id)
+        if updated is None:
+            raise HTTPException(status_code=400, detail="Task not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     scheduled = scheduler_service.schedule(payload.task_id, payload.run_at)
-    task_store.update_status(payload.task_id, "scheduled")
 
     return ScheduleTaskResponse(
         task_id=scheduled.task_id,
@@ -628,14 +697,25 @@ async def execute_agent_task(
 ) -> ExecuteTaskResponse:
     task_store = _task_store(request)
     agent_executor = _agent_executor(request)
+    execution_guard = _execution_guard(request)
 
     task = task_store.get_task(payload.task_id)
     if task is None:
         raise HTTPException(status_code=400, detail="Task not found")
 
-    task_store.update_status(payload.task_id, "running")
-    result = agent_executor.execute(task.task_id, task.prompt)
-    task_store.update_status(payload.task_id, "completed")
+    try:
+        result = await asyncio.to_thread(
+            execution_guard.run,
+            task.task_id,
+            lambda: agent_executor.execute(task.task_id, task.prompt),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task execution failed: {exc}",
+        ) from exc
 
     return ExecuteTaskResponse(
         task_id=result.task_id,

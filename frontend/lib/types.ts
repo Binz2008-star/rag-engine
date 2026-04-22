@@ -5,11 +5,6 @@ export type SourceItem = {
   score: number;
 };
 
-export interface Source {
-  source: string;
-  chunk_id: string;
-}
-
 export type QueryRequest = {
   question: string;
   session_id?: string | null;
@@ -69,9 +64,16 @@ export type AgentAnalyzeResponse = {
   status: string;
 };
 
+export type GeneralChatResponse = {
+  capability: string;
+  intent: string;
+  answer: string;
+  status: string;
+};
+
 export type DispatchResponse = {
-  capability: "rag" | "trading" | "agent";
-  kind: "rag_answer" | "trading_analysis" | "agent_analysis" | "error";
+  capability: "rag" | "trading" | "agent" | "general";
+  kind: "rag_answer" | "trading_analysis" | "agent_analysis" | "general_chat" | "error";
   status: "ok" | "error";
   request_id: string;
   payload: Record<string, unknown>;
@@ -155,7 +157,7 @@ export interface ChatMessage {
   role: MessageRole;
   content: string;
   createdAt: number;
-  sources?: Source[];
+  sources?: SourceItem[];
   latencyMs?: number;
   error?: string;
 }

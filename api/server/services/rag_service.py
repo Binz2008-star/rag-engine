@@ -15,11 +15,10 @@ when the evaluated pipeline gains native token streaming.
 from __future__ import annotations
 
 import asyncio
-import json as _json
 import logging
 import time
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from app.inference_service import InferenceService
 from app.models import PipelineResult
@@ -114,44 +113,6 @@ class RagService:
         )
         wall_ms = int((time.perf_counter() - t0) * 1000)
         return _result_to_payload(result, wall_ms)
-
-    async def query_stream(self, question: str) -> AsyncGenerator[str, None]:
-        """Async generator yielding SSE-formatted strings for /query/stream.
-
-        Bridges Pipeline.run_stream() (sync generator in a worker thread) to
-        FastAPI's async StreamingResponse via asyncio.Queue.
-        """
-        if self._pipeline is None or not self._ready:
-            raise PipelineNotReadyError("Pipeline is not initialised")
-
-        query_id = f"api_stream_{int(time.time() * 1000)}"
-        loop = asyncio.get_running_loop()
-        # Unbounded queue — max 768 tokens per request, never a backpressure risk.
-        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
-
-        def _run_pipeline() -> None:
-            try:
-                for event in self._pipeline.run_stream(question, query_id):
-                    loop.call_soon_threadsafe(queue.put_nowait, event)
-            except Exception:
-                logger.exception("Streaming pipeline error for query_id=%s", query_id)
-                loop.call_soon_threadsafe(
-                    queue.put_nowait,
-                    {"type": "done", "grounded": False, "answer": "Insufficient data."},
-                )
-            finally:
-                loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel
-
-        future = loop.run_in_executor(None, _run_pipeline)
-
-        try:
-            while True:
-                event = await queue.get()
-                if event is None:
-                    break
-                yield f"data: {_json.dumps(event)}\n\n"
-        finally:
-            await future  # ensure thread is fully cleaned up before response closes
 
     # ------------------------------------------------------------------
     # Internals
