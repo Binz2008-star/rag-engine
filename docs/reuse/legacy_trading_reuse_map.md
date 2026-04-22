@@ -1,0 +1,61 @@
+# Import now
+- README.md
+- IMPLEMENTATION_REPORT.md
+- FINAL_SUMMARY.md
+- execution_handler.py
+- strategy_runner.py
+- risk_module_integration.py
+- bybit_client.py
+- api_monitor.py
+- bot_diagnostics.py
+- telegram_interface.py
+- telegram_bot.py
+- core/
+- modules/
+- ai-trading-agent/
+
+# Postpone
+- backtester.py
+- backtesting_example.py
+- backtest_results/
+- performance_charts/
+- ml_models/
+- adaptive_learning_engine.py
+- AUTOMATIC_TRADING_IMPLEMENTATION.md
+- BYBIT_MIGRATION_SUMMARY.md
+- BYBIT_FIXES_SUMMARY.md
+- BYBIT_INTEGRATION_SUMMARY.md
+- BYBIT_FIXES_SUMMARY_2025.md
+- BYBIT_LIMIT_ORDERS.md
+- BYBIT_AUTH_SUMMARY.md
+- BYBIT_API_KEY_UPDATE_SUMMARY.md
+- BYBIT_API_KEY_SOLUTION.md
+- BOLLINGER_BANDS_STRATEGY_DOCUMENTATION.md
+- strategies/
+- indicators/
+- async_db_utils.py
+- recover_missing_trades.py
+- fix_db_columns.py
+- close_binance_trades.py
+- check_open_trades.py
+
+# Ignore
+- __pycache__/
+- venv/
+- myenv/
+- .pytest_cache/
+- .idea/
+- .vs/
+- .git/
+- .github/
+- .env
+- bot.pid
+- logs/
+- auth_errors.log
+- bot_output.log
+- auto_trader_error
+- auto_trader_error2
+- auto_trader_output
+- auto_trader_output2
+- New Text Document
+- New Text Document (2)
