@@ -1,4 +1,4 @@
-"""Embedding generation - converts text to vectors using Ollama."""
+"""Embedding generation - converts text to vectors using Ollama or sentence-transformers."""
 
 from __future__ import annotations
 
@@ -9,18 +9,29 @@ from typing import List
 import numpy as np
 import requests
 
-from app.config import BATCH_SIZE, EMBED_MODEL, MAX_RETRIES, OLLAMA_BASE_URL, TIMEOUT
+from app.config import BATCH_SIZE, EMBED_MODEL, MAX_RETRIES, OLLAMA_BASE_URL, SENTENCE_TRANSFORMER_MODEL, TIMEOUT, USE_SENTENCE_TRANSFORMERS
 
 logger = logging.getLogger(__name__)
 
 
 class EmbeddingClient:
-    """Generate embeddings from text using Ollama."""
+    """Generate embeddings from text using Ollama or sentence-transformers."""
 
     def __init__(self) -> None:
         self.base_url = OLLAMA_BASE_URL.rstrip("/")
         self.timeout = TIMEOUT
         self.session = requests.Session()
+        self._sentence_transformer = None
+
+        # Initialize sentence-transformer if enabled
+        if USE_SENTENCE_TRANSFORMERS:
+            try:
+                from sentence_transformers import SentenceTransformer
+                self._sentence_transformer = SentenceTransformer(SENTENCE_TRANSFORMER_MODEL)
+                logger.info("Initialized sentence-transformer model: %s", SENTENCE_TRANSFORMER_MODEL)
+            except Exception as exc:
+                logger.warning("Failed to initialize sentence-transformer: %s", exc)
+                self._sentence_transformer = None
 
     def close(self) -> None:
         self.session.close()
@@ -37,6 +48,41 @@ class EmbeddingClient:
                 logger.warning("Text at index %d is empty/whitespace only.", i)
 
         total_chars = sum(len(t) for t in texts)
+
+        # Use sentence-transformer if enabled and available
+        if self._sentence_transformer is not None:
+            try:
+                t0 = time.perf_counter()
+                embeddings = self._sentence_transformer.encode(texts, convert_to_numpy=True)
+                arr = np.asarray(embeddings, dtype=np.float32)
+
+                if arr.ndim != 2:
+                    raise ValueError(f"Expected 2D embedding array, got shape={arr.shape}")
+
+                if arr.shape[0] != len(texts):
+                    raise ValueError(
+                        f"Embedding row count mismatch: expected {len(texts)}, got {arr.shape[0]}"
+                    )
+
+                if arr.shape[1] <= 0:
+                    raise ValueError(f"Invalid embedding dimension: {arr.shape[1]}")
+
+                if not np.isfinite(arr).all():
+                    raise ValueError("Embeddings contain NaN or Inf values.")
+
+                arr = self._normalize_rows(arr)
+
+                elapsed = time.perf_counter() - t0
+                logger.info(
+                    "Sentence-transformer embed request succeeded: shape=%s, elapsed=%.3fs",
+                    arr.shape,
+                    elapsed,
+                )
+                return arr
+            except Exception as exc:
+                logger.warning("Sentence-transformer embedding failed, falling back to Ollama: %s", exc)
+
+        # Fallback to Ollama
         last_error: Exception | None = None
 
         for attempt in range(1, MAX_RETRIES + 1):
@@ -52,8 +98,8 @@ class EmbeddingClient:
 
             try:
                 response = self.session.post(
-                    f"{self.base_url}/embed",
-                    json={"model": EMBED_MODEL, "input": texts},
+                    f"{self.base_url}/api/embed",
+                    json={"model": EMBED_MODEL, "input": texts, "keep_alive": "10m"},
                     timeout=self.timeout,
                 )
                 response.raise_for_status()

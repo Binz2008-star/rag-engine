@@ -10,6 +10,15 @@ MODEL_DIR = BASE_DIR / "models"
 MODEL_REGISTRY_PATH = MODEL_DIR / "registry.jsonl"
 ACTIVE_MODEL_PATH = MODEL_DIR / "active_model.json"
 
+# Vector storage paths
+STORAGE_DIR = MODEL_DIR
+FAISS_INDEX_PATH = STORAGE_DIR / "faiss.index"
+METADATA_PATH = STORAGE_DIR / "metadata.json"
+DATA_HASH_PATH = STORAGE_DIR / "data_hash.txt"
+DATA_RAW_DIR = DATA_DIR
+
+SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".json"}
+
 # Event storage
 EVENT_DB_PATH = LOG_DIR / "events.db"
 INDEX_DIR = MODEL_DIR
@@ -21,6 +30,10 @@ CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3")
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "4000"))
 TIMEOUT = int(os.getenv("TIMEOUT", "60"))
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
+
+# Sentence-transformers configuration (fallback embedding backend)
+SENTENCE_TRANSFORMER_MODEL = os.getenv("SENTENCE_TRANSFORMER_MODEL", "all-MiniLM-L6-v2")
+USE_SENTENCE_TRANSFORMERS = os.getenv("USE_SENTENCE_TRANSFORMERS", "false").lower() == "true"
 
 # Canonical refusal message. The LLM system prompt instructs the model to
 # emit exactly this string when it cannot answer from the retrieved
@@ -49,3 +62,13 @@ TRAINING_TRIGGER_FAILURE_COUNT = 10
 MIN_QUERY_LENGTH = 3
 
 EVENT_SCHEMA_VERSION = "1.0"
+
+# Advanced retrieval shadow mode
+USE_ADVANCED_RETRIEVAL_SHADOW = os.getenv("USE_ADVANCED_RETRIEVAL_SHADOW", "false").lower() == "true"
+
+# Reranker configuration (for advanced retrieval path)
+RERANK_ENABLED = True
+RERANK_SEMANTIC_WEIGHT = 0.6
+RERANK_LEXICAL_WEIGHT = 0.3
+RERANK_PHRASE_WEIGHT = 0.1
+RERANK_SOURCE_PRIOR_WEIGHT = 0.0

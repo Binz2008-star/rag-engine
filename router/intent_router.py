@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
-
-import joblib
-from sklearn.pipeline import Pipeline as SkPipeline
+from typing import TYPE_CHECKING
 
 from app.config import ACTIVE_MODEL_PATH, MODEL_DIR, ROUTER_CONFIDENCE_THRESHOLD
 from app.models import Route
 from router.features import extract_hints
+
+if TYPE_CHECKING:
+    from sklearn.pipeline import Pipeline as SkPipeline
+
+logger = logging.getLogger(__name__)
 
 
 class IntentRouter:
@@ -22,8 +26,19 @@ class IntentRouter:
         path: Path,
         threshold: float = ROUTER_CONFIDENCE_THRESHOLD,
     ) -> "IntentRouter":
-        model = joblib.load(path)
-        return cls(model=model, threshold=threshold)
+        try:
+            import joblib  # deferred: joblib → numpy → OpenBLAS DLL; must not run at import time
+            from sklearn.pipeline import Pipeline as SkPipeline  # noqa: F401
+            model = joblib.load(path)
+            return cls(model=model, threshold=threshold)
+        except Exception as exc:
+            # Catches ImportError, MemoryError, OSError (DLL load failure),
+            # and OpenBLAS allocation failures that surface as RuntimeError.
+            logger.warning(
+                "ML intent model unavailable (%s: %s) — falling back to rule-based routing only.",
+                type(exc).__name__, exc,
+            )
+            return cls(model=None, threshold=threshold)
 
     @classmethod
     def from_active_model(cls) -> "IntentRouter":

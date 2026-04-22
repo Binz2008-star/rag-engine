@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import time
+from typing import Any, Iterator
 
-from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE
+from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE, USE_ADVANCED_RETRIEVAL_SHADOW
 from app.models import KnowledgeGap, PipelineResult
 from app.utils import stable_hash
 from router.features import normalize_query
@@ -28,6 +29,10 @@ def _has_sufficient_overlap(query: str, chunks: list) -> bool:
     q_terms = set(query.lower().split())
     if not q_terms:
         return False
+    # Non-Latin queries (Arabic, etc.) cannot match English corpus text by term
+    # overlap — skip the gate and let the grounding cosine check decide instead.
+    if not any("a" <= c <= "z" for c in query.lower()):
+        return True
     ctx_text = " ".join(c.text.lower() for c in chunks)
     hits = sum(1 for t in q_terms if t in ctx_text)
     return hits >= 1
@@ -48,6 +53,8 @@ class Pipeline:
         self.retriever = retriever
         self.llm = llm
         self.reranker = reranker
+
+        # Shadow retriever is initialized externally (e.g., in eval_runner) to avoid circular import
         # Lazy-import the analyzer only when the caller does not inject one.
         # analysis.knowledge_gap imports `requests`, which is intentionally
         # absent from the lightweight CI lane; keeping this import off the
@@ -244,6 +251,90 @@ class Pipeline:
             model_version=self.model_version,
             retriever_version=self.retriever_version,
         )
+
+    def run_stream(self, query: str, query_id: str) -> Iterator[dict[str, Any]]:
+        """Streaming variant of run(). Yields SSE-ready dicts.
+
+        Pre-LLM gates are byte-for-byte identical to run(). Tokens are buffered
+        locally during generation, then post-generation checks (speculative prefix,
+        grounding) run on the complete answer. Only if the answer passes all checks
+        are the buffered tokens emitted to the client. This maintains policy parity
+        with run() — the client never sees ungrounded text.
+
+        run() is not modified — the eval path is untouched.
+        """
+        normalized_query = normalize_query(query)
+
+        if len(normalized_query.strip()) < 3:
+            yield {"type": "done", "grounded": False, "answer": REFUSAL_MESSAGE}
+            return
+
+        route = self.router.route(normalized_query)
+        vec = self.embedder.embed_batch([normalized_query])[0]
+
+        if _is_sensitive_query(query):
+            yield {"type": "done", "grounded": False, "answer": REFUSAL_MESSAGE}
+            return
+
+        hits = self.retriever.retrieve(vec, route.intent, normalized_query)
+
+        if not hits:
+            yield {"type": "done", "grounded": False, "answer": "Insufficient data."}
+            return
+
+        if self.reranker:
+            hits = self.reranker.rerank(hits, normalized_query, top_k=len(hits))
+
+        if hits and hits[0].score < 0.20:
+            yield {"type": "done", "grounded": False, "answer": "Insufficient data."}
+            return
+
+        if not _has_sufficient_overlap(normalized_query, hits):
+            yield {"type": "done", "grounded": False, "answer": "Insufficient data."}
+            return
+
+        # Buffer tokens locally — do not emit to client yet.
+        collected: list[str] = []
+        for token in self.llm.generate_stream(normalized_query, hits):
+            collected.append(token)
+
+        if not collected:
+            yield {"type": "done", "grounded": False, "answer": "Insufficient data."}
+            return
+
+        # Post-generation checks — mirrors run() exactly.
+        # Speculative prefixes are redefined here intentionally (not extracted to a
+        # module constant) so that changes to run() don't silently affect the
+        # streaming path without a deliberate review.
+        raw_answer = "".join(collected).strip()
+        answer = self.llm._enforce_english_only(raw_answer)
+        normalized_answer = answer.lower()
+
+        speculative_prefixes = (
+            "based on the context",
+            "it appears",
+            "it can be inferred",
+            "this suggests",
+            "likely",
+            "used cooking oil",
+            "uco",
+        )
+        if normalized_answer.startswith(speculative_prefixes) or \
+                normalized_answer.startswith("insufficient data"):
+            yield {"type": "done", "grounded": False, "answer": "Insufficient data."}
+            return
+
+        grounded = check_grounding(answer, hits, self.embedder.embed_batch)
+        if not grounded:
+            yield {"type": "done", "grounded": False, "answer": "Insufficient data."}
+            return
+
+        # All checks passed — emit the buffered tokens to client.
+        yield {"type": "start"}
+        for token in collected:
+            yield {"type": "token", "content": token}
+
+        yield {"type": "done", "grounded": True}
 
     def close(self) -> None:
         """No-op close method for CI compatibility."""
