@@ -35,6 +35,19 @@ Operational health visibility for backend dependencies.
   - `GET /api/health`
   - `GET /api/system/health`
 
+### 5. Agent Runtime
+Foundational services for task management, scheduling, and execution.
+
+- **TaskStore**: Thread-safe in-memory task store with JSON persistence
+- **SchedulerService**: Simple scheduler for scheduling tasks
+- **AgentExecutor**: Shell for executing agent tasks
+
+API Endpoints:
+- POST /api/agent/tasks - Create a new agent task
+- GET /api/agent/tasks?session_id=... - List agent tasks
+- POST /api/agent/tasks/schedule - Schedule a task
+- POST /api/agent/tasks/execute - Execute a task
+
 ## Architecture overview
 
 - **Backend:** FastAPI
