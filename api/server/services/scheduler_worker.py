@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+import random
 import threading
 import time
 from typing import Callable
@@ -46,8 +47,8 @@ class SchedulerWorker:
         """Calculate exponential backoff with jitter."""
         backoff = BASE_BACKOFF_SECONDS * (2 ** retry_count)
         backoff = min(backoff, MAX_BACKOFF_SECONDS)
-        # Add jitter (±10%) to avoid thundering herd
-        jitter = backoff * 0.1 * (time.time() % 1)
+        # Add symmetric jitter (±10%) to avoid thundering herd
+        jitter = random.uniform(-backoff * 0.1, backoff * 0.1)
         return backoff + jitter
 
     def _run_task(self, task_id: str) -> None:
@@ -56,7 +57,9 @@ class SchedulerWorker:
             logger.warning("Scheduled task not found: %s", task_id)
             return
 
-        # Skip tasks already in terminal state
+        # Skip tasks in terminal state or already running
+        # This check must happen BEFORE semaphore acquisition to prevent
+        # rescheduling tasks that are currently executing
         if task.status in {"completed", "failed", "running"}:
             logger.info("Skipping scheduled task %s (already %s)", task_id, task.status)
             return
@@ -64,7 +67,14 @@ class SchedulerWorker:
         # Acquire semaphore to limit concurrent executions
         acquired = self._execution_semaphore.acquire(blocking=False)
         if not acquired:
-            logger.warning("Execution limit reached, skipping task %s", task_id)
+            logger.warning("Execution limit reached, rescheduling task %s in 2s", task_id)
+            # Reschedule with short delay instead of dropping
+            # Task status remains "scheduled" - this is backpressure, not a state change
+            next_run_at = time.time() + 2.0
+            try:
+                self._scheduler.schedule(task_id, next_run_at)
+            except Exception as schedule_exc:
+                logger.exception("Failed to reschedule task %s: %s", task_id, schedule_exc)
             return
 
         logger.info("Executing scheduled task: %s (title: %s)", task_id, task.title)

@@ -76,25 +76,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         exchange_client=app.state.trading_exchange_client,
     )
 
-    try:
-        await check_ollama(
-            base_url=settings.ollama_base_url,
-            required_models=settings.ollama_required_models,
-        )
-        logger.info("Ollama health check passed")
-    except OllamaUnavailableError as exc:
-        logger.error("Ollama health check failed: %s", exc)
-        raise SystemExit(1) from exc
+    app.state.rag_service = None
 
-    service = RagService(index_dir=settings.index_dir)
-    app.state.rag_service = service
+    # Start RAG service in background without blocking server startup
+    async def init_rag_service():
+        try:
+            await check_ollama(
+                base_url=settings.ollama_base_url,
+                required_models=settings.ollama_required_models,
+            )
+            logger.info("Ollama health check passed")
+        except OllamaUnavailableError as exc:
+            logger.error("Ollama health check failed: %s - RAG features will be degraded", exc)
+            return
 
-<<<<<<< HEAD
-    try:
-        await service.startup()
-    except Exception:
-        logger.exception("Pipeline startup failed - API will report degraded")
-=======
         try:
             service = RagService(index_dir=settings.index_dir)
             app.state.rag_service = service
@@ -118,6 +113,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Store scheduler task reference for shutdown
     app.state.scheduler_task = None
+    app.state.scheduler_startup_task = None
 
     # Wait for RAG initialization before starting scheduler
     async def start_scheduler_after_rag():
@@ -139,7 +135,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         app.state.scheduler_task = asyncio.create_task(run_scheduler_worker())
 
-    asyncio.create_task(start_scheduler_after_rag())
+    app.state.scheduler_startup_task = asyncio.create_task(start_scheduler_after_rag())
 
     try:
         yield
@@ -148,6 +144,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Shutting down scheduler worker")
         if app.state.scheduler_worker is not None:
             app.state.scheduler_worker.stop()
+        if app.state.scheduler_startup_task is not None and not app.state.scheduler_startup_task.done():
+            app.state.scheduler_startup_task.cancel()
+            try:
+                await app.state.scheduler_startup_task
+            except asyncio.CancelledError:
+                pass
         if app.state.scheduler_task is not None:
             app.state.scheduler_task.cancel()
             try:
