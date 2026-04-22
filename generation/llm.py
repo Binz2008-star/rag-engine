@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json as _json
 import logging
 import time
-from typing import Optional
+from typing import Iterator, Optional
 
 import requests
 
@@ -131,6 +132,88 @@ class LLMClient:
     def _enforce_english_only(answer: str) -> str:
         cleaned = "".join(char for char in answer if not ("\u0600" <= char <= "\u06FF")).strip()
         return cleaned or "Insufficient data."
+
+    def generate_stream(self, query: str, hits: list[RetrievalHit]) -> Iterator[str]:
+        """Yields raw tokens from Ollama as generated.
+        No English enforcement applied — caller collects the full answer
+        and calls _enforce_english_only() on the complete string.
+        """
+        if not hits:
+            return
+        context = self.build_context(hits)
+        if not context.strip():
+            return
+
+        user_message = f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
+        last_exc: Exception | None = None
+        yielded_any = False
+
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = self.session.post(
+                    f"{self.base_url}/api/chat",
+                    json={
+                        "model": self.model,
+                        "stream": True,
+                        "messages": [
+                            {"role": "system", "content": self._SYSTEM_PROMPT},
+                            {"role": "user",   "content": user_message},
+                        ],
+                        "options": {
+                            "temperature": 0,
+                            "top_k": 1,
+                            "top_p": 1,
+                            "seed": 42,
+                            "num_ctx": 4096,
+                            "num_predict": 768,
+                        },
+                    },
+                    timeout=self.timeout,
+                    stream=True,
+                )
+                response.raise_for_status()
+                for raw_line in response.iter_lines():
+                    if not raw_line:
+                        continue
+                    try:
+                        chunk = _json.loads(raw_line)
+                    except _json.JSONDecodeError:
+                        continue
+                    token: str = chunk.get("message", {}).get("content", "")
+                    if token:
+                        yielded_any = True
+                        yield token
+                    if chunk.get("done"):
+                        return
+                return  # clean exit if Ollama closes stream without done flag
+
+            except requests.exceptions.RequestException as exc:
+                if yielded_any:
+                    # Partial stream already sent — retrying would duplicate tokens.
+                    # Log and exit cleanly; the client will show what arrived.
+                    logger.error(
+                        "LLM stream dropped mid-response on attempt %d/%d: %r",
+                        attempt + 1, MAX_RETRIES, exc,
+                    )
+                    return
+                last_exc = exc
+                logger.warning(
+                    "LLM stream failed attempt %d/%d: %r", attempt + 1, MAX_RETRIES, exc
+                )
+                self._reset_after_failure(exc)
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(2 ** attempt)
+                continue
+            except (KeyError, ValueError, TypeError) as exc:
+                logger.error("Invalid Ollama stream payload: %r", exc)
+                self._reset_after_failure(exc)
+                return
+
+        if not self.fail_closed:
+            raise RuntimeError(
+                f"LLM stream failed after {MAX_RETRIES} attempts: {last_exc!r}"
+            )
+        # fail_closed: caller treats empty yield as refusal
 
     def close(self) -> None:
         try:
