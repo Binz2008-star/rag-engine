@@ -8,7 +8,10 @@ Usage:
     python eval_runner.py --report reports/run_01.json
 """
 
+from __future__ import annotations
+
 import argparse
+import enum
 import json
 import os
 import sys
@@ -16,8 +19,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Literal
 
-from app.config import REFUSAL_MESSAGE
+from app.config import REFUSAL_MESSAGE, USE_ADVANCED_RETRIEVAL_SHADOW
 from app.pipeline import Pipeline
 from app.inference_service import InferenceService
 from evaluation.eval_gate import gate
@@ -32,6 +36,8 @@ from retrieval.faiss_index import FaissIndex
 from retrieval.multi_retriever import MultiRetriever
 from retrieval.reranker import Reranker
 from generation.llm import LLMClient
+from app.advanced_retriever_adapter import AdvancedRetrievalAdapter
+from app.decision_logger import DecisionLogger
 
 EVAL_QUERIES_PATH = Path(__file__).parent / "tests" / "eval_queries.json"
 DEFAULT_REPORT_PATH = Path(__file__).parent / "reports" / f"eval_{int(time.time())}.json"
@@ -49,6 +55,35 @@ class QueryResult:
     intent_method: str
     failure_type: str | None = None
     grounded: bool = True
+
+
+def from_api_response(api_response: dict) -> QueryResult:
+    """Convert API QueryResponse to eval QueryResult format.
+
+    Handles schema differences between API and eval contracts:
+    - API uses structured SourceItem objects, eval expects list[dict] with 'source' key
+    - API has extra fields (model_version, retriever_version, latency_ms, wall_ms) that are ignored
+    """
+    # Convert SourceItem objects to dict format expected by eval
+    sources = []
+    if "sources" in api_response:
+        for src in api_response["sources"]:
+            if isinstance(src, dict):
+                sources.append({"source": src.get("source", "")})
+            else:
+                # Handle case where source is already a string or other format
+                sources.append({"source": str(src)})
+
+    return QueryResult(
+        answer=api_response.get("answer", ""),
+        sources=sources,
+        request_id=api_response.get("request_id", ""),
+        intent=api_response.get("intent", ""),
+        intent_confidence=api_response.get("intent_confidence", 0.0),
+        intent_method=api_response.get("intent_method", ""),
+        failure_type=api_response.get("failure_type"),
+        grounded=api_response.get("grounded", True),
+    )
 
 
 @dataclass
@@ -85,12 +120,81 @@ class TestResult:
 # contains_numbers) live in evaluation/refusal.py so eval_main, metrics,
 # and this runner all share one definition of "refusal".
 
+# Schema aliases — the two evaluator paths (this runner vs evaluation/eval_main.py)
+# historically drifted. `tests/eval_queries.json` was authored against the
+# long-name schema used by eval_main.py, which meant this runner silently
+# ignored contains/exact/failure_type expectations. Normalising at the single
+# ingest point below fixes the CI gate without changing any test file.
+_FIELD_ALIASES: dict[str, str] = {
+    "expected_answer_exact": "expected_exact",
+    "expected_answer_contains": "expected_contains",
+}
+
+# Configurable thresholds to avoid brittle hard-coding
+_INTENT_METHOD_CONFIDENCE_THRESHOLD = 0.85
+_LATENCY_SLA_MS = 2500
+_REFUSAL_MESSAGE = "Insufficient data."
+
+
+class FailureCategory(enum.Enum):
+    """Structured failure taxonomy for categorizing evaluation failures."""
+    # Content failures
+    WRONG_ANSWER = "wrong_answer"
+    MISSING_TERMS = "missing_terms"
+    FORBIDDEN_CONTENT = "forbidden_content"
+    REFUSAL_FAILURE = "refusal_failure"
+    HALLUCINATION_RISK = "hallucination_risk"
+    ARABIC_LEAKAGE = "arabic_leakage"
+    ANSWER_TOO_SHORT = "answer_too_short"
+    GENERIC_ANSWER = "generic_answer"
+
+    # Source failures
+    WRONG_SOURCE = "wrong_source"
+    TOP1_SOURCE_MISMATCH = "top1_source_mismatch"
+    LOW_SOURCE_PRECISION = "low_source_precision"
+    CORPUS_MISSING = "corpus_missing"
+    CORPUS_MISSING_STRICT = "corpus_missing_strict"
+
+    # Pipeline failures
+    UNEXPECTED_FAILURE_TYPE = "unexpected_failure_type"
+    FAILURE_TYPE_MISMATCH = "failure_type_mismatch"
+
+    # Infrastructure failures
+    TIMEOUT = "timeout"
+    INFRA_FAILURE = "infra_failure"
+    ERROR = "error"
+
+    # Performance failures
+    LATENCY_TOO_HIGH = "latency_too_high"
+
+    @classmethod
+    def from_bucket(cls, bucket: str) -> "FailureCategory | None":
+        """Map legacy bucket name to FailureCategory enum."""
+        try:
+            return cls(bucket)
+        except ValueError:
+            return None
+
+
+def _normalize_test(test: dict) -> dict:
+    """Return a copy of `test` with long-name schema fields mapped to the
+    canonical short names consumed by this runner. The original dict is not
+    mutated so upstream callers keep their view."""
+    if not any(alias in test for alias in _FIELD_ALIASES):
+        return test
+    normalized = dict(test)
+    for alias, canonical in _FIELD_ALIASES.items():
+        if alias in normalized and canonical not in normalized:
+            normalized[canonical] = normalized[alias]
+    return normalized
+
 
 def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple[bool, list[str], list[str]]:
     """
     Evaluate ALL criteria in the test case.
     Returns (passed, reasons, buckets).
     """
+    test = _normalize_test(test)
     answer  = (result.answer or "").strip()
     sources = [s["source"] for s in result.sources]
     reasons: list[str] = []
@@ -99,66 +203,88 @@ def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple
     # expected_refusal: true — pattern-based, not string-exact
     if test.get("expected_refusal") is True:
         if not is_insufficient_response(answer):
-            buckets.add("refusal_failure")
+            buckets.add(FailureCategory.REFUSAL_FAILURE.value)
             reasons.append(f"expected refusal, got {answer!r}")
 
     # Refusal response validation with semantic matching
     if "expected_exact" in test:
         exp = test["expected_exact"]
-        if exp == REFUSAL_MESSAGE:
+        if exp == _REFUSAL_MESSAGE:
             if not is_insufficient_response(answer):
-                buckets.add("refusal_failure")
+                buckets.add(FailureCategory.REFUSAL_FAILURE.value)
                 reasons.append(f"expected refusal response, got {answer!r}")
         elif answer != exp:
-            buckets.add("wrong_answer")
+            buckets.add(FailureCategory.WRONG_ANSWER.value)
             reasons.append(f"expected exact {exp!r}, got {answer!r}")
 
     # Hallucination detection for refusal responses
-    if "expected_exact" in test and test["expected_exact"] == REFUSAL_MESSAGE:
+    if "expected_exact" in test and test["expected_exact"] == _REFUSAL_MESSAGE:
         if is_insufficient_response(answer) and contains_numbers(answer):
-            buckets.add("hallucination_risk")
+            buckets.add(FailureCategory.HALLUCINATION_RISK.value)
             reasons.append("refusal response contains numbers (hallucination risk)")
 
     if "expected_contains" in test:
         missing = [t for t in test["expected_contains"] if t.lower() not in answer.lower()]
         if missing:
-            buckets.add("wrong_answer")
+            buckets.add(FailureCategory.WRONG_ANSWER.value)
             reasons.append(f"missing terms: {missing}")
+
+    # Forbidden content validation (must_not_contain)
+    if "must_not_contain" in test:
+        forbidden_found = [t for t in test["must_not_contain"] if t.lower() in answer.lower()]
+        if forbidden_found:
+            buckets.add(FailureCategory.FORBIDDEN_CONTENT.value)
+            reasons.append(f"contains forbidden terms: {forbidden_found}")
+
+    # Pipeline failure_type expectation. Mirrors evaluation/eval_main.py so both
+    # evaluator paths enforce the same contract. `None` means "no failure
+    # expected"; any non-None value must match the pipeline-reported type.
+    if "expected_failure_type" in test:
+        expected_ft = test["expected_failure_type"]
+        actual_ft = getattr(result, "failure_type", None)
+        if expected_ft is None and actual_ft is not None:
+            buckets.add(FailureCategory.UNEXPECTED_FAILURE_TYPE.value)
+            reasons.append(f"unexpected failure_type: {actual_ft}")
+        elif expected_ft is not None and actual_ft != expected_ft:
+            buckets.add(FailureCategory.FAILURE_TYPE_MISMATCH.value)
+            reasons.append(
+                f"failure_type mismatch: expected {expected_ft}, got {actual_ft}"
+            )
 
     # Source attribution validation
     if "expected_source" in test:
         expected = test["expected_source"]
         if expected not in sources:
-            buckets.add("wrong_source")
+            buckets.add(FailureCategory.WRONG_SOURCE.value)
             reasons.append(f"expected source {expected!r}, got {sources}")
 
         # Top-1 source accuracy
         if sources and sources[0] != expected:
-            buckets.add("top1_source_mismatch")
+            buckets.add(FailureCategory.TOP1_SOURCE_MISMATCH.value)
             reasons.append(f"top-1 source mismatch: expected {expected!r}, got {sources[0]!r}")
 
         # Source precision (expected in top-2)
         if expected not in sources[:2]:
-            buckets.add("low_source_precision")
+            buckets.add(FailureCategory.LOW_SOURCE_PRECISION.value)
             reasons.append(f"expected source not in top-2: {expected!r}")
 
     # Arabic leakage validation for multilingual tests
     if test.get("suite") == "multilingual_output":
         if contains_arabic(answer):
-            buckets.add("arabic_leakage")
+            buckets.add(FailureCategory.ARABIC_LEAKAGE.value)
             reasons.append("response contains Arabic characters (should be English only)")
 
     # Minimum length validation for non-refusal responses
     if "min_length" in test:
         if not is_insufficient_response(answer) and len(answer.split()) < test["min_length"]:
-            buckets.add("answer_too_short")
+            buckets.add(FailureCategory.ANSWER_TOO_SHORT.value)
             reasons.append(f"answer too short (min {test['min_length']} words)")
 
     # Maximum latency validation
     if "max_latency_ms" in test:
         elapsed_ms = elapsed * 1000
         if elapsed_ms > test["max_latency_ms"]:
-            buckets.add("latency_too_high")
+            buckets.add(FailureCategory.LATENCY_TOO_HIGH.value)
             reasons.append(f"latency too high ({elapsed_ms:.0f}ms > {test['max_latency_ms']}ms)")
 
     # Strict mode: additional checks
@@ -171,12 +297,12 @@ def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple
                 "professional services",
             ]
             if any(p in answer.lower() and len(answer.split()) < 15 for p in generic_patterns):
-                buckets.add("generic_answer")
+                buckets.add(FailureCategory.GENERIC_ANSWER.value)
                 reasons.append("generic answer (strict mode)")
 
         # Fail if corpus_missing for required queries
-        if test.get("required_corpus", False) and "corpus_missing" in buckets:
-            buckets.add("corpus_missing_strict")
+        if test.get("required_corpus", False) and FailureCategory.CORPUS_MISSING.value in buckets:
+            buckets.add(FailureCategory.CORPUS_MISSING_STRICT.value)
             reasons.append("corpus missing for required query (strict mode)")
 
     passed = len(reasons) == 0
@@ -253,8 +379,7 @@ def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
     low_conf_failures = [r for r in results if not r.passed and r.intent_confidence > 0 and r.intent_confidence < 0.6]
 
     avg_elapsed = round(sum(r.elapsed for r in results) / total, 2) if total else 0
-    latency_sla_ms = 2500
-    sla_pass = (avg_elapsed * 1000) <= latency_sla_ms
+    sla_pass = (avg_elapsed * 1000) <= _LATENCY_SLA_MS
 
     # ── Canonical metrics (required by eval_gate) ─────────────────────────────
     # Hallucination rate: pipeline-reported failure_type == "hallucination"
@@ -269,10 +394,10 @@ def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
     # Canonical refusal_accuracy: out-of-domain queries that returned the
     # canonical refusal message exactly (case-insensitive).
     canonical_refusal_rows = [r for r in results if r.has_expected_exact
-                              and r.expected_exact == REFUSAL_MESSAGE and not r.error]
+                              and r.expected_exact == _REFUSAL_MESSAGE and not r.error]
     canonical_refusal_hits = sum(
         1 for r in canonical_refusal_rows
-        if str(r.answer or "").strip().lower() == REFUSAL_MESSAGE.lower()
+        if str(r.answer or "").strip().lower() == _REFUSAL_MESSAGE.lower()
     )
     canonical_refusal_accuracy = (
         round(canonical_refusal_hits / len(canonical_refusal_rows), 3)
@@ -297,7 +422,7 @@ def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
         "intent_type_metrics": intent_type_metrics,
         "low_conf_failures":  len(low_conf_failures),
         "avg_elapsed_s":      avg_elapsed,
-        "latency_sla_ms":     latency_sla_ms,
+        "latency_sla_ms":     _LATENCY_SLA_MS,
         "sla_pass":           sla_pass,
     }
 
@@ -361,6 +486,7 @@ def main(query_fn=None) -> int:
     # Use provided query function or default to new Pipeline architecture
     service = None
     pipeline = None
+    shadow_logger = None
     if query_fn is None:
         print("Initializing components...")
         router = IntentRouter.from_active_model()
@@ -385,29 +511,80 @@ def main(query_fn=None) -> int:
         service = InferenceService(pipeline=pipeline)
         print(f"Ready with {len(indexes)} indexes\n")
 
+        # Initialize shadow logger if enabled
+        shadow_logger = None
+        shadow_adapter = None
+        if USE_ADVANCED_RETRIEVAL_SHADOW:
+            shadow_logger = DecisionLogger(log_path="logs/shadow_comparison.jsonl")
+            print("Shadow mode: ENABLED - logging comparison to logs/shadow_comparison.jsonl")
+
+            # Initialize shadow adapter separately to avoid circular import
+            try:
+                from app.advanced_retriever_adapter import AdvancedRetrievalAdapter
+                shadow_adapter = AdvancedRetrievalAdapter(indexes=indexes)
+                print("Shadow adapter initialized\n")
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("Failed to initialize shadow adapter: %s", e)
+                print(f"Shadow adapter initialization failed: {e}\n")
+
         def query_fn(question: str):
             result = service.handle_query(question, query_id=f"eval_{int(time.time()*1000)}")
             # Convert to expected format
             sources = [{"source": h.source} for h in result.retrieval]
             # Determine intent method based on confidence
-            intent_method = "rules" if result.confidence >= 0.85 else "v2_model"
+            intent_method = "rules" if result.confidence >= _INTENT_METHOD_CONFIDENCE_THRESHOLD else "v2_model"
 
-            return QueryResult(
-                answer=result.answer,
-                sources=sources,
-                request_id=result.query_id,
-                intent=result.intent,
-                intent_confidence=result.confidence,
-                intent_method=intent_method,
-                failure_type=result.failure_type,
-                grounded=result.grounded,
-            )
+            # Log shadow comparison if enabled
+            if shadow_logger and shadow_adapter:
+                primary_sources = [h.source for h in result.retrieval]
+                # Run shadow retrieval
+                try:
+                    shadow_hits, shadow_metadata = shadow_adapter.retrieve(
+                        query_vec=None,  # Not used by advanced path
+                        intent=result.intent,
+                        query=question,
+                        top_k=5
+                    )
+                    advanced_sources = shadow_metadata.get('advanced_sources') if shadow_metadata else None
+                    advanced_intent = shadow_metadata.get('advanced_intent') if shadow_metadata else None
+                except Exception as e:
+                    # Shadow retrieval failure should not break eval
+                    import logging
+                    logging.getLogger(__name__).warning("Shadow retrieval in eval failed: %s", e)
+                    advanced_sources = None
+                    advanced_intent = None
+                    shadow_metadata = None
+
+                shadow_logger.log_shadow_comparison(
+                    request_id=result.query_id,
+                    query=question,
+                    primary_sources=primary_sources,
+                    advanced_sources=advanced_sources,
+                    primary_intent=result.intent,
+                    advanced_intent=advanced_intent,
+                    shadow_metadata=shadow_metadata,
+                )
+
+            # Convert InferenceService result to API response format, then to eval format
+            api_response = {
+                "answer": result.answer,
+                "sources": sources,
+                "request_id": result.query_id,
+                "intent": result.intent,
+                "intent_confidence": result.confidence,
+                "intent_method": intent_method,
+                "failure_type": result.failure_type,
+                "grounded": result.grounded,
+            }
+            return from_api_response(api_response)
     else:
         print("Using provided query function\n")
 
     results: list[TestResult] = []
 
     def _build_test_result(idx: int, test: dict) -> tuple[TestResult, str]:
+        test = _normalize_test(test)
         question = test.get("question") or test.get("query", "")
         question = str(question).strip()
         tr = TestResult(
@@ -446,9 +623,9 @@ def main(query_fn=None) -> int:
         except Exception as exc:
             tr.error = str(exc)
             if "Embedding failure" in str(exc) or "embedding" in str(exc).lower():
-                tr.buckets = ["infra_failure"]
+                tr.buckets = [FailureCategory.INFRA_FAILURE.value]
             else:
-                tr.buckets = ["error"]
+                tr.buckets = [FailureCategory.ERROR.value]
         return tr
 
     def _print_result(tr: TestResult, total_count: int) -> None:
@@ -481,7 +658,7 @@ def main(query_fn=None) -> int:
                         tr, _ = _build_test_result(i, test)
                         tr.error = f"query timeout after {args.query_timeout:.0f}s"
                         tr.elapsed = args.query_timeout
-                        tr.buckets = ["timeout"]
+                        tr.buckets = [FailureCategory.TIMEOUT.value]
                 _print_result(tr, total_count)
                 results.append(tr)
         else:
@@ -499,7 +676,7 @@ def main(query_fn=None) -> int:
                             tr, _ = _build_test_result(i, test)
                             tr.error = f"query timeout after {args.query_timeout:.0f}s"
                             tr.elapsed = args.query_timeout
-                            tr.buckets = ["timeout"]
+                            tr.buckets = [FailureCategory.TIMEOUT.value]
                         indexed[i] = tr
                         _print_result(tr, total_count)
                 except FuturesTimeoutError:
@@ -510,7 +687,7 @@ def main(query_fn=None) -> int:
                         tr, _ = _build_test_result(i, test)
                         tr.error = f"global deadline timeout after {args.query_timeout:.0f}s"
                         tr.elapsed = args.query_timeout
-                        tr.buckets = ["timeout"]
+                        tr.buckets = [FailureCategory.TIMEOUT.value]
                         indexed[i] = tr
             # Preserve input order for the report.
             results = [indexed[i] for i in sorted(indexed)]
