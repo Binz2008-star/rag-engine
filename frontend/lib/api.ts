@@ -1,14 +1,20 @@
 import type {
   AgentAnalyzeRequest,
   AgentAnalyzeResponse,
+  CreateTaskRequest,
   DispatchRequest,
   DispatchResponse,
+  ExecuteTaskRequest,
+  ExecuteTaskResponse,
   HealthResponse,
   QueryRequest,
   QueryResponse,
+  ScheduleTaskRequest,
+  ScheduleTaskResponse,
   SystemHealthResponse,
+  TaskResponse,
   TradingAnalyzeRequest,
-  TradingAnalyzeResponse,
+  TradingAnalyzeResponse
 } from "./types";
 
 const API_BASE_URL =
@@ -160,4 +166,66 @@ export async function postDispatch(
   });
 
   return parseJsonOrThrow<DispatchResponse>(response);
+}
+
+export async function createAgentTask(
+  payload: CreateTaskRequest,
+  signal?: AbortSignal,
+): Promise<TaskResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/agent/tasks`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  return parseJsonOrThrow<TaskResponse>(response);
+}
+
+export async function listAgentTasks(
+  sessionId?: string,
+  signal?: AbortSignal,
+): Promise<TaskResponse[]> {
+  const suffix = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+  const response = await fetch(`${API_BASE_URL}/api/agent/tasks${suffix}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+    signal,
+  });
+  return parseJsonOrThrow<TaskResponse[]>(response);
+}
+
+export async function scheduleAgentTask(
+  payload: ScheduleTaskRequest,
+  signal?: AbortSignal,
+): Promise<ScheduleTaskResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/agent/tasks/schedule`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  return parseJsonOrThrow<ScheduleTaskResponse>(response);
+}
+
+export async function executeAgentTask(
+  payload: ExecuteTaskRequest,
+  signal?: AbortSignal,
+): Promise<ExecuteTaskResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/agent/tasks/execute`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+  return parseJsonOrThrow<ExecuteTaskResponse>(response);
 }

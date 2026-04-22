@@ -21,11 +21,14 @@ from .core.config import get_settings  # noqa: E402
 from .core.logging import configure_logging  # noqa: E402
 from .infra.ollama_health import OllamaUnavailableError, check_ollama  # noqa: E402
 from .services.agent_service import AgentService  # noqa: E402
+from .services.agent_executor import AgentExecutor  # noqa: E402
 from .services.capability_router import CapabilityRouter  # noqa: E402
 from .services.context_service import ContextService  # noqa: E402
 from .services.health_guardian import HealthGuardian  # noqa: E402
 from .services.interaction_log_service import InteractionLogService  # noqa: E402
 from .services.rag_service import RagService  # noqa: E402
+from .services.scheduler_service import SchedulerService  # noqa: E402
+from .services.task_store import TaskStore  # noqa: E402
 from .services.trading_service import TradingService  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -50,6 +53,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.health_guardian = HealthGuardian()
     app.state.trading_service = TradingService()
     app.state.agent_service = AgentService()
+    app.state.task_store = TaskStore()
+    app.state.scheduler_service = SchedulerService()
+    app.state.agent_executor = AgentExecutor()
 
     try:
         await check_ollama(

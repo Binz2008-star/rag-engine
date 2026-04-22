@@ -10,22 +10,31 @@ from ..core.config import get_settings
 from ..schemas import (
     AgentAnalyzeRequest,
     AgentAnalyzeResponse,
+    CreateTaskRequest,
     DispatchRequest,
     DispatchResponse,
     ErrorResponse,
+    ExecuteTaskRequest,
+    ExecuteTaskResponse,
     HealthResponse,
     QueryRequest,
     QueryResponse,
+    ScheduleTaskRequest,
+    ScheduleTaskResponse,
     SystemHealthResponse,
+    TaskResponse,
     TradingAnalyzeRequest,
     TradingAnalyzeResponse,
 )
+from ..services.agent_executor import AgentExecutor
 from ..services.agent_service import AgentService
 from ..services.capability_router import Capability, CapabilityRouter
 from ..services.context_service import ContextService, InteractionRecord
 from ..services.health_guardian import HealthGuardian
 from ..services.interaction_log_service import InteractionLogService, LoggedRequest
 from ..services.rag_service import PipelineNotReadyError, RagService
+from ..services.scheduler_service import SchedulerService
+from ..services.task_store import TaskStore
 from ..services.trading_service import TradingService
 
 logger = logging.getLogger(__name__)
@@ -90,6 +99,36 @@ def _health_guardian(request: Request) -> HealthGuardian:
             detail="Health guardian not initialised",
         )
     return guardian
+
+
+def _task_store(request: Request) -> TaskStore:
+    service: TaskStore | None = getattr(request.app.state, "task_store", None)
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Task store not initialised",
+        )
+    return service
+
+
+def _scheduler_service(request: Request) -> SchedulerService:
+    service: SchedulerService | None = getattr(request.app.state, "scheduler_service", None)
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scheduler service not initialised",
+        )
+    return service
+
+
+def _agent_executor(request: Request) -> AgentExecutor:
+    service: AgentExecutor | None = getattr(request.app.state, "agent_executor", None)
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Agent executor not initialised",
+        )
+    return service
 
 
 @router.get(
@@ -478,3 +517,130 @@ async def dispatch(payload: DispatchRequest, request: Request) -> DispatchRespon
         raise HTTPException(
             status_code=500, detail="Internal error while dispatching request"
         ) from exc
+
+
+@router.post(
+    "/agent/tasks",
+    response_model=TaskResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def create_agent_task(
+    payload: CreateTaskRequest,
+    request: Request,
+) -> TaskResponse:
+    task_store = _task_store(request)
+    task_id = str(uuid.uuid4())
+    task = task_store.create_task(
+        task_id=task_id,
+        title=payload.title.strip(),
+        prompt=payload.prompt.strip(),
+        intent=payload.intent.strip(),
+        session_id=payload.session_id,
+        user_id=payload.user_id,
+    )
+    return TaskResponse(
+        task_id=task.task_id,
+        title=task.title,
+        prompt=task.prompt,
+        intent=task.intent,
+        status=task.status,
+        session_id=task.session_id,
+        user_id=task.user_id,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+    )
+
+
+@router.get(
+    "/agent/tasks",
+    response_model=list[TaskResponse],
+    responses={503: {"model": ErrorResponse}},
+)
+async def list_agent_tasks(
+    request: Request,
+    session_id: str | None = None,
+) -> list[TaskResponse]:
+    task_store = _task_store(request)
+    tasks = task_store.list_tasks(session_id=session_id)
+    return [
+        TaskResponse(
+            task_id=task.task_id,
+            title=task.title,
+            prompt=task.prompt,
+            intent=task.intent,
+            status=task.status,
+            session_id=task.session_id,
+            user_id=task.user_id,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+        )
+        for task in tasks
+    ]
+
+
+@router.post(
+    "/agent/tasks/schedule",
+    response_model=ScheduleTaskResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def schedule_agent_task(
+    payload: ScheduleTaskRequest,
+    request: Request,
+) -> ScheduleTaskResponse:
+    task_store = _task_store(request)
+    scheduler_service = _scheduler_service(request)
+
+    task = task_store.get_task(payload.task_id)
+    if task is None:
+        raise HTTPException(status_code=400, detail="Task not found")
+
+    scheduled = scheduler_service.schedule(payload.task_id, payload.run_at)
+    task_store.update_status(payload.task_id, "scheduled")
+
+    return ScheduleTaskResponse(
+        task_id=scheduled.task_id,
+        run_at=scheduled.run_at,
+        status=scheduled.status,
+        created_at=scheduled.created_at,
+    )
+
+
+@router.post(
+    "/agent/tasks/execute",
+    response_model=ExecuteTaskResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def execute_agent_task(
+    payload: ExecuteTaskRequest,
+    request: Request,
+) -> ExecuteTaskResponse:
+    task_store = _task_store(request)
+    agent_executor = _agent_executor(request)
+
+    task = task_store.get_task(payload.task_id)
+    if task is None:
+        raise HTTPException(status_code=400, detail="Task not found")
+
+    task_store.update_status(payload.task_id, "running")
+    result = agent_executor.execute(task.task_id, task.prompt)
+    task_store.update_status(payload.task_id, "completed")
+
+    return ExecuteTaskResponse(
+        task_id=result.task_id,
+        status=result.status,
+        output=result.output,
+        started_at=result.started_at,
+        finished_at=result.finished_at,
+    )

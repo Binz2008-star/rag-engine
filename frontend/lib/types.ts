@@ -77,6 +77,50 @@ export type DispatchResponse = {
   payload: Record<string, unknown>;
 };
 
+export type CreateTaskRequest = {
+  title: string;
+  prompt: string;
+  intent: string;
+  session_id?: string | null;
+  user_id?: string | null;
+};
+
+export type TaskResponse = {
+  task_id: string;
+  title: string;
+  prompt: string;
+  intent: string;
+  status: string;
+  session_id?: string | null;
+  user_id?: string | null;
+  created_at: number;
+  updated_at: number;
+};
+
+export type ScheduleTaskRequest = {
+  task_id: string;
+  run_at: number;
+};
+
+export type ScheduleTaskResponse = {
+  task_id: string;
+  run_at: number;
+  status: string;
+  created_at: number;
+};
+
+export type ExecuteTaskRequest = {
+  task_id: string;
+};
+
+export type ExecuteTaskResponse = {
+  task_id: string;
+  status: string;
+  output: string;
+  started_at: number;
+  finished_at: number;
+};
+
 export type HealthResponse = {
   status: string;
   pipeline_ready: boolean;

@@ -98,3 +98,47 @@ class DispatchResponse(BaseModel):
     status: str
     request_id: str
     payload: dict[str, Any]
+
+
+class CreateTaskRequest(BaseModel):
+    title: str = Field(..., min_length=1)
+    prompt: str = Field(..., min_length=1)
+    intent: str = Field(..., min_length=1)
+    session_id: str | None = None
+    user_id: str | None = None
+
+
+class TaskResponse(BaseModel):
+    task_id: str
+    title: str
+    prompt: str
+    intent: str
+    status: str
+    session_id: str | None = None
+    user_id: str | None = None
+    created_at: float
+    updated_at: float
+
+
+class ScheduleTaskRequest(BaseModel):
+    task_id: str = Field(..., min_length=1)
+    run_at: float
+
+
+class ScheduleTaskResponse(BaseModel):
+    task_id: str
+    run_at: float
+    status: str
+    created_at: float
+
+
+class ExecuteTaskRequest(BaseModel):
+    task_id: str = Field(..., min_length=1)
+
+
+class ExecuteTaskResponse(BaseModel):
+    task_id: str
+    status: str
+    output: str
+    started_at: float
+    finished_at: float
