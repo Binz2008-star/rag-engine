@@ -1,14 +1,14 @@
 "use client";
 
-import {
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { postDispatch } from "@/lib/api";
-import type { AgentAnalyzeResponse, TradingAnalyzeResponse } from "@/lib/types";
+import type {
+    AgentAnalyzeResponse,
+    DispatchResponse,
+    QueryResponse,
+    TradingAnalyzeResponse,
+} from "@/lib/types";
 
 const SESSION_ID = "web-session-1";
 const USER_ID = "web-user-1";
@@ -130,6 +130,64 @@ function LoadingBubble() {
   );
 }
 
+function asQueryPayload(payload: Record<string, unknown>): QueryResponse {
+  return payload as unknown as QueryResponse;
+}
+
+function asTradingPayload(payload: Record<string, unknown>): TradingAnalyzeResponse {
+  return payload as unknown as TradingAnalyzeResponse;
+}
+
+function asAgentPayload(payload: Record<string, unknown>): AgentAnalyzeResponse {
+  return payload as unknown as AgentAnalyzeResponse;
+}
+
+function buildAssistantMessage(response: DispatchResponse): AssistantMessage {
+  if (response.status !== "ok") {
+    return {
+      id: makeId(),
+      role: "assistant",
+      kind: "error",
+      content: "Dispatch request failed.",
+    };
+  }
+
+  if (response.kind === "trading_analysis") {
+    return {
+      id: makeId(),
+      role: "assistant",
+      kind: "trading",
+      trading: asTradingPayload(response.payload),
+    };
+  }
+
+  if (response.kind === "agent_analysis") {
+    return {
+      id: makeId(),
+      role: "assistant",
+      kind: "agent",
+      agent: asAgentPayload(response.payload),
+    };
+  }
+
+  if (response.kind === "rag_answer") {
+    const rag = asQueryPayload(response.payload);
+    return {
+      id: makeId(),
+      role: "assistant",
+      kind: "text",
+      content: rag.answer,
+    };
+  }
+
+  return {
+    id: makeId(),
+    role: "assistant",
+    kind: "error",
+    content: "Unsupported dispatch response kind.",
+  };
+}
+
 export default function ChatShell() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -178,28 +236,7 @@ export default function ChatShell() {
           user_id: USER_ID,
         });
 
-        if (result.capability === "rag") {
-          const answer = result.data.answer as string;
-          setMessages((prev) => [
-            ...prev,
-            { id: makeId(), role: "assistant", kind: "text", content: answer },
-          ]);
-        } else if (result.capability === "trading") {
-          setMessages((prev) => [
-            ...prev,
-            { id: makeId(), role: "assistant", kind: "trading", trading: result.data as TradingAnalyzeResponse },
-          ]);
-        } else if (result.capability === "agent") {
-          setMessages((prev) => [
-            ...prev,
-            { id: makeId(), role: "assistant", kind: "agent", agent: result.data as AgentAnalyzeResponse },
-          ]);
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            { id: makeId(), role: "assistant", kind: "error", content: `Unknown capability: ${result.capability}` },
-          ]);
-        }
+        setMessages((prev) => [...prev, buildAssistantMessage(result)]);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Request failed unexpectedly.";
@@ -211,7 +248,7 @@ export default function ChatShell() {
         setIsLoading(false);
       }
     },
-    [input, isLoading],
+    [input, isLoading]
   );
 
   const handleKeyDown = useCallback(
@@ -221,7 +258,7 @@ export default function ChatShell() {
         event.currentTarget.form?.requestSubmit();
       }
     },
-    [],
+    []
   );
 
   return (

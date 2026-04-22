@@ -94,4 +94,7 @@ class DispatchRequest(BaseModel):
 
 class DispatchResponse(BaseModel):
     capability: str
-    data: dict[str, Any]
+    kind: str
+    status: str
+    request_id: str
+    payload: dict[str, Any]

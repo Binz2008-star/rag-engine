@@ -361,6 +361,8 @@ async def dispatch(payload: DispatchRequest, request: Request) -> DispatchRespon
     rag_service = _rag_service(request)
     trading_service = _trading_service(request)
     agent_service = _agent_service(request)
+    context_service = _context_service(request)
+    interaction_log_service = _interaction_log_service(request)
 
     question = payload.question.strip()
     if not question:
@@ -375,19 +377,20 @@ async def dispatch(payload: DispatchRequest, request: Request) -> DispatchRespon
         )
 
     route = capability_router.route(question)
+    request_started = time.time()
+    request_id = str(uuid.uuid4())
+    session_id = (payload.session_id or "").strip()
 
     try:
-        if route.capability == Capability.RAG:
-            result = await rag_service.query(question)
-            return DispatchResponse(
-                capability="rag",
-                data=dict(result),
-            )
-        elif route.capability == Capability.TRADING:
-            result = trading_service.analyze(question=question)
+        if route.capability == Capability.TRADING:
+            result = trading_service.analyze(question)
             return DispatchResponse(
                 capability="trading",
-                data={
+                kind="trading_analysis",
+                status="ok",
+                request_id=request_id,
+                payload={
+                    "capability": result.capability,
                     "intent": result.intent,
                     "market": result.market,
                     "asset": result.asset,
@@ -396,11 +399,16 @@ async def dispatch(payload: DispatchRequest, request: Request) -> DispatchRespon
                     "status": result.status,
                 },
             )
-        elif route.capability == Capability.AGENT:
-            result = agent_service.analyze(question=question)
+
+        if route.capability == Capability.AGENT:
+            result = agent_service.analyze(question)
             return DispatchResponse(
                 capability="agent",
-                data={
+                kind="agent_analysis",
+                status="ok",
+                request_id=request_id,
+                payload={
+                    "capability": result.capability,
                     "intent": result.intent,
                     "prompt": result.prompt,
                     "summary": result.summary,
@@ -408,15 +416,65 @@ async def dispatch(payload: DispatchRequest, request: Request) -> DispatchRespon
                     "status": result.status,
                 },
             )
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Capability {route.capability} not supported",
-            )
+
+        result = await rag_service.query(question)
+        response_payload = dict(result)
+        response_payload["request_id"] = response_payload.get("request_id") or request_id
+
+        if session_id and context_service is not None:
+            try:
+                context_service.add_interaction(
+                    InteractionRecord(
+                        timestamp=request_started,
+                        session_id=session_id,
+                        user_id=payload.user_id,
+                        question=question,
+                        answer=str(response_payload.get("answer", "")),
+                        grounded=bool(response_payload.get("grounded", False)),
+                        failure_type=response_payload.get("failure_type"),
+                        sources_count=len(response_payload.get("sources", [])),
+                        latency_ms=int(response_payload.get("latency_ms", 0)),
+                    )
+                )
+            except Exception:
+                logger.warning("Failed to store dispatch context interaction", exc_info=True)
+
+        if interaction_log_service is not None:
+            try:
+                interaction_log_service.log_request(
+                    LoggedRequest(
+                        request_id=str(response_payload["request_id"]),
+                        timestamp=request_started,
+                        route="/api/dispatch",
+                        session_id=session_id or None,
+                        user_id=payload.user_id,
+                        question=question,
+                        answer=str(response_payload.get("answer", "")),
+                        grounded=bool(response_payload.get("grounded", False)),
+                        failure_type=response_payload.get("failure_type"),
+                        latency_ms=int(response_payload.get("latency_ms", 0)),
+                        wall_ms=int(response_payload.get("wall_ms", 0)),
+                        intent=str(response_payload.get("intent", "")),
+                        sources_count=len(response_payload.get("sources", [])),
+                    )
+                )
+            except Exception:
+                logger.warning("Failed to append dispatch interaction log", exc_info=True)
+
+        return DispatchResponse(
+            capability="rag",
+            kind="rag_answer",
+            status="ok",
+            request_id=str(response_payload["request_id"]),
+            payload=response_payload,
+        )
+
     except PipelineNotReadyError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Dispatch failed")
         raise HTTPException(
-            status_code=500, detail="Internal error while processing request"
+            status_code=500, detail="Internal error while dispatching request"
         ) from exc

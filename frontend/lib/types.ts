@@ -34,11 +34,6 @@ export type DispatchRequest = {
   user_id?: string | null;
 };
 
-export type DispatchResponse = {
-  capability: string;
-  data: Record<string, unknown>;
-};
-
 export type QueryResponse = {
   answer: string;
   sources: SourceItem[];
@@ -72,6 +67,14 @@ export type AgentAnalyzeResponse = {
   summary: string;
   suggested_tools: string[];
   status: string;
+};
+
+export type DispatchResponse = {
+  capability: "rag" | "trading" | "agent";
+  kind: "rag_answer" | "trading_analysis" | "agent_analysis" | "error";
+  status: "ok" | "error";
+  request_id: string;
+  payload: Record<string, unknown>;
 };
 
 export type HealthResponse = {

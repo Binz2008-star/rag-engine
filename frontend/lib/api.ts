@@ -8,7 +8,7 @@ import type {
   QueryResponse,
   SystemHealthResponse,
   TradingAnalyzeRequest,
-  TradingAnalyzeResponse
+  TradingAnalyzeResponse,
 } from "./types";
 
 const API_BASE_URL =
