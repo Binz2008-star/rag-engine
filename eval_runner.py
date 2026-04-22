@@ -85,12 +85,36 @@ class TestResult:
 # contains_numbers) live in evaluation/refusal.py so eval_main, metrics,
 # and this runner all share one definition of "refusal".
 
+# Schema aliases — the two evaluator paths (this runner vs evaluation/eval_main.py)
+# historically drifted. `tests/eval_queries.json` was authored against the
+# long-name schema used by eval_main.py, which meant this runner silently
+# ignored contains/exact/failure_type expectations. Normalising at the single
+# ingest point below fixes the CI gate without changing any test file.
+_FIELD_ALIASES: dict[str, str] = {
+    "expected_answer_exact": "expected_exact",
+    "expected_answer_contains": "expected_contains",
+}
+
+
+def _normalize_test(test: dict) -> dict:
+    """Return a copy of `test` with long-name schema fields mapped to the
+    canonical short names consumed by this runner. The original dict is not
+    mutated so upstream callers keep their view."""
+    if not any(alias in test for alias in _FIELD_ALIASES):
+        return test
+    normalized = dict(test)
+    for alias, canonical in _FIELD_ALIASES.items():
+        if alias in normalized and canonical not in normalized:
+            normalized[canonical] = normalized[alias]
+    return normalized
+
 
 def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple[bool, list[str], list[str]]:
     """
     Evaluate ALL criteria in the test case.
     Returns (passed, reasons, buckets).
     """
+    test = _normalize_test(test)
     answer  = (result.answer or "").strip()
     sources = [s["source"] for s in result.sources]
     reasons: list[str] = []
@@ -124,6 +148,28 @@ def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple
         if missing:
             buckets.add("wrong_answer")
             reasons.append(f"missing terms: {missing}")
+
+    # Forbidden content validation (must_not_contain)
+    if "must_not_contain" in test:
+        forbidden_found = [t for t in test["must_not_contain"] if t.lower() in answer.lower()]
+        if forbidden_found:
+            buckets.add("forbidden_content")
+            reasons.append(f"contains forbidden terms: {forbidden_found}")
+
+    # Pipeline failure_type expectation. Mirrors evaluation/eval_main.py so both
+    # evaluator paths enforce the same contract. `None` means "no failure
+    # expected"; any non-None value must match the pipeline-reported type.
+    if "expected_failure_type" in test:
+        expected_ft = test["expected_failure_type"]
+        actual_ft = getattr(result, "failure_type", None)
+        if expected_ft is None and actual_ft is not None:
+            buckets.add("unexpected_failure_type")
+            reasons.append(f"unexpected failure_type: {actual_ft}")
+        elif expected_ft is not None and actual_ft != expected_ft:
+            buckets.add("failure_type_mismatch")
+            reasons.append(
+                f"failure_type mismatch: expected {expected_ft}, got {actual_ft}"
+            )
 
     # Source attribution validation
     if "expected_source" in test:
@@ -408,6 +454,7 @@ def main(query_fn=None) -> int:
     results: list[TestResult] = []
 
     def _build_test_result(idx: int, test: dict) -> tuple[TestResult, str]:
+        test = _normalize_test(test)
         question = test.get("question") or test.get("query", "")
         question = str(question).strip()
         tr = TestResult(
