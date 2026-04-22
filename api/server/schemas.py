@@ -1,75 +1,86 @@
-"""Pydantic request/response schemas for the public API.
-
-Shape is a 1:1 projection of `app.models.PipelineResult` — no field is added
-that the canonical pipeline does not actually measure. `latency_ms` is a
-single number because that is all the pipeline records; adding split
-retrieval/generation timings would require instrumenting evaluated code and
-re-running the strict gate.
-"""
-
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class QueryRequest(BaseModel):
-    """Body for POST /api/query."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    question: str = Field(..., min_length=1, max_length=4000)
+    question: str = Field(..., min_length=1)
+    session_id: str | None = None
+    user_id: str | None = None
 
 
-class Source(BaseModel):
-    """Single retrieved chunk surfaced to the UI."""
+class TradingAnalyzeRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    session_id: str | None = None
+    user_id: str | None = None
 
-    model_config = ConfigDict(extra="ignore")
 
+class AgentAnalyzeRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    session_id: str | None = None
+    user_id: str | None = None
+
+
+class SourceItem(BaseModel):
     source: str
-    chunk_id: str = ""
-    doc_type: str = ""
-    score: float = 0.0
+    chunk_id: str
+    doc_type: str
+    score: float
 
 
 class QueryResponse(BaseModel):
-    """Response for POST /api/query.
-
-    Field parity with `PipelineResult`:
-
-    * ``latency_ms``  — pipeline-measured end-to-end time
-    * ``wall_ms``     — API wall-clock (includes thread hop + serialisation)
-    * ``grounded`` / ``failure_type`` — same contract the eval gate enforces
-    * ``intent_method`` — coarse class (``rules`` / ``v2_model``) matching
-      the eval runner; the raw router label is kept under
-      ``intent_method_raw`` for observability.
-    """
-
     answer: str
-    sources: List[Source] = Field(default_factory=list)
-    latency_ms: int = 0
-    wall_ms: int = 0
-    request_id: str = ""
-    intent: str = ""
-    intent_confidence: float = 0.0
-    intent_method: str = ""
-    intent_method_raw: str = ""
-    grounded: bool = True
-    failure_type: Optional[str] = None
-    model_version: str = ""
-    retriever_version: str = ""
+    sources: list[SourceItem]
+    latency_ms: int
+    wall_ms: int
+    request_id: str
+    intent: str
+    intent_confidence: float
+    intent_method: str
+    intent_method_raw: str
+    grounded: bool
+    failure_type: str | None
+    model_version: str
+    retriever_version: str
+
+
+class TradingAnalyzeResponse(BaseModel):
+    capability: str
+    intent: str
+    market: str | None
+    asset: str | None
+    timeframe: str | None
+    prompt: str
+    status: str
+
+
+class AgentAnalyzeResponse(BaseModel):
+    capability: str
+    intent: str
+    prompt: str
+    summary: str
+    suggested_tools: list[str]
+    status: str
 
 
 class HealthResponse(BaseModel):
-    status: Literal["ok", "starting", "degraded", "error"]
+    status: str
     pipeline_ready: bool
     version: str
     chat_model: str
-    index_count: int = 0
-    detail: Optional[str] = None
+    index_count: int | None = None
+    detail: str | None = None
 
 
 class ErrorResponse(BaseModel):
-    error: str
-    detail: Optional[str] = None
+    error: str | None = None
+    detail: str | list[dict[str, Any]]
+
+
+class SystemHealthResponse(BaseModel):
+    version: str
+    pipeline_ready: bool
+    index_count: int | None = None
+    guardian: dict[str, object]

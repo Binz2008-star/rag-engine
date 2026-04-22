@@ -1,14 +1,3 @@
-"""FastAPI application entrypoint.
-
-Run locally:
-    uvicorn server.main:app --reload --host 0.0.0.0 --port 8000 --app-dir api
-
-The app reuses the existing eval-certified pipeline built by
-`app.pipeline.Pipeline` + `app.inference_service.InferenceService`.
-Startup eagerly constructs the pipeline and loads the FAISS indexes so the
-first request does not pay the cold-start cost.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -23,20 +12,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-
-# Ensure the parent project (where `app.pipeline` lives) is importable
-# regardless of the CWD used to launch uvicorn.
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-
 
 from .api.routes import router as api_router  # noqa: E402
 from .core.config import get_settings  # noqa: E402
 from .core.logging import configure_logging  # noqa: E402
 from .infra.ollama_health import OllamaUnavailableError, check_ollama  # noqa: E402
+from .services.agent_service import AgentService  # noqa: E402
+from .services.capability_router import CapabilityRouter  # noqa: E402
+from .services.context_service import ContextService  # noqa: E402
+from .services.health_guardian import HealthGuardian  # noqa: E402
+from .services.interaction_log_service import InteractionLogService  # noqa: E402
 from .services.rag_service import RagService  # noqa: E402
-
+from .services.trading_service import TradingService  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +44,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings.port,
     )
 
-    # Check Ollama availability before initializing pipeline
+    app.state.context_service = ContextService()
+    app.state.interaction_log_service = InteractionLogService()
+    app.state.capability_router = CapabilityRouter()
+    app.state.health_guardian = HealthGuardian()
+    app.state.trading_service = TradingService()
+    app.state.agent_service = AgentService()
+
     try:
         await check_ollama(
             base_url=settings.ollama_base_url,
@@ -72,7 +68,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await service.startup()
     except Exception:
         logger.exception("Pipeline startup failed - API will report degraded")
-        # Keep the app running so /api/health can report the failure.
 
     try:
         yield
@@ -92,7 +87,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins or ["*"],
+        allow_origins=settings.cors_origins or ["http://localhost:3000", "http://localhost:3001"],
         allow_credentials=True,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
