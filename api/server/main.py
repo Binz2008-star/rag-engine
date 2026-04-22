@@ -30,6 +30,7 @@ from .services.health_guardian import HealthGuardian  # noqa: E402
 from .services.interaction_log_service import InteractionLogService  # noqa: E402
 from .services.rag_service import RagService  # noqa: E402
 from .services.scheduler_service import SchedulerService  # noqa: E402
+from .services.scheduler_worker import SchedulerWorker  # noqa: E402
 from .services.task_store import TaskStore  # noqa: E402
 from .services.trading_service import TradingService  # noqa: E402
 from .services.trading_execution_service import ShellExecutionService  # noqa: E402
@@ -75,29 +76,100 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         exchange_client=app.state.trading_exchange_client,
     )
 
-    try:
-        await check_ollama(
-            base_url=settings.ollama_base_url,
-            required_models=settings.ollama_required_models,
-        )
-        logger.info("Ollama health check passed")
-    except OllamaUnavailableError as exc:
-        logger.error("Ollama health check failed: %s", exc)
-        raise SystemExit(1) from exc
+    app.state.rag_service = None
 
-    service = RagService(index_dir=settings.index_dir)
-    app.state.rag_service = service
+    # Start RAG service in background without blocking server startup
+    async def init_rag_service():
+        try:
+            await check_ollama(
+                base_url=settings.ollama_base_url,
+                required_models=settings.ollama_required_models,
+            )
+            logger.info("Ollama health check passed")
+        except OllamaUnavailableError as exc:
+            logger.error("Ollama health check failed: %s - RAG features will be degraded", exc)
+            return
 
-    try:
-        await service.startup()
-    except Exception:
-        logger.exception("Pipeline startup failed - API will report degraded")
+        try:
+            service = RagService(index_dir=settings.index_dir)
+            app.state.rag_service = service
+            await service.startup()
+            logger.info("RAG service startup completed")
+        except Exception:
+            logger.exception("RAG service startup failed - API will report degraded")
+            app.state.rag_service = None
+
+    # Schedule RAG initialization as background task
+    import asyncio
+    app.state.rag_init_task = asyncio.create_task(init_rag_service())
+
+    # Initialize scheduler worker (but don't start yet)
+    app.state.scheduler_worker = SchedulerWorker(
+        task_store=app.state.task_store,
+        scheduler_service=app.state.scheduler_service,
+        execution_guard=app.state.execution_guard,
+        agent_executor=app.state.agent_executor,
+    )
+
+    # Store scheduler task reference for shutdown
+    app.state.scheduler_task = None
+    app.state.scheduler_startup_task = None
+
+    # Wait for RAG initialization before starting scheduler
+    async def start_scheduler_after_rag():
+        try:
+            # Wait for RAG init to complete (or fail gracefully)
+            await app.state.rag_init_task
+            logger.info("RAG initialization complete, starting scheduler worker")
+        except Exception:
+            logger.warning("RAG initialization failed, starting scheduler worker in degraded mode")
+
+        # Now start the scheduler worker
+        async def run_scheduler_worker():
+            try:
+                await asyncio.to_thread(app.state.scheduler_worker.run_forever)
+            except asyncio.CancelledError:
+                logger.info("Scheduler worker cancelled during shutdown")
+            except Exception:
+                logger.exception("Scheduler worker failed unexpectedly")
+
+        app.state.scheduler_task = asyncio.create_task(run_scheduler_worker())
+
+    app.state.scheduler_startup_task = asyncio.create_task(start_scheduler_after_rag())
 
     try:
         yield
     finally:
-        logger.info("Shutting down RAG service")
-        await service.shutdown()
+        # Shutdown scheduler worker cooperatively
+        logger.info("Shutting down scheduler worker")
+        if app.state.scheduler_worker is not None:
+            app.state.scheduler_worker.stop()
+        if app.state.scheduler_startup_task is not None and not app.state.scheduler_startup_task.done():
+            app.state.scheduler_startup_task.cancel()
+            try:
+                await app.state.scheduler_startup_task
+            except asyncio.CancelledError:
+                pass
+        if app.state.scheduler_task is not None:
+            app.state.scheduler_task.cancel()
+            try:
+                await app.state.scheduler_task
+            except asyncio.CancelledError:
+                pass
+
+        # Shutdown RAG service
+        if app.state.rag_service is not None:
+            logger.info("Shutting down RAG service")
+            await app.state.rag_service.shutdown()
+
+        # Cancel RAG init task if still running
+        if app.state.rag_init_task is not None and not app.state.rag_init_task.done():
+            logger.info("Cancelling RAG initialization task")
+            app.state.rag_init_task.cancel()
+            try:
+                await app.state.rag_init_task
+            except asyncio.CancelledError:
+                pass
 
 
 def create_app() -> FastAPI:
