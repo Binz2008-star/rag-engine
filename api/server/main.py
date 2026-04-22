@@ -101,9 +101,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Schedule RAG initialization as background task
     import asyncio
-    asyncio.create_task(init_rag_service())
+    rag_init_task = asyncio.create_task(init_rag_service())
 
-    # Initialize and start scheduler worker in background
+    # Initialize scheduler worker (but don't start yet)
     app.state.scheduler_worker = SchedulerWorker(
         task_store=app.state.task_store,
         scheduler_service=app.state.scheduler_service,
@@ -111,15 +111,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         agent_executor=app.state.agent_executor,
     )
 
-    async def run_scheduler_worker():
-        try:
-            await asyncio.to_thread(app.state.scheduler_worker.run_forever)
-        except asyncio.CancelledError:
-            logger.info("Scheduler worker cancelled during shutdown")
-        except Exception:
-            logger.exception("Scheduler worker failed unexpectedly")
+    # Store scheduler task reference for shutdown
+    app.state.scheduler_task = None
 
-    scheduler_task = asyncio.create_task(run_scheduler_worker())
+    # Wait for RAG initialization before starting scheduler
+    async def start_scheduler_after_rag():
+        try:
+            # Wait for RAG init to complete (or fail gracefully)
+            await rag_init_task
+            logger.info("RAG initialization complete, starting scheduler worker")
+        except Exception:
+            logger.warning("RAG initialization failed, starting scheduler worker in degraded mode")
+
+        # Now start the scheduler worker
+        async def run_scheduler_worker():
+            try:
+                await asyncio.to_thread(app.state.scheduler_worker.run_forever)
+            except asyncio.CancelledError:
+                logger.info("Scheduler worker cancelled during shutdown")
+            except Exception:
+                logger.exception("Scheduler worker failed unexpectedly")
+
+        app.state.scheduler_task = asyncio.create_task(run_scheduler_worker())
+
+    asyncio.create_task(start_scheduler_after_rag())
 
     try:
         yield
@@ -129,11 +144,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await app.state.rag_service.shutdown()
 
         logger.info("Shutting down scheduler worker")
-        scheduler_task.cancel()
-        try:
-            await scheduler_task
-        except asyncio.CancelledError:
-            pass
+        if app.state.scheduler_task is not None:
+            app.state.scheduler_task.cancel()
+            try:
+                await app.state.scheduler_task
+            except asyncio.CancelledError:
+                pass
 
 
 def create_app() -> FastAPI:
