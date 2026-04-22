@@ -25,7 +25,7 @@
       "based on context"
     ],
     "expected_answer_contains": [
-      "Deliveroo"
+      "Founder"
     ],
     "suite": "baseline_en"
   },
@@ -106,7 +106,7 @@
     "expected_method": "rule",
     "must_be_grounded": true,
     "expected_answer_contains": [
-      "compliance"
+      "Worker protection"
     ],
     "suite": "baseline_en"
   },
