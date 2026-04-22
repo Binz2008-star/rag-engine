@@ -15,6 +15,9 @@ class ExecutionResult:
 
 class AgentExecutor:
     def execute(self, task_id: str, prompt: str) -> ExecutionResult:
+        if prompt.startswith("[FAIL_TEST]"):
+            raise RuntimeError("Controlled execution failure for reliability test")
+
         started_at = time()
         output = f"Execution shell accepted task: {prompt}"
         finished_at = time()

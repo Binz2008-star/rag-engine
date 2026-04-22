@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 import asyncio
 import logging
 import time
@@ -40,7 +41,7 @@ from ..services.health_guardian import HealthGuardian
 from ..services.interaction_log_service import InteractionLogService, LoggedRequest
 from ..services.rag_service import PipelineNotReadyError, RagService
 from ..services.scheduler_service import SchedulerService
-from ..services.task_store import TaskStore
+from ..services.task_store import InvalidStateTransitionError, TaskStore
 from ..services.trading_service import TradingService
 
 logger = logging.getLogger(__name__)
@@ -681,6 +682,10 @@ async def create_agent_task(
         error_message=task.error_message,
         last_run_started_at=task.last_run_started_at,
         last_run_finished_at=task.last_run_finished_at,
+        error_type=task.error_type,
+        retry_count=task.retry_count,
+        run_count=task.run_count,
+        metadata=task.metadata,
     )
 
 
@@ -709,6 +714,10 @@ async def list_agent_tasks(
             error_message=task.error_message,
             last_run_started_at=task.last_run_started_at,
             last_run_finished_at=task.last_run_finished_at,
+            error_type=task.error_type,
+            retry_count=task.retry_count,
+            run_count=task.run_count,
+            metadata=task.metadata,
         )
         for task in tasks
     ]
@@ -732,12 +741,32 @@ async def schedule_agent_task(
 
     task = task_store.get_task(payload.task_id)
     if task is None:
-        raise HTTPException(status_code=400, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found")
 
     try:
         updated = task_store.set_scheduled(payload.task_id)
         if updated is None:
-            raise HTTPException(status_code=400, detail="Task not found")
+            raise HTTPException(status_code=404, detail="Task not found")
+    except InvalidStateTransitionError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "invalid_state_transition",
+                "current_state": exc.current_status,
+                "target_state": exc.target_status,
+                "message": str(exc),
+            },
+        ) from exc
+    except RuntimeError as exc:
+        # Map specific RuntimeError messages to 400
+        msg = str(exc)
+        if msg in ("Task not found", "Task already completed", "Max retries exceeded for task"):
+            raise HTTPException(status_code=400, detail=msg) from exc
+        # Other RuntimeErrors are unexpected
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task scheduling failed: {exc}",
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -770,7 +799,7 @@ async def execute_agent_task(
 
     task = task_store.get_task(payload.task_id)
     if task is None:
-        raise HTTPException(status_code=400, detail="Task not found")
+        raise HTTPException(status_code=404, detail="Task not found")
 
     try:
         result = await asyncio.to_thread(
@@ -778,6 +807,26 @@ async def execute_agent_task(
             task.task_id,
             lambda: agent_executor.execute(task.task_id, task.prompt),
         )
+    except InvalidStateTransitionError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "invalid_state_transition",
+                "current_state": exc.current_status,
+                "target_state": exc.target_status,
+                "message": str(exc),
+            },
+        ) from exc
+    except RuntimeError as exc:
+        # Map specific RuntimeError messages to 400
+        msg = str(exc)
+        if msg in ("Task not found", "Task already completed", "Max retries exceeded for task"):
+            raise HTTPException(status_code=400, detail=msg) from exc
+        # Other RuntimeErrors are unexpected
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task execution failed: {exc}",
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
