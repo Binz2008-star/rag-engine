@@ -27,12 +27,8 @@ class ExecutionGuard:
         if task.retry_count >= MAX_RETRIES:
             raise RuntimeError("Max retries exceeded for task")
 
-        current_state = self._task_store.get_current_state(task_id)
-        if current_state is None:
-            raise RuntimeError("Task not found")
-
         if not self._task_store.can_transition_to(task_id, "running"):
-            raise InvalidStateTransitionError(current_state, "running")
+            raise InvalidStateTransitionError(task.status, "running")
 
         updated = self._task_store.set_running(task_id)
         if updated is None:
@@ -60,8 +56,6 @@ class ExecutionGuard:
             )
             if failed is None:
                 raise ValueError("Task not found") from exc
-
-            self._task_store._persist()
 
             raise
 
