@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.utils import new_query_id
@@ -17,7 +18,11 @@ from generation.llm import LLMClient
 
 
 class QueryRequest(BaseModel):
-    query: str
+    query: str | None = None
+    question: str | None = None
+
+    def resolved_query(self) -> str:
+        return (self.query or self.question or "").strip()
 
 
 def _load_indexes(model_dir: Path) -> dict[str, FaissIndex]:
@@ -32,6 +37,13 @@ def _load_indexes(model_dir: Path) -> dict[str, FaissIndex]:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="RAG Intent System")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000", "http://localhost:3001"],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
     router = IntentRouter.from_active_model()
     embedder = Embedder()
@@ -45,20 +57,13 @@ def create_app() -> FastAPI:
     pipeline = Pipeline(router=router, embedder=embedder, retriever=retriever, llm=llm, reranker=reranker)
     service = InferenceService(pipeline=pipeline)
 
-    @app.get("/health")
-    def health():
-        return {
-            "status": "ok",
-            "router_loaded": True,
-            "indexes_loaded": sorted(indexes.keys()),
-            "model_version": pipeline.model_version,
-            "retriever_version": pipeline.retriever_version,
-        }
+    def _run_query(req: QueryRequest) -> dict:
+        question = req.resolved_query()
+        if not question:
+            raise HTTPException(status_code=422, detail="query or question is required")
 
-    @app.post("/query")
-    def query(req: QueryRequest):
         query_id = new_query_id()
-        result = service.handle_query(req.query, query_id)
+        result = service.handle_query(question, query_id)
         response = {
             "query_id": result.query_id,
             "intent": result.intent,
@@ -79,6 +84,24 @@ def create_app() -> FastAPI:
                 "missing_confidence": result.knowledge_gap.missing_confidence,
             }
         return response
+
+    @app.get("/health")
+    def health():
+        return {
+            "status": "ok",
+            "router_loaded": True,
+            "indexes_loaded": sorted(indexes.keys()),
+            "model_version": pipeline.model_version,
+            "retriever_version": pipeline.retriever_version,
+        }
+
+    @app.post("/query")
+    def query(req: QueryRequest):
+        return _run_query(req)
+
+    @app.post("/api/query")
+    def compat_query(req: QueryRequest):
+        return _run_query(req)
 
     return app
 
