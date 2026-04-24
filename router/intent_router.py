@@ -184,7 +184,7 @@ class IntentRouter:
         # Non-rule queries always return general/0.5/rule publicly
         return Route(intent="general", confidence=0.5, intent_method="rule")
 
-    def route_with_shadow(self, query: str) -> tuple[Route, ShadowDecision | None]:
+    def _route_with_shadow(self, query: str) -> tuple[Route, ShadowDecision | None]:
         """Route query and return both public route and shadow decision.
 
         This method is for internal evaluation only and does not affect

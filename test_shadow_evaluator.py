@@ -202,6 +202,56 @@ def test_no_dependency_on_model_artifacts():
     assert isinstance(report, ShadowEvalReport)
 
 
+def test_load_train_jsonl_label_field():
+    """Test that loader handles 'label' field from train.jsonl."""
+    evaluator = ShadowEvaluator(IntentRouter())
+
+    # Create temp JSONL file with 'label' field (train.jsonl format)
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+        temp_path = Path(f.name)
+        f.write('{"query": "What is GDP?", "label": "general"}\n')
+        f.write('{"query": "ECO services", "label": "eco"}\n')
+
+    try:
+        rows = evaluator.load_train_jsonl(temp_path)
+        assert len(rows) == 2
+        assert rows[0]["query"] == "What is GDP?"
+        assert rows[0]["expected_intent"] == "general"
+        assert rows[1]["query"] == "ECO services"
+        assert rows[1]["expected_intent"] == "eco"
+    finally:
+        temp_path.unlink()
+
+
+def test_load_train_jsonl_intent_field():
+    """Test that loader handles 'intent' field (intent_dataset.jsonl format)."""
+    evaluator = ShadowEvaluator(IntentRouter())
+
+    # Create temp JSONL file with 'intent' field (intent_dataset.jsonl format)
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+        temp_path = Path(f.name)
+        f.write('{"query": "What is GDP?", "intent": "general"}\n')
+        f.write('{"query": "ECO services", "intent": "eco"}\n')
+
+    try:
+        rows = evaluator.load_train_jsonl(temp_path)
+        assert len(rows) == 2
+        assert rows[0]["query"] == "What is GDP?"
+        assert rows[0]["expected_intent"] == "general"
+        assert rows[1]["query"] == "ECO services"
+        assert rows[1]["expected_intent"] == "eco"
+    finally:
+        temp_path.unlink()
+
+
+def test_private_route_with_shadow():
+    """Test that route_with_shadow is private (starts with underscore)."""
+    router = IntentRouter()
+    assert hasattr(router, "_route_with_shadow")
+    # Should not have public version
+    assert not hasattr(router, "route_with_shadow")
+
+
 if __name__ == "__main__":
     # Run tests
     test_load_train_jsonl()
@@ -236,5 +286,15 @@ if __name__ == "__main__":
 
     test_no_dependency_on_model_artifacts()
     print("✓ test_no_dependency_on_model_artifacts")
+
+    test_load_train_jsonl_label_field()
+    print("✓ test_load_train_jsonl_label_field")
+
+    test_load_train_jsonl_intent_field()
+    print("✓ test_load_train_jsonl_intent_field")
+
+    test_private_route_with_shadow()
+    print("✓ test_private_route_with_shadow")
+
 
     print("\nAll B2 dataset-driven shadow evaluator tests passed!")

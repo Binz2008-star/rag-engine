@@ -58,16 +58,18 @@ class ShadowEvaluator:
             path: Path to train.jsonl file
 
         Returns:
-            List of dicts with 'query' and 'intent' keys
+            List of dicts with 'query' and 'expected_intent' keys
         """
         rows = []
         with open(path, encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     row = json.loads(line)
+                    # Handle both 'label' (train.jsonl) and 'intent' (intent_dataset.jsonl) fields
+                    intent = row.get("label", row.get("intent", "general"))
                     rows.append({
                         "query": row["query"],
-                        "expected_intent": row["intent"],
+                        "expected_intent": intent,
                     })
         return rows
 
@@ -165,7 +167,7 @@ class ShadowEvaluator:
             evaluated_rows += 1
 
             # Run query through router with shadow decision
-            public_route, shadow_decision = self.router.route_with_shadow(query)
+            public_route, shadow_decision = self.router._route_with_shadow(query)
 
             # Extract shadow decision details
             if shadow_decision:
