@@ -87,9 +87,11 @@
     "query": "What is the contact information for ECO?",
     "expected_intent": "eco",
     "expected_method": "rule",
-    "expected_refusal": true,
-    "expected_failure_type": "retrieval_miss",
-    "suite": "baseline_en"
+    "suite": "baseline_en",
+    "expected_contains": [
+      "+971 52 223 3989",
+      "robinedwan@gmail.com"
+    ]
   },
   {
     "query": "What is NAFFCO?",
@@ -408,5 +410,15 @@
     "expected_refusal": true,
     "expected_failure_type": "retrieval_miss",
     "suite": "corpus_boundary"
+  },
+  {
+    "query": "Who operates ECO?",
+    "expected_intent": "eco",
+    "expected_method": "rule",
+    "expected_contains": [
+      "Founder",
+      "General Manager"
+    ],
+    "suite": "baseline_en"
   }
 ]

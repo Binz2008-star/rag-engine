@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.config import BATCH_SIZE, CHUNK_OVERLAP, CHUNK_SIZE, DATA_DIR
 from app.models import Chunk
