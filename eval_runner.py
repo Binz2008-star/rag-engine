@@ -389,8 +389,6 @@ def main(query_fn=None) -> int:
             result = service.handle_query(question, query_id=f"eval_{int(time.time()*1000)}")
             # Convert to expected format
             sources = [{"source": h.source} for h in result.retrieval]
-            # Determine intent method based on confidence
-            intent_method = "rules" if result.confidence >= 0.85 else "v2_model"
 
             return QueryResult(
                 answer=result.answer,
@@ -398,7 +396,7 @@ def main(query_fn=None) -> int:
                 request_id=result.query_id,
                 intent=result.intent,
                 intent_confidence=result.confidence,
-                intent_method=intent_method,
+                intent_method=result.intent_method,
                 failure_type=result.failure_type,
                 grounded=result.grounded,
             )
