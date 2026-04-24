@@ -172,3 +172,8 @@ web/
 
 # Local test files
 test_*.json
+
+# Model artifacts
+models/faiss.index
+models/data_hash.txt
+*.index
