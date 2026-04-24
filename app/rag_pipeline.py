@@ -7,6 +7,8 @@ import re
 import time
 
 import requests
+from langdetect import detect
+from langdetect.lang_detect_exception import LangDetectException
 
 from app.config import (
     CHAT_MODEL,
@@ -69,6 +71,49 @@ def _is_absent_fact_query(query: str) -> bool:
     """Return True if the query targets facts structurally absent from this corpus
     (financial data, stock info, salaries) that models typically confabulate."""
     return any(p.search(query) for p in _ABSENT_FACT_PATTERNS)
+
+
+def _normalize_query_language(query: str) -> str:
+    """Translate non-English queries to English before retrieval and generation."""
+    try:
+        lang = detect(query)
+    except LangDetectException:
+        return query
+
+    if lang == "en":
+        return query
+
+    # Use LLM to translate non-English queries to English
+    translation_prompt = (
+        f"Translate the following query to English. "
+        f"Return only the translated text, nothing else.\n\nQuery: {query}"
+    )
+
+    try:
+        response = requests.post(
+            f"{OLLAMA_BASE_URL}/chat",
+            json={
+                "model": CHAT_MODEL,
+                "stream": False,
+                "messages": [{"role": "user", "content": translation_prompt}],
+                "options": {
+                    "temperature": 0.0,
+                    "top_p": 0.9,
+                    "num_predict": 100,
+                },
+            },
+            timeout=TIMEOUT,
+        )
+        response.raise_for_status()
+        data = response.json()
+        translated = data.get("message", {}).get("content", "").strip()
+        if translated:
+            logger.info(f"Translated query from {lang} to English: {query} -> {translated}")
+            return translated
+    except Exception as e:
+        logger.warning(f"Translation failed for query '{query}': {e}, using original")
+
+    return query
 
 
 def normalize_expected_terms(answer: str, query: str) -> str:
@@ -359,19 +404,23 @@ class RagPipeline:
             logger.info("Pipeline not initialized; building/loading index lazily")
             self.build_index()
 
+        # Normalize query language for multilingual support
+        normalized_question = _normalize_query_language(question)
+
         t0 = time.perf_counter()
 
-        retrieved = self.retriever.retrieve(question, self.vector_store)
+        retrieved = self.retriever.retrieve(normalized_question, self.vector_store)
         t1 = time.perf_counter()
 
         # Apply intent-aware priority AFTER retrieval but BEFORE final selection
-        retrieved = self.enforce_intent_priority(question, retrieved)
+        retrieved = self.enforce_intent_priority(normalized_question, retrieved)
 
         # Enforce top-K limit to prevent contamination
         TOP_K = 3
         retrieved = retrieved[:TOP_K]
 
         logger.info("Query: %s", question)
+        logger.info("Normalized: %s", normalized_question)
         logger.info("Retrieved %d chunks in %.3fs (top-K limited to %d)", len(retrieved), t1 - t0, TOP_K)
 
         for rank, rc in enumerate(retrieved, start=1):
@@ -395,7 +444,7 @@ class RagPipeline:
                 intent_method=self.retriever.last_intent_method,
             )
 
-        prompt = build_prompt(question, retrieved)
+        prompt = build_prompt(normalized_question, retrieved)
         logger.info("Prompt length: %d chars", len(prompt))
 
         try:

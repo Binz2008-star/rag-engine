@@ -112,3 +112,9 @@
 {"query": "What are your limitations?", "label": "general", "label_source": "manual_expansion", "reviewed": true}
 {"query": "How do you handle unfamiliar questions?", "label": "general", "label_source": "manual_expansion", "reviewed": true}
 {"query": "What information do you need to answer questions?", "label": "general", "label_source": "manual_expansion", "reviewed": true}
+{"query": "What are Robin's skills", "label": "cv", "label_source": "existing_labeled_seed", "reviewed": true}
+{"query": "Tell me about Robin's experience", "label": "cv", "label_source": "existing_labeled_seed", "reviewed": true}
+{"query": "What is Eco", "label": "eco", "label_source": "existing_labeled_seed", "reviewed": true}
+{"query": "Tell me about Eco company", "label": "eco", "label_source": "existing_labeled_seed", "reviewed": true}
+{"query": "Hello", "label": "general", "label_source": "existing_labeled_seed", "reviewed": true}
+{"query": "What can you help with", "label": "general", "label_source": "existing_labeled_seed", "reviewed": true}
