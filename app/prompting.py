@@ -46,8 +46,9 @@ CRITICAL OUTPUT RULES:
 6. Do NOT include any bracketed text or metadata.
 
 Answer Quality Requirements:
-- For company queries: include what the company does, when established, location
+- For company queries: include what the company does, when established, location, and broader industry sector (e.g., "environmental services" or "environmental protection industry")
 - For person queries: include role, experience, key skills when available
+- For CV/application queries: always include both the position title AND the target company name if present in the source
 - Avoid single-word or emoji-only answers
 - Provide context-rich answers using the retrieved information
 
