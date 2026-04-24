@@ -159,3 +159,16 @@ truth_table_post_fix.md
 
 # Optional local eval scratch
 # tests/eval_queries.json - removed for CI compatibility
+
+# Frontend build artifacts
+frontend/
+frontend_corrupted/
+assistant_frontend_clean/
+web/
+
+# IDE configs
+.claude/
+.codex/
+
+# Local test files
+test_*.json
