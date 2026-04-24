@@ -73,7 +73,7 @@ class IntentRouter:
             threshold=meta.get("threshold", ROUTER_CONFIDENCE_THRESHOLD),
         )
 
-    def _run_shadow_classification(self, query: str, eco_hint: bool, cv_hint: bool) -> ShadowDecision | None:
+    def _run_shadow_classification(self, query: str, eco_hint: bool, cv_hint: bool) -> ShadowDecision:
         """Run shadow classification with decision priority logic (internal-only)."""
         # Priority 1: conflicting hints
         if eco_hint and cv_hint:
@@ -183,3 +183,38 @@ class IntentRouter:
 
         # Non-rule queries always return general/0.5/rule publicly
         return Route(intent="general", confidence=0.5, intent_method="rule")
+
+    def route_with_shadow(self, query: str) -> tuple[Route, ShadowDecision | None]:
+        """Route query and return both public route and shadow decision.
+
+        This method is for internal evaluation only and does not affect
+        the public route contract.
+
+        Args:
+            query: Query string
+
+        Returns:
+            Tuple of (public Route, shadow ShadowDecision or None)
+        """
+        eco_hint, cv_hint = extract_hints(query)
+
+        # Hard-rule routes bypass model execution entirely
+        q = query.lower()
+        if "roben" in q or "roben's" in q:
+            route = Route(intent="cv", confidence=1.0, intent_method="rule")
+            return route, None
+
+        if eco_hint and not cv_hint:
+            route = Route(intent="eco", confidence=1.0, intent_method="rule")
+            return route, None
+
+        if cv_hint and not eco_hint:
+            route = Route(intent="cv", confidence=1.0, intent_method="rule")
+            return route, None
+
+        # Run shadow classification
+        shadow_decision = self._run_shadow_classification(query, eco_hint=eco_hint, cv_hint=cv_hint)
+
+        # Non-rule queries always return general/0.5/rule publicly
+        route = Route(intent="general", confidence=0.5, intent_method="rule")
+        return route, shadow_decision
