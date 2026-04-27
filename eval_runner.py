@@ -103,8 +103,8 @@ def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple
             reasons.append(f"expected refusal, got {answer!r}")
 
     # Refusal response validation with semantic matching
-    if "expected_exact" in test:
-        exp = test["expected_exact"]
+    if "expected_answer_exact" in test:
+        exp = test["expected_answer_exact"]
         if exp == REFUSAL_MESSAGE:
             if not is_insufficient_response(answer):
                 buckets.add("refusal_failure")
@@ -114,7 +114,7 @@ def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple
             reasons.append(f"expected exact {exp!r}, got {answer!r}")
 
     # Hallucination detection for refusal responses
-    if "expected_exact" in test and test["expected_exact"] == REFUSAL_MESSAGE:
+    if "expected_answer_exact" in test and test["expected_answer_exact"] == REFUSAL_MESSAGE:
         if is_insufficient_response(answer) and contains_numbers(answer):
             buckets.add("hallucination_risk")
             reasons.append("refusal response contains numbers (hallucination risk)")
@@ -124,6 +124,12 @@ def check_result(result, test: dict, elapsed: float, mode: str = "dev") -> tuple
         if missing:
             buckets.add("wrong_answer")
             reasons.append(f"missing terms: {missing}")
+
+    if "expected_answer_contains" in test:
+        missing = [t for t in test["expected_answer_contains"] if t.lower() not in answer.lower()]
+        if missing:
+            buckets.add("wrong_answer")
+            reasons.append(f"missing answer terms: {missing}")
 
     # Source attribution validation
     if "expected_source" in test:
@@ -257,9 +263,12 @@ def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
     sla_pass = (avg_elapsed * 1000) <= latency_sla_ms
 
     # ── Canonical metrics (required by eval_gate) ─────────────────────────────
-    # Hallucination rate: pipeline-reported failure_type == "hallucination"
-    hallucinations = sum(1 for r in results if r.failure_type == "hallucination")
-    hallucination_rate = round(hallucinations / total, 3) if total else 0.0
+    # Grounding failure rate: pipeline-reported failure_type in grounding category
+    grounding_failures = sum(
+        1 for r in results
+        if r.failure_type in {"grounding_reject", "speculative_reject"}
+    )
+    grounding_failure_rate = round(grounding_failures / total, 3) if total else 0.0
 
     # Domain accuracy: correct intent routing for eco/cv (rule-routed queries)
     domain_rows = [r for r in results if r.expected_intent in {"eco", "cv"} and not r.error]
@@ -289,7 +298,7 @@ def compute_metrics(results: list[TestResult], mode: str = "dev") -> dict:
         "top1_source_accuracy": round(top1_hits / len(top1_tests), 3) if top1_tests else None,
         "source_precision": round(precision_hits / len(precision_tests), 3) if precision_tests else None,
         "refusal_accuracy":   canonical_refusal_accuracy,
-        "hallucination_rate": hallucination_rate,
+        "grounding_failure_rate": grounding_failure_rate,
         "domain_accuracy":    domain_accuracy,
         "ocr_presence_check": True,
         "failure_buckets":    bucket_counts,
@@ -545,7 +554,7 @@ def main(query_fn=None) -> int:
         failed_checks = gate_result["failed_checks"]
 
         if args.mode == "strict":
-            print(f"  Hallucination rate: {metrics['hallucination_rate']*100:.1f}%")
+            print(f"  Grounding failure rate: {metrics['grounding_failure_rate']*100:.1f}%")
             print(f"  Domain accuracy:    {metrics['domain_accuracy']*100:.1f}%")
             print(f"  OCR presence check: {metrics['ocr_presence_check']}")
             print(f"  Gate decision:      {decision}")

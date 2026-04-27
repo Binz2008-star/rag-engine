@@ -34,7 +34,7 @@ def run_training_cycle(build_pipeline: Callable[[Path], object]) -> str:
     model_path = train_intent_model(out_train, f"{version}.joblib")
 
     pipeline = build_pipeline(model_path)
-    eval_result = run_eval(pipeline, BASE_DIR / "data" / "eval_queries.json")
+    eval_result = run_eval(pipeline, BASE_DIR / "tests" / "eval_queries.json")
     metrics = eval_result["metrics"]
 
     gate_result = gate(metrics)

@@ -4,7 +4,7 @@ import json
 import time
 
 from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE
-from app.models import KnowledgeGap, PipelineResult
+from app.models import FailureType, KnowledgeGap, PipelineResult
 from app.query_normalizer import is_arabic
 from app.utils import stable_hash
 from router.features import normalize_query
@@ -70,6 +70,49 @@ class Pipeline:
             sample_ids.extend(c.chunk_id for c in idx.chunks[:100])
         self.retriever_version = f"{getattr(retriever, 'version', 'unknown')}_{stable_hash(sample_ids)[:8]}"
 
+    def _shape_context(self, hits: list, intent: str) -> list:
+        """
+        Shape and optimize context before generation.
+
+        Strategies:
+        1. Diversify sources (avoid clustering on same document)
+        2. Boost CV-specific chunks for cv intent
+        3. Reorder by relevance score
+        4. Truncate to max context size
+        """
+        if not hits:
+            return hits
+
+        # Group by source to diversify
+        source_seen = set()
+        diversified = []
+        others = []
+
+        for hit in hits:
+            if hit.source not in source_seen:
+                diversified.append(hit)
+                source_seen.add(hit.source)
+            else:
+                others.append(hit)
+
+        # Append remaining hits
+        shaped = diversified + others
+
+        # Intent-specific boosting
+        if intent == "cv":
+            # Boost CV-specific sources
+            shaped.sort(key=lambda h: (
+                0 if "cv" in h.doc_type.lower() or "roben" in h.source.lower() else 1,
+                -h.score
+            ))
+        else:
+            # Sort by score
+            shaped.sort(key=lambda h: -h.score)
+
+        # Limit to top-k for context window
+        max_context_hits = 5
+        return shaped[:max_context_hits]
+
     def _analyze_gap(self, query: str, intent: str, normalized_query: str) -> KnowledgeGap:
         """Run LLM gap analysis and enrich with deterministic corpus coverage."""
         gap = self.knowledge_gap_analyzer.analyze(query, intent, normalized_query)
@@ -95,7 +138,7 @@ class Pipeline:
                 retrieval=[],
                 answer=REFUSAL_MESSAGE,
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.ROUTING_MISS,
                 knowledge_gap=None,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
@@ -118,7 +161,7 @@ class Pipeline:
                 retrieval=[],
                 answer=REFUSAL_MESSAGE,
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.SENSITIVE_REJECT,
                 knowledge_gap=None,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
@@ -140,7 +183,7 @@ class Pipeline:
                 retrieval=[],
                 answer="Insufficient data.",
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.RETRIEVAL_EMPTY,
                 knowledge_gap=knowledge_gap,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
@@ -163,7 +206,7 @@ class Pipeline:
                 retrieval=hits,
                 answer="Insufficient data.",
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.RETRIEVAL_LOW_SCORE,
                 knowledge_gap=knowledge_gap,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
@@ -188,7 +231,7 @@ class Pipeline:
                     retrieval=hits,
                     answer=REFUSAL_MESSAGE,
                     grounded=True,
-                    failure_type="translation_failure",
+                    failure_type=FailureType.TRANSLATION_FAILURE,
                     knowledge_gap=None,
                     latency_ms=elapsed_ms,
                     model_version=self.model_version,
@@ -210,14 +253,17 @@ class Pipeline:
                 retrieval=hits,
                 answer="Insufficient data.",
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.TERM_OVERLAP_MISS,
                 knowledge_gap=None,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
                 retriever_version=self.retriever_version,
             )
 
-        answer = self.llm.generate(generation_query, hits)
+        # Context shaping: optimize retrieval hits before generation
+        shaped_hits = self._shape_context(hits, route.intent)
+
+        answer = self.llm.generate(generation_query, shaped_hits)
         normalized_answer = answer.strip().lower()
 
         speculative_prefixes = (
@@ -233,12 +279,12 @@ class Pipeline:
         if normalized_answer.startswith(speculative_prefixes):
             answer = "Insufficient data."
             grounded = True
-            failure_type = "retrieval_miss"
+            failure_type = FailureType.SPECULATIVE_REJECT
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
         elif normalized_answer.startswith("insufficient data"):
             answer = "Insufficient data."
             grounded = True
-            failure_type = "retrieval_miss"
+            failure_type = FailureType.GROUNDING_REJECT
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
         else:
             # Authoritative grounding: same logic as evaluator (sentence-level
@@ -249,7 +295,7 @@ class Pipeline:
             if not grounded:
                 answer = "Insufficient data."
                 grounded = True
-                failure_type = "retrieval_miss"
+                failure_type = FailureType.GROUNDING_REJECT
                 knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
             else:
                 failure_type = None

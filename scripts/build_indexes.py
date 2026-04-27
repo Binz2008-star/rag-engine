@@ -94,6 +94,41 @@ def load_text(path: Path, ocr_tracking: dict) -> str:
 
             document = Document(str(path))
             return "\n".join(paragraph.text for paragraph in document.paragraphs)
+        if suffix == ".pptx":
+            from pptx import Presentation
+
+            prs = Presentation(str(path))
+            text_parts = []
+            for slide_num, slide in enumerate(prs.slides, 1):
+                slide_text = [f"\n[Slide {slide_num}]"]
+
+                # Extract title (usually first text frame with title placeholder)
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text.strip():
+                        if hasattr(shape, "placeholder_format") and shape.placeholder_format.type == 1:  # Title placeholder
+                            slide_text.append(f"Title: {shape.text.strip()}")
+                            break
+
+                # Extract bullet points and body text
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text.strip():
+                        # Skip if it was already captured as title
+                        if slide_text and slide_text[-1].startswith("Title:") and shape.text.strip() == slide_text[-1][7:].strip():
+                            continue
+
+                        # Check if it's a text frame with paragraphs (bullets)
+                        if hasattr(shape, "text_frame"):
+                            for para in shape.text_frame.paragraphs:
+                                if para.text.strip():
+                                    bullet_marker = "• " if para.level > 0 else ""
+                                    slide_text.append(f"{bullet_marker}{para.text.strip()}")
+                        else:
+                            # Regular text shape
+                            slide_text.append(shape.text.strip())
+
+                text_parts.append("\n".join(slide_text))
+
+            return "\n".join(text_parts)
         return ""
     except Exception as e:
         print(f"Warning: Failed to load {path}: {e}")
@@ -110,7 +145,7 @@ def build_grouped_chunks(debug: bool) -> tuple[dict[str, list[Chunk]], dict[str,
     }
 
     for path in sorted(DATA_DIR.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in {".txt", ".md", ".pdf", ".docx", ".py"}:
+        if not path.is_file() or path.suffix.lower() not in {".txt", ".md", ".pdf", ".docx", ".pptx", ".py"}:
             continue
         doc_type = classify_doc(path)
         try:

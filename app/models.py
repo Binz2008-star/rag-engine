@@ -2,7 +2,51 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from typing import Any, Optional
+
+
+class FailureType(str, Enum):
+    """Explicit failure type taxonomy for better debugging and monitoring.
+
+    NOTE: INJECTION_REJECT is reserved for future use. There is currently
+    no active injection detection gate in the pipeline. Prompt injection
+    is handled via system prompt isolation, not a separate failure type.
+    """
+    ROUTING_MISS = "routing_miss"
+    RETRIEVAL_EMPTY = "retrieval_empty"
+    RETRIEVAL_LOW_SCORE = "retrieval_low_score"
+    TERM_OVERLAP_MISS = "term_overlap_miss"
+    GROUNDING_REJECT = "grounding_reject"
+    SPECULATIVE_REJECT = "speculative_reject"
+    INJECTION_REJECT = "injection_reject"  # RESERVED: No active gate, future use only
+    SENSITIVE_REJECT = "sensitive_reject"
+    TRANSLATION_FAILURE = "translation_failure"
+
+
+def normalize_legacy_failure_type(failure_type: str | None) -> str | None:
+    """Normalize legacy failure_type labels to current taxonomy.
+
+    Maps retired labels to their modern equivalents for backward compatibility
+    with historical event data.
+
+    Args:
+        failure_type: Legacy failure_type string from historical events.
+
+    Returns:
+        Normalized failure_type string matching current FailureType enum,
+        or None if input is None.
+    """
+    if failure_type is None:
+        return None
+
+    # Legacy label mappings
+    legacy_map = {
+        "retrieval_miss": "retrieval_empty",  # Most common legacy case
+        "hallucination": "grounding_reject",    # Ungrounded answers
+    }
+
+    return legacy_map.get(failure_type, failure_type)
 
 
 @dataclass
@@ -80,7 +124,7 @@ class PipelineResult:
     retrieval: list[RetrievalHit] = field(default_factory=list)
     answer: str = ""
     grounded: bool = False
-    failure_type: str | None = None
+    failure_type: FailureType | None = None
     knowledge_gap: KnowledgeGap | None = None
     latency_ms: int = 0
     model_version: str = ""

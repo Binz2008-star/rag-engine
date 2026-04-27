@@ -25,17 +25,47 @@ def extract_text_with_ocr_fallback(pdf_path: Path, min_chars: int = 200) -> tupl
 
     try:
         import pytesseract
-        from PIL import Image
+        from PIL import Image, ImageOps
 
         ocr_text_parts: list[str] = []
 
         for page in document:
-            matrix = fitz.Matrix(3, 3)
+            # Try multiple OCR strategies
+            page_texts = []
+
+            # Strategy 1: 300 DPI, psm6
+            matrix = fitz.Matrix(300/72, 300/72)
             pix = page.get_pixmap(matrix=matrix)
             img_bytes = pix.tobytes("png")
             img = Image.open(io.BytesIO(img_bytes))
-            page_text = pytesseract.image_to_string(img, lang="eng", config="--psm 6")
-            ocr_text_parts.append(page_text)
+            img = ImageOps.grayscale(img)
+            img = ImageOps.autocontrast(img)
+            page_text = pytesseract.image_to_string(img, config='--psm 6 -c preserve_interword_spaces=1')
+            page_texts.append(("300dpi_psm6", page_text))
+
+            # Strategy 2: 400 DPI, psm6
+            matrix = fitz.Matrix(400/72, 400/72)
+            pix = page.get_pixmap(matrix=matrix)
+            img_bytes = pix.tobytes("png")
+            img = Image.open(io.BytesIO(img_bytes))
+            img = ImageOps.grayscale(img)
+            img = ImageOps.autocontrast(img)
+            page_text = pytesseract.image_to_string(img, config='--psm 6 -c preserve_interword_spaces=1')
+            page_texts.append(("400dpi_psm6", page_text))
+
+            # Strategy 3: 400 DPI, psm11 (sparse text)
+            matrix = fitz.Matrix(400/72, 400/72)
+            pix = page.get_pixmap(matrix=matrix)
+            img_bytes = pix.tobytes("png")
+            img = Image.open(io.BytesIO(img_bytes))
+            img = ImageOps.grayscale(img)
+            img = ImageOps.autocontrast(img)
+            page_text = pytesseract.image_to_string(img, config='--psm 11 -c preserve_interword_spaces=1')
+            page_texts.append(("400dpi_psm11", page_text))
+
+            # Select best result (longest non-empty text)
+            best_strategy, best_text = max(page_texts, key=lambda x: len(x[1].strip()))
+            ocr_text_parts.append(best_text)
 
         document.close()
         ocr_text = "\n".join(ocr_text_parts).strip()

@@ -27,6 +27,8 @@ class InferenceService:
             "intent": result.intent,
             "confidence": result.confidence,
             "intent_method": result.intent_method,
+            "routing_decision": result.intent,
+            "intent_confidence": result.confidence,
         })
 
         emit_event({
@@ -37,6 +39,8 @@ class InferenceService:
             "intent": result.intent,
             "confidence": result.confidence,
             "intent_method": result.intent_method,
+            "top_k_used": len(result.retrieval),
+            "context_size_chars": sum(len(h.text) for h in result.retrieval),
             "retrieval": [
                 {
                     "doc_id": h.chunk_id,
@@ -57,6 +61,8 @@ class InferenceService:
             "intent": result.intent,
             "confidence": result.confidence,
             "intent_method": result.intent_method,
+            "top_k_used": len(result.retrieval),
+            "context_size_chars": sum(len(h.text) for h in result.retrieval),
             "retrieval": [
                 {
                     "doc_id": h.chunk_id,
@@ -81,6 +87,8 @@ class InferenceService:
                 "intent": result.intent,
                 "confidence": result.confidence,
                 "intent_method": result.intent_method,
+                "top_k_used": len(result.retrieval),
+                "context_size_chars": sum(len(h.text) for h in result.retrieval),
                 "retrieval": [
                     {
                         "doc_id": h.chunk_id,
@@ -104,5 +112,36 @@ class InferenceService:
                     "missing_confidence": result.knowledge_gap.missing_confidence,
                 }
             emit_event(failure_event)
+            emit_event({
+                "event_type": "query_failed",
+                "query_id": result.query_id,
+                "query": result.query,
+                "normalized_query": result.normalized_query,
+                "intent": result.intent,
+                "confidence": result.confidence,
+                "intent_method": result.intent_method,
+                "routing_decision": result.intent,
+                "intent_confidence": result.confidence,
+                "top_k_used": len(result.retrieval),
+                "context_size_chars": sum(len(h.text) for h in result.retrieval),
+                "failure_type": result.failure_type,
+            })
+        else:
+            emit_event({
+                "event_type": "query_completed",
+                "query_id": result.query_id,
+                "query": result.query,
+                "normalized_query": result.normalized_query,
+                "intent": result.intent,
+                "confidence": result.confidence,
+                "intent_method": result.intent_method,
+                "routing_decision": result.intent,
+                "intent_confidence": result.confidence,
+                "top_k_used": len(result.retrieval),
+                "context_size_chars": sum(len(h.text) for h in result.retrieval),
+                "latency_ms": result.latency_ms,
+                "model_version": result.model_version,
+                "retriever_version": result.retriever_version,
+            })
 
         return result

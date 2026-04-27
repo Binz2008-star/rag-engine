@@ -102,7 +102,7 @@ def analyze_logs(logs: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def classify_failures(logs: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
-    """Classify failures into categories."""
+    """Classify failures into categories aligned with evaluator taxonomy."""
     if not logs:
         return {}
 
@@ -113,16 +113,21 @@ def classify_failures(logs: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, An
         answer = log.get("answer", "").strip()
         sources = log.get("sources", [])
         is_refusal = log.get("is_refusal", False)
+        failure_type = log.get("failure_type", None)
 
-        # Classification
-        if is_refusal:
-            failures["refusals"].append(log)
+        # Classification aligned with evaluator taxonomy
+        if failure_type:
+            # Use the canonical failure_type from the system
+            failure_key = str(failure_type)
+            failures[failure_key].append(log)
+        elif is_refusal:
+            failures["refusal_failure"].append(log)
         elif not sources:
-            failures["no_sources"].append(log)
+            failures["retrieval_miss"].append(log)
         elif len(answer) < 50:
-            failures["short_answers"].append(log)
+            failures["short_answer"].append(log)
         elif len(answer) > 1000:
-            failures["long_answers"].append(log)
+            failures["long_answer"].append(log)
         else:
             failures["successful"].append(log)
 

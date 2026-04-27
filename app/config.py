@@ -64,8 +64,8 @@ THRESHOLDS_BY_INTENT = {
 TOP_K = 5
 CHUNK_SIZE = 700
 CHUNK_OVERLAP = 120
-BATCH_SIZE = 32
-SUPPORTED_EXTENSIONS = {".docx", ".html", ".md", ".pdf", ".txt"}
+BATCH_SIZE = 8
+SUPPORTED_EXTENSIONS = {".docx", ".html", ".md", ".pdf", ".pptx", ".txt"}
 RERANK_ENABLED = os.getenv("RERANK_ENABLED", "true").lower() == "true"
 RERANK_SEMANTIC_WEIGHT = get_float_env("RERANK_SEMANTIC_WEIGHT", 0.6)
 RERANK_LEXICAL_WEIGHT = get_float_env("RERANK_LEXICAL_WEIGHT", 0.25)

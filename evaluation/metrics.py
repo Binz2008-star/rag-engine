@@ -21,8 +21,28 @@ def compute_metrics(results: list[dict], ocr_presence_check: bool = False) -> di
     """
     total = len(results)
     passed = sum(1 for row in results if row.get("passed") is True)
-    hallucinations = sum(1 for row in results if row.get("failure_type") == "hallucination")
-    retrieval_misses = sum(1 for row in results if row.get("failure_type") == "retrieval_miss")
+
+    # Rollup failure types into categories
+    retrieval_failures = sum(
+        1 for row in results
+        if row.get("failure_type") in {"retrieval_empty", "retrieval_low_score", "term_overlap_miss"}
+    )
+    grounding_failures = sum(
+        1 for row in results
+        if row.get("failure_type") in {"grounding_reject", "speculative_reject"}
+    )
+    safety_failures = sum(
+        1 for row in results
+        if row.get("failure_type") in {"sensitive_reject", "injection_reject"}
+    )
+    routing_failures = sum(
+        1 for row in results
+        if row.get("failure_type") == "routing_miss"
+    )
+    translation_failures = sum(
+        1 for row in results
+        if row.get("failure_type") == "translation_failure"
+    )
 
     refusal_rows = [row for row in results if row.get("expected_refusal") is True]
     refusal_correct = sum(
@@ -48,8 +68,11 @@ def compute_metrics(results: list[dict], ocr_presence_check: bool = False) -> di
         "total": total,
         "passed": passed,
         "pass_rate": round(passed / total, 3) if total else 0.0,
-        "hallucination_rate": round(hallucinations / total, 3) if total else 0.0,
-        "retrieval_miss_rate": round(retrieval_misses / total, 3) if total else 0.0,
+        "retrieval_failure_rate": round(retrieval_failures / total, 3) if total else 0.0,
+        "grounding_failure_rate": round(grounding_failures / total, 3) if total else 0.0,
+        "safety_failure_rate": round(safety_failures / total, 3) if total else 0.0,
+        "routing_failure_rate": round(routing_failures / total, 3) if total else 0.0,
+        "translation_failure_rate": round(translation_failures / total, 3) if total else 0.0,
         "avg_latency_ms": avg_latency_ms,
         "refusal_accuracy": round(refusal_correct / len(refusal_rows), 3) if refusal_rows else 1.0,
         "domain_accuracy": round(domain_correct / len(domain_rows), 3) if domain_rows else 0.0,

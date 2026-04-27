@@ -9,7 +9,7 @@ split-brain defect must NOT be re-introduced.
 Two layers of enforcement:
     1. Behavior tests  - run the pipeline with mocked `check_grounding` and
        assert the rejection path forces `Insufficient data.` +
-       `retrieval_miss`.
+       `grounding_reject`.
     2. Static invariant - scan `app/pipeline.py` source and reject any
        re-introduction of a weaker grounding helper.
 
@@ -25,7 +25,7 @@ from pathlib import Path
 
 import numpy as np
 
-from app.models import KnowledgeGap, RetrievalHit, Route
+from app.models import FailureType, KnowledgeGap, RetrievalHit, Route
 
 
 # --------------------------------------------------------------------------- #
@@ -126,16 +126,18 @@ def _build_pipeline(llm_answer: str, context_text: str = "ECO provides wastewate
 def test_ungrounded_answer_is_forced_to_refusal(monkeypatch):
     """
     When `check_grounding()` rejects the LLM output, the pipeline MUST
-    replace it with the canonical refusal and classify as retrieval_miss.
+    replace it with the canonical refusal and classify as grounding_reject.
     This is the v1.0 contract: the evaluator's verdict is binding at runtime.
     """
     import app.pipeline as pipeline_module
 
     monkeypatch.setattr(pipeline_module, "check_grounding", lambda *a, **kw: False)
 
+    # Use context text that ensures term overlap check passes
+    # so grounding check is actually reached
     pipeline = _build_pipeline(
         llm_answer="ECO was founded in 1995 and operates in 12 countries.",
-        context_text="ECO provides wastewater services.",
+        context_text="What is ECO? ECO provides wastewater services.",
     )
     result = pipeline.run("What is ECO?", query_id="test-ungrounded")
 
@@ -143,7 +145,7 @@ def test_ungrounded_answer_is_forced_to_refusal(monkeypatch):
         "Ungrounded LLM output must be replaced with the canonical refusal. "
         "Pipeline shipped ungrounded content — v1.0 grounding contract violated."
     )
-    assert result.failure_type == "retrieval_miss"
+    assert result.failure_type == FailureType.GROUNDING_REJECT
     assert result.grounded is True  # refusal is trivially grounded
 
 
