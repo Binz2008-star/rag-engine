@@ -6,6 +6,7 @@ from typing import Any, Iterator
 
 from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE
 from app.models import KnowledgeGap, PipelineResult
+from app.query_normalizer import is_arabic
 from app.utils import stable_hash
 from router.features import normalize_query
 from generation.grounding import check_grounding
@@ -170,8 +171,35 @@ class Pipeline:
                 retriever_version=self.retriever_version,
             )
 
-        # Hard grounding gate: reject if insufficient overlap
-        if not _has_sufficient_overlap(normalized_query, hits):
+        # Translate Arabic queries to English before overlap check and generation.
+        # normalized_query is preserved for logging; generation_query is English-only.
+        if is_arabic(normalized_query):
+            generation_query = self.llm.translate_to_english(normalized_query)
+            if not generation_query or generation_query == normalized_query:
+                # Translation failed — degrade to refusal rather than
+                # passing Arabic into the English overlap gate
+                elapsed_ms = int((time.perf_counter() - t0) * 1000)
+                return PipelineResult(
+                    query_id=query_id,
+                    query=query,
+                    normalized_query=normalized_query,
+                    intent=route.intent,
+                    confidence=route.confidence,
+                    intent_method=route.intent_method,
+                    retrieval=hits,
+                    answer=REFUSAL_MESSAGE,
+                    grounded=True,
+                    failure_type="translation_failure",
+                    knowledge_gap=None,
+                    latency_ms=elapsed_ms,
+                    model_version=self.model_version,
+                    retriever_version=self.retriever_version,
+                )
+        else:
+            generation_query = normalized_query
+
+        # Hard grounding gate: use English query for term overlap
+        if not _has_sufficient_overlap(generation_query, hits):
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             return PipelineResult(
                 query_id=query_id,
@@ -190,7 +218,7 @@ class Pipeline:
                 retriever_version=self.retriever_version,
             )
 
-        answer = self.llm.generate(normalized_query, hits)
+        answer = self.llm.generate(generation_query, hits)
         normalized_answer = answer.strip().lower()
 
         speculative_prefixes = (
