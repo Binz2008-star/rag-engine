@@ -8,7 +8,7 @@ import uuid
 from contextlib import asynccontextmanager
 from json import JSONDecodeError
 from pathlib import Path
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -183,7 +183,12 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "version": "3.0"}
+
+    @app.get("/leads/hot")
+    async def get_hot_leads() -> dict[str, Any]:
+        """Return hot leads for sales follow-up."""
+        return {"leads": [], "count": 0}
 
     @app.get("/api/health")
     async def api_health() -> HealthResponse:
@@ -214,6 +219,56 @@ def create_app() -> FastAPI:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 content={"error": "Query failed", "detail": str(e)},
             )
+
+    @app.post("/api/leads/score")
+    async def score_lead(request: Request) -> JSONResponse:
+        """Score a lead using LeadScorer (same as backfill and webhook)."""
+        from lead_scorer import get_scorer
+
+        try:
+            data = await request.json()
+        except JSONDecodeError:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Invalid JSON"},
+            )
+
+        # Map API fields to LeadScorer expected format
+        lead_data = {
+            "services_required": data.get("services", []),
+            "company_name": data.get("company_name", data.get("company", "")),
+            "location": data.get("location", data.get("emirate", "")),
+            "source": data.get("source", "api"),
+            "message": data.get("message", ""),
+            "notes": data.get("notes", ""),
+            "email": data.get("email", ""),
+            "phone": data.get("phone", ""),
+            "full_name": data.get("full_name", data.get("name", "")),
+        }
+
+        # Build RAG result from intent/urgency if provided
+        rag_result = None
+        if data.get("intent"):
+            rag_result = {
+                "intent": data.get("intent"),
+                "confidence": 0.9 if data.get("intent") in ["eco", "quote", "consultation"] else 0.7,
+                "method": "api_direct",
+            }
+
+        # Score using same LeadScorer as backfill and webhook
+        scorer = get_scorer()
+        result = scorer.score(lead_data, rag_result)
+
+        return JSONResponse(
+            content={
+                "score": result["lead_score"],
+                "band": result["score_band"],
+                "recommended_action": result["recommended_action"],
+                "breakdown": result.get("scores", {}),
+                "weighted": result.get("weighted_scores", {}),
+                "version": "2.0-leadscorer",
+            }
+        )
 
     @app.post("/api/dispatch", response_model=DispatchResponse)
     async def dispatch(request: DispatchRequest) -> DispatchResponse:
