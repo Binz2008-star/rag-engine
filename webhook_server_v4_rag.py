@@ -1010,9 +1010,29 @@ async def get_lead_events(
 @app.get("/leads/hot")
 async def get_hot_leads(limit: int = 20):
     """Get HOT and WARM leads with scores and RAG intent."""
-    conn = get_db()
-    cur = conn.cursor()
+    conn = None
+    cur = None
     try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Check if scoring columns exist
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'leads' AND column_name IN ('lead_score', 'score_band')
+        """)
+        existing_cols = {row['column_name'] for row in cur.fetchall()}
+
+        if 'lead_score' not in existing_cols or 'score_band' not in existing_cols:
+            log.warning("Lead scoring columns not found - run migrate_phase2.sql")
+            return JSONResponse({
+                "count": 0,
+                "leads": [],
+                "warning": "Lead scoring columns not found. Run: psql $DATABASE_URL -f migrate_phase2.sql"
+            })
+
+        # Query hot/warm leads
         cur.execute(
             """
             SELECT id, full_name, company_name, email, phone,
@@ -1035,15 +1055,30 @@ async def get_hot_leads(limit: int = 20):
             for k, v in lead_dict.items():
                 if isinstance(v, datetime):
                     lead_dict[k] = v.isoformat() if v else None
+                elif isinstance(v, list):
+                    lead_dict[k] = list(v) if v else []
             results.append(lead_dict)
 
         return JSONResponse({
             "count": len(results),
             "leads": results
         })
+    except Exception as e:
+        log.exception("Failed to fetch hot leads")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Failed to fetch hot leads",
+                "detail": str(e),
+                "leads": [],
+                "count": 0
+            }
+        )
     finally:
-        cur.close()
-        conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 
 if __name__ == "__main__":
