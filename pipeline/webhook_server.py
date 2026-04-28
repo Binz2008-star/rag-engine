@@ -44,7 +44,7 @@ load_dotenv()
 import psycopg2
 import psycopg2.extras
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Header, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.security import APIKeyHeader, HTTPBasic, HTTPBasicCredentials
 from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 
@@ -1111,6 +1111,218 @@ async def get_hot_leads(limit: int = 20):
             cur.close()
         if conn:
             conn.close()
+
+
+@app.get("/")
+async def root():
+    """Root endpoint with service info and available endpoints."""
+    return {
+        "service": "ECO Technology Lead Pipeline",
+        "version": "4.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "hot_leads": "/leads/hot",
+            "all_leads": "/leads",
+            "admin_dashboard": "/admin",
+            "admin_stats": "/admin/stats (requires auth)",
+            "admin_lead_detail": "/admin/leads/{id} (requires auth)"
+        }
+    }
+
+
+@app.get("/admin")
+async def admin_dashboard(_: bool = Depends(require_admin)):
+    """Admin dashboard UI. Requires HTTP Basic auth."""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        # Get stats
+        cur.execute("""
+            SELECT
+                COUNT(*)::INT                                       AS total,
+                COUNT(*) FILTER (WHERE score_band = 'HOT')::INT    AS hot,
+                COUNT(*) FILTER (WHERE score_band = 'WARM')::INT   AS warm,
+                COUNT(*) FILTER (WHERE score_band = 'MEDIUM')::INT AS medium,
+                COUNT(*) FILTER (WHERE score_band = 'COLD')::INT   AS cold,
+                AVG(lead_score)                                     AS avg_score
+            FROM leads
+        """)
+        stats = dict(cur.fetchone())
+        stats["avg_score"] = str(stats["avg_score"]) if stats["avg_score"] is not None else "0"
+
+        # Get recent leads
+        cur.execute("""
+            SELECT id, full_name, company_name, email, phone,
+                   services_required, status, lead_score, score_band,
+                   created_at
+            FROM leads
+            ORDER BY created_at DESC
+            LIMIT 20
+        """)
+        leads = []
+        for row in cur.fetchall():
+            lead = dict(row)
+            for k, v in lead.items():
+                if isinstance(v, datetime):
+                    lead[k] = v.isoformat() if v else None
+                elif isinstance(v, list):
+                    lead[k] = list(v) if v else []
+            leads.append(lead)
+
+        # Generate HTML
+        html = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECO Admin Dashboard</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }}
+        .container {{ max-width: 1400px; margin: 0 auto; }}
+        h1 {{ margin-bottom: 20px; font-size: 28px; }}
+        .stats {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }}
+        .stat-card {{
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            padding: 20px;
+        }}
+        .stat-label {{ font-size: 14px; color: #aaa; margin-bottom: 8px; }}
+        .stat-value {{ font-size: 32px; font-weight: bold; }}
+        .stat-value.hot {{ color: #ff6b6b; }}
+        .stat-value.warm {{ color: #feca57; }}
+        .stat-value.medium {{ color: #54a0ff; }}
+        .stat-value.cold {{ color: #5f27cd; }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            overflow: hidden;
+        }}
+        th, td {{
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }}
+        th {{ background: rgba(255,255,255,0.1); font-weight: 600; }}
+        tr:hover {{ background: rgba(255,255,255,0.08); }}
+        .badge {{
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }}
+        .badge.HOT {{ background: #ff6b6b; color: #fff; }}
+        .badge.WARM {{ background: #feca57; color: #000; }}
+        .badge.MEDIUM {{ background: #54a0ff; color: #fff; }}
+        .badge.COLD {{ background: #5f27cd; color: #fff; }}
+        .score {{ font-weight: bold; }}
+        .refresh {{
+            background: #6c5ce7;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }}
+        .refresh:hover {{ background: #5b4cdb; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 ECO Admin Dashboard</h1>
+        <button class="refresh" onclick="location.reload()">Refresh</button>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Leads</div>
+                <div class="stat-value">{stats['total']}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Hot</div>
+                <div class="stat-value hot">{stats['hot']}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Warm</div>
+                <div class="stat-value warm">{stats['warm']}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Medium</div>
+                <div class="stat-value medium">{stats['medium']}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Cold</div>
+                <div class="stat-value cold">{stats['cold']}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Score</div>
+                <div class="stat-value">{stats['avg_score']}</div>
+            </div>
+        </div>
+
+        <h2>Recent Leads</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Company</th>
+                    <th>Email</th>
+                    <th>Score</th>
+                    <th>Band</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+        for lead in leads:
+            html += f"""
+                <tr>
+                    <td>{lead['id']}</td>
+                    <td>{lead['full_name'] or '-'}</td>
+                    <td>{lead['company_name'] or '-'}</td>
+                    <td>{lead['email'] or '-'}</td>
+                    <td class="score">{lead['lead_score'] or '-'}</td>
+                    <td><span class="badge {lead['score_band'] or 'COLD'}">{lead['score_band'] or '-'}</span></td>
+                    <td>{lead['status'] or '-'}</td>
+                    <td>{lead['created_at'][:19] if lead['created_at'] else '-'}</td>
+                </tr>
+"""
+        html += """
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+"""
+        return HTMLResponse(content=html)
+    except Exception as e:
+        log.exception("GET /admin failed")
+        return HTMLResponse(
+            status_code=500,
+            content=f"<h1>Error</h1><p>{str(e)}</p>"
+        )
+    finally:
+        cur.close()
+        conn.close()
 
 
 @app.get("/admin/stats")
