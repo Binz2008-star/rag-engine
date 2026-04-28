@@ -60,8 +60,13 @@ try:
     from rag_client_webhook import rag_health as rag_backend_health
     SCORING_AVAILABLE = True
 except ImportError:
-    SCORING_AVAILABLE = False
-    logging.warning("Lead scorer not available - scoring disabled")
+    try:
+        from pipeline.lead_scorer import get_scorer
+        from rag_client_webhook import rag_health as rag_backend_health
+        SCORING_AVAILABLE = True
+    except ImportError:
+        SCORING_AVAILABLE = False
+        logging.warning("Lead scorer not available - scoring disabled")
 
 # ─── Config (from .env) ───────────────────────────────────────────────────────
 # Critical: All secrets must be in .env - no fallbacks in source code
