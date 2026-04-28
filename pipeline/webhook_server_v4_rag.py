@@ -27,10 +27,12 @@ Endpoints:
 
 import os
 import json
+import secrets
 import smtplib
 import logging
 import hashlib
 import time
+from decimal import Decimal
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timezone
@@ -41,9 +43,9 @@ load_dotenv()
 
 import psycopg2
 import psycopg2.extras
-from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Header, Depends
-from fastapi.responses import JSONResponse
-from fastapi.security import APIKeyHeader
+from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Header, Depends, Query
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.security import APIKeyHeader, HTTPBasic, HTTPBasicCredentials
 from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 
 # RAG client import
@@ -144,6 +146,39 @@ async def verify_webhook_api_key(api_key: str = Depends(api_key_header)):
     if api_key != API_KEY:
         raise HTTPException(status_code=403, detail="Invalid API key")
     return True
+
+
+_http_basic = HTTPBasic()
+
+
+def require_admin(credentials: HTTPBasicCredentials = Depends(_http_basic)) -> bool:
+    """HTTP Basic auth for admin endpoints. Reads ADMIN_USERNAME / ADMIN_PASSWORD from env."""
+    username = os.environ.get("ADMIN_USERNAME", "")
+    password = os.environ.get("ADMIN_PASSWORD", "")
+    if not username or not password:
+        raise HTTPException(status_code=500, detail="Admin auth not configured")
+    ok = (
+        secrets.compare_digest(credentials.username, username)
+        and secrets.compare_digest(credentials.password, password)
+    )
+    if not ok:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return True
+
+
+def _serialize_row(row: dict) -> dict:
+    """Convert psycopg2 non-JSON types to JSON-safe equivalents."""
+    out = {}
+    for k, v in row.items():
+        if isinstance(v, datetime):
+            out[k] = v.isoformat() if v else None
+        elif isinstance(v, Decimal):
+            out[k] = str(v)
+        elif isinstance(v, list):
+            out[k] = list(v)
+        else:
+            out[k] = v
+    return out
 
 @app.on_event("startup")
 async def startup_event():
@@ -1079,6 +1114,321 @@ async def get_hot_leads(limit: int = 20):
             cur.close()
         if conn:
             conn.close()
+
+
+@app.get("/admin/stats")
+async def admin_stats(_: bool = Depends(require_admin)):
+    """Aggregate lead KPIs. Requires HTTP Basic auth (ADMIN_USERNAME / ADMIN_PASSWORD)."""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT
+                COUNT(*)::INT                                       AS total,
+                COUNT(*) FILTER (WHERE score_band = 'HOT')::INT    AS hot,
+                COUNT(*) FILTER (WHERE score_band = 'WARM')::INT   AS warm,
+                COUNT(*) FILTER (WHERE score_band = 'MEDIUM')::INT AS medium,
+                COUNT(*) FILTER (WHERE score_band = 'COLD')::INT   AS cold,
+                AVG(lead_score)                                     AS avg_score
+            FROM leads
+        """)
+        row = dict(cur.fetchone())
+        row["avg_score"] = str(row["avg_score"]) if row["avg_score"] is not None else None
+        return JSONResponse(content=row)
+    except Exception as e:
+        log.exception("GET /admin/stats failed")
+        return JSONResponse(status_code=500, content={"error": "Stats query failed", "detail": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(
+    band: Optional[str] = Query(None, description="Filter by score_band (HOT, WARM, COLD)"),
+    _: bool = Depends(require_admin)
+):
+    """
+    Internal admin dashboard showing all leads with scoring data.
+    Protected by HTTP Basic Auth.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        # Build query with optional band filter
+        if band:
+            cur.execute(
+                """
+                SELECT id, full_name, company_name, email, phone,
+                       services_required, source, status,
+                       lead_score, score_band, rag_intent,
+                       rag_confidence, rag_method, recommended_action,
+                       scored_at, created_at
+                FROM leads
+                WHERE score_band = %s
+                ORDER BY created_at DESC
+                LIMIT 100
+                """,
+                (band.upper(),)
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, full_name, company_name, email, phone,
+                       services_required, source, status,
+                       lead_score, score_band, rag_intent,
+                       rag_confidence, rag_method, recommended_action,
+                       scored_at, created_at
+                FROM leads
+                ORDER BY created_at DESC
+                LIMIT 100
+                """
+            )
+
+        leads = cur.fetchall()
+
+        # Convert to list of dicts
+        leads_data = []
+        for lead in leads:
+            lead_dict = dict(lead)
+            # Convert datetime to ISO strings
+            for k, v in lead_dict.items():
+                if isinstance(v, datetime):
+                    lead_dict[k] = v.isoformat()
+            leads_data.append(lead_dict)
+
+        # Generate HTML
+        html = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECO Admin Dashboard</title>
+    <style>
+        * {{ box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }}
+        .header {{
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }}
+        .header h1 {{ margin: 0; font-size: 24px; }}
+        .header p {{ margin: 5px 0 0; opacity: 0.8; }}
+        .filters {{
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            position: sticky;
+            top: 10px;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .filter-btn {{
+            padding: 10px 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            color: #333;
+        }}
+        .filter-btn:hover {{ background: #f0f0f0; }}
+        .filter-btn.active {{ background: #3498db; color: white; border-color: #3498db; }}
+        .stats {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }}
+        .stat-card {{
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }}
+        .stat-value {{ font-size: 28px; font-weight: bold; color: #2c3e50; }}
+        .stat-label {{ font-size: 12px; color: #7f8c8d; margin-top: 5px; }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        th, td {{
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }}
+        th {{
+            background: #34495e;
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+        }}
+        tr:hover {{ background: #f8f9fa; }}
+        .score-badge {{
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }}
+        .score-HOT {{ background: #e74c3c; color: white; }}
+        .score-WARM {{ background: #f39c12; color: white; }}
+        .score-COLD {{ background: #95a5a6; color: white; }}
+        .score-null {{ background: #bdc3c7; color: white; }}
+        .score-value {{ font-weight: bold; }}
+        .action {{ font-size: 12px; color: #7f8c8d; }}
+        @media (max-width: 768px) {{
+            table {{ display: block; overflow-x: auto; }}
+            th, td {{ padding: 8px; font-size: 12px; }}
+            .filters {{ flex-direction: column; }}
+            .filter-btn {{ width: 100%; text-align: center; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ECO Technology Admin Dashboard</h1>
+        <p>Lead Management Pipeline v4.0</p>
+    </div>
+
+    <div class="filters">
+        <a href="/admin" class="filter-btn {'active' if not band else ''}">All Leads</a>
+        <a href="/admin?band=HOT" class="filter-btn {'active' if band == 'HOT' else ''}">🔥 HOT</a>
+        <a href="/admin?band=WARM" class="filter-btn {'active' if band == 'WARM' else ''}">⚡ WARM</a>
+        <a href="/admin?band=COLD" class="filter-btn {'active' if band == 'COLD' else ''}">❄️ COLD</a>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-value">{len(leads_data)}</div>
+            <div class="stat-label">Total Leads</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{sum(1 for l in leads_data if l.get('score_band') == 'HOT')}</div>
+            <div class="stat-label">HOT Leads</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{sum(1 for l in leads_data if l.get('score_band') == 'WARM')}</div>
+            <div class="stat-label">WARM Leads</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{sum(1 for l in leads_data if l.get('score_band') == 'COLD')}</div>
+            <div class="stat-label">COLD Leads</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Company</th>
+                <th>Score</th>
+                <th>Band</th>
+                <th>Action</th>
+                <th>Services</th>
+                <th>Location</th>
+                <th>Source</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+"""
+
+        for lead in leads_data:
+            score = lead.get('lead_score')
+            score_band = lead.get('score_band') or 'null'
+            score_class = f'score-{score_band}' if score_band else 'score-null'
+            services = lead.get('services_required', [])
+            if isinstance(services, list):
+                services_str = ', '.join(s[:2]) + ('...' if len(services) > 2 else '')
+            else:
+                services_str = str(services) if services else '-'
+
+            html += f"""
+            <tr>
+                <td>#{lead.get('id')}</td>
+                <td><strong>{lead.get('company_name', '-')}</strong><br><small>{lead.get('full_name', '-')}</small></td>
+                <td class="score-value">{score if score else '-'}</td>
+                <td><span class="score-badge {score_class}">{score_band if score_band else 'N/A'}</span></td>
+                <td class="action">{lead.get('recommended_action', '-')[:50]}</td>
+                <td>{services_str}</td>
+                <td>{lead.get('location', '-')}</td>
+                <td>{lead.get('source', '-')}</td>
+                <td><small>{lead.get('created_at', '')[:10]}</small></td>
+            </tr>
+"""
+
+        html += """
+        </tbody>
+    </table>
+
+    <script>
+        // Highlight active filter
+        const currentBand = new URLSearchParams(window.location.search).get('band');
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            const btnBand = new URLSearchParams(btn.href.split('?')[1] || '').get('band');
+            if ((currentBand === null && !btnBand) || currentBand === btnBand) {
+                btn.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>
+"""
+        return HTMLResponse(content=html)
+    except Exception as e:
+        log.exception("GET /admin failed")
+        return HTMLResponse(content=f"<h1>Error</h1><p>{str(e)}</p>", status_code=500)
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/admin/leads/{lead_id}")
+async def admin_lead_detail(lead_id: int, _: bool = Depends(require_admin)):
+    """Single lead detail by ID. Requires HTTP Basic auth."""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT id, full_name, company_name, email, phone,
+                   services_required, source, status,
+                   lead_score, score_band, rag_intent,
+                   rag_confidence, rag_method, recommended_action,
+                   scored_at, created_at
+            FROM leads
+            WHERE id = %s
+            LIMIT 1
+            """,
+            (lead_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return JSONResponse(status_code=404, content={"error": "Lead not found"})
+        return JSONResponse(content=_serialize_row(dict(row)))
+    except Exception as e:
+        log.exception("GET /admin/leads/%s failed", lead_id)
+        return JSONResponse(status_code=500, content={"error": "Lead query failed", "detail": str(e)})
+    finally:
+        cur.close()
+        conn.close()
 
 
 if __name__ == "__main__":
