@@ -451,18 +451,8 @@ class RagPipeline:
             answer = self._generate(prompt).strip()
             t2 = time.perf_counter()
         except Exception as e:
-            logger.warning(f"Generation failed: {e}, returning fallback")
-            t2 = time.perf_counter()
-            return RagResponse(
-                answer="Insufficient data.",
-                sources=[],
-                retrieval_time=t1 - t0,
-                generation_time=t2 - t1,
-                request_id=self.retriever.last_request_id,
-                intent=self.retriever.last_intent,
-                intent_confidence=self.retriever.last_intent_confidence,
-                intent_method=self.retriever.last_intent_method,
-            )
+            logger.exception("Generation failed for query=%r", question)
+            raise RuntimeError(f"Generation failed: {e!r}") from e
 
         if not answer:
             answer = "Insufficient data."
@@ -534,7 +524,7 @@ class RagPipeline:
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 response = self.session.post(
-                    f"{OLLAMA_BASE_URL}/chat",
+                    f"{OLLAMA_BASE_URL}/api/chat",
                     json={
                         "model": CHAT_MODEL,
                         "stream": False,
@@ -559,6 +549,11 @@ class RagPipeline:
             except Exception as exc:
                 last_error = exc
                 logger.warning("Generate attempt %d/%d failed: %s", attempt, MAX_RETRIES, exc)
+                try:
+                    self.session.close()
+                except Exception:
+                    pass
+                self.session = requests.Session()
                 if attempt < MAX_RETRIES:
                     time.sleep(2 ** (attempt - 1))
 

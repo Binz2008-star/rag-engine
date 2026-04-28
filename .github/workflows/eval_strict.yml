@@ -73,7 +73,7 @@ jobs:
         run: |
           python -m py_compile eval_runner.py       && echo 'eval_runner.py OK'
           python -m py_compile app/config.py        && echo 'app/config.py OK'
-          python -m py_compile app/pipeline.py     && echo 'app/pipeline.py OK'
+          python -m py_compile app/main.py          && echo 'app/main.py OK'
           python -m py_compile generation/llm.py    && echo 'generation/llm.py OK'
           python -m py_compile evaluation/eval_main.py && echo 'evaluation/eval_main.py OK'
 
@@ -221,3 +221,17 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
           REPORT_PATH: reports/ci_eval_strict.json
+
+      - name: Aggregate evaluation trends
+        if: always()
+        run: python scripts/aggregate_reports.py
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Upload aggregated trends
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-aggregated-trends-${{ github.run_id }}
+          path: reports/aggregated_trends.json
+          retention-days: 90

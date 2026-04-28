@@ -1,6 +1,8 @@
 ROBEN EDWAN
 Ajman, UAE | +971 52 223 3989 | robenedwan@gmail.com | linkedin.com/in/robin-edwan-environmental
 
+CV TAILORED FOR: Deliveroo – Operations Manager / Grocery Operations Role
+
 GROCERY OPERATIONS / OPERATIONS MANAGEMENT PROFILE
 
 Operations leader with 10+ years of UAE experience across compliance-driven service delivery, multi-client operations, stakeholder coordination, and process automation. Founder of a municipality-approved environmental services company serving 80+ commercial clients with a strong focus on service continuity, operational governance, and measurable efficiency improvements.
@@ -50,3 +52,7 @@ CERTIFICATIONS
 - Hugging Face NLP
 - ElevenLabs Voice Technology
 - Process Automation Tools (Jobber, Power Automate)
+
+TARGET POSITION
+This CV is applying for the Operations Manager position at Deliveroo.
+The role targeted is Deliveroo Operations Manager in the grocery delivery sector.

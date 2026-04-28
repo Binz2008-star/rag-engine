@@ -138,10 +138,6 @@ class TaskResponse(BaseModel):
     error_message: str | None = None
     last_run_started_at: float | None = None
     last_run_finished_at: float | None = None
-    error_type: str | None = None
-    retry_count: int = 0
-    run_count: int = 0
-    metadata: dict[str, Any] | None = None
 
 
 class ScheduleTaskRequest(BaseModel):

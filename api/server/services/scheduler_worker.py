@@ -123,7 +123,7 @@ class SchedulerWorker:
                         # Task is due, execute immediately
                         logger.info("Triggering scheduled task: %s (scheduled for %s)", item.task_id, item.run_at)
                         try:
-                            self._run_task(item.task_id)
+                            self._run_task(item.item_id)
                         except Exception:
                             logger.exception("Failed to run scheduled task: %s", item.task_id)
                     else:

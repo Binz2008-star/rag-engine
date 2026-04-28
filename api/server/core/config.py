@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from dotenv import load_dotenv
 
@@ -74,29 +74,6 @@ class Settings:
                 "nomic-embed-text,robin-assistant-opt",
             )
         )
-
-        # Trading runtime feature flags
-        self.trading_live_enabled: bool = os.getenv(
-            "TRADING_LIVE_ENABLED", "false"
-        ).lower() in ("true", "1", "yes")
-        self.trading_exchange: str = os.getenv(
-            "TRADING_EXCHANGE", "none"
-        ).lower()
-        self.trading_binance_api_key: Optional[str] = os.getenv(
-            "TRADING_BINANCE_API_KEY"
-        )
-        self.trading_binance_api_secret: Optional[str] = os.getenv(
-            "TRADING_BINANCE_API_SECRET"
-        )
-        self.trading_bybit_api_key: Optional[str] = os.getenv(
-            "TRADING_BYBIT_API_KEY"
-        )
-        self.trading_bybit_api_secret: Optional[str] = os.getenv(
-            "TRADING_BYBIT_API_SECRET"
-        )
-        self.trading_sandbox: bool = os.getenv(
-            "TRADING_SANDBOX", "true"
-        ).lower() in ("true", "1", "yes")
 
 
 @lru_cache(maxsize=1)
