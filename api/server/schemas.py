@@ -211,3 +211,4 @@ class JotformWebhookResponse(BaseModel):
     lead_id: str
     intent: str
     indexed: bool
+    request_id: str

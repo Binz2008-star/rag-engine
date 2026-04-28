@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 import sys
+import uuid
 from contextlib import asynccontextmanager
+from json import JSONDecodeError
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -19,7 +23,14 @@ if str(_PROJECT_ROOT) not in sys.path:
 from .core.config import get_settings  # noqa: E402
 from .core.logging import configure_logging  # noqa: E402
 from .infra.ollama_health import OllamaUnavailableError, check_ollama  # noqa: E402
-from .schemas import JotformWebhookResponse  # noqa: E402
+from .schemas import (
+    DispatchRequest,
+    DispatchResponse,
+    HealthResponse,
+    JotformWebhookResponse,
+    QueryRequest,
+    QueryResponse,
+)  # noqa: E402
 from .services.agent_executor import AgentExecutor  # noqa: E402
 from .services.execution_guard import ExecutionGuard  # noqa: E402
 from .services.jotform_ingest_service import ingest_jotform_payload  # noqa: E402
@@ -170,12 +181,78 @@ def create_app() -> FastAPI:
             "version": settings.version,
         }
 
+    @app.get("/health")
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/api/health")
+    async def api_health() -> HealthResponse:
+        rag_service: RagService | None = getattr(app.state, "rag_service", None)
+        return HealthResponse(
+            status="ok",
+            pipeline_ready=rag_service.ready if rag_service else False,
+            version=settings.version,
+            chat_model="llama3.2",
+            index_count=rag_service.index_count if rag_service else None,
+        )
+
+    @app.post("/api/query", response_model=QueryResponse)
+    async def query(request: QueryRequest) -> QueryResponse | JSONResponse:
+        """Execute a RAG query against the knowledge base."""
+        rag_service: RagService | None = getattr(app.state, "rag_service", None)
+        if rag_service is None or not rag_service.ready:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"error": "RAG service not ready", "detail": "Pipeline is initializing or unavailable"},
+            )
+        try:
+            result = await rag_service.query(request.question)
+            return QueryResponse(**result)
+        except Exception as e:
+            logger.exception("Query failed")
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"error": "Query failed", "detail": str(e)},
+            )
+
+    @app.post("/api/dispatch", response_model=DispatchResponse)
+    async def dispatch(request: DispatchRequest) -> DispatchResponse:
+        """Route a question to the appropriate capability."""
+        from router.intent_router import IntentRouter
+
+        router = IntentRouter.from_active_model()
+        route_result = router.route(request.question)
+
+        # Map intent to capability
+        capability_map = {
+            "cv": "cv",
+            "eco": "eco",
+            "general": "chat",
+        }
+        capability = capability_map.get(route_result.intent, "chat")
+
+        return DispatchResponse(
+            capability=capability,
+            kind=route_result.intent,
+            status="ok",
+            request_id=str(uuid.uuid4()),
+            payload={
+                "intent": route_result.intent,
+                "confidence": route_result.confidence,
+                "method": route_result.intent_method,
+                "question": request.question,
+            },
+        )
+
     @app.post("/api/webhooks/jotform-agent")
     async def jotform_webhook(request: Request) -> JSONResponse:
         """Ingest Jotform AI Agent webhook payload as structured lead + RAG memory."""
+        request_id = str(uuid.uuid4())
+
+        # Parse JSON with narrow exception handling
         try:
             payload = await request.json()
-        except Exception:
+        except JSONDecodeError:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"error": "Invalid JSON payload"},
@@ -187,42 +264,59 @@ def create_app() -> FastAPI:
                 content={"error": "Payload must be a non-empty object"},
             )
 
-        # Optional secret validation
-        webhook_secret = os.getenv("JOTFORM_WEBHOOK_SECRET")
-        if webhook_secret:
+        # Payload size guard (100KB limit)
+        import json
+        try:
+            payload_size = len(json.dumps(payload))
+            if payload_size > 100_000:
+                return JSONResponse(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    content={"error": "Payload too large (max 100KB)"},
+                )
+        except (TypeError, ValueError):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Invalid payload structure"},
+            )
+
+        # Optional secret validation via settings
+        if settings.jotform_webhook_secret:
             provided_secret = request.headers.get("X-Jotform-Secret")
-            if provided_secret != webhook_secret:
-                logger.warning("Jotform webhook secret validation failed")
+            if provided_secret != settings.jotform_webhook_secret:
+                logger.warning("Jotform webhook secret validation failed (request_id=%s)", request_id)
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     content={"error": "Invalid webhook secret"},
                 )
 
-        # Check if webhook is enabled
-        if not os.getenv("JOTFORM_WEBHOOK_ENABLED", "true").lower() in ("true", "1", "yes"):
+        # Check if webhook is enabled via settings
+        if not settings.jotform_webhook_enabled:
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 content={"error": "Jotform webhook is disabled"},
             )
 
+        # Ingest payload in thread pool to avoid blocking
         try:
-            lead = ingest_jotform_payload(payload)
+            lead = await asyncio.to_thread(ingest_jotform_payload, payload)
+            logger.info("Jotform lead ingested successfully (request_id=%s, lead_id=%s, intent=%s)", request_id, lead.lead_id, lead.intent)
             response = JotformWebhookResponse(
                 status="ok",
                 source="jotform",
                 lead_id=lead.lead_id,
                 intent=lead.intent,
-                indexed=True,
+                indexed=False,  # File-based storage, requires index rebuild
+                request_id=request_id,
             )
             return JSONResponse(content=response.model_dump(), status_code=status.HTTP_200_OK)
         except ValueError as e:
-            logger.error("Jotform webhook validation error: %s", e)
+            logger.error("Jotform webhook validation error (request_id=%s): %s", request_id, e)
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"error": str(e)},
             )
         except Exception as e:
-            logger.exception("Jotform webhook ingestion failed: %s", e)
+            logger.exception("Jotform webhook ingestion failed (request_id=%s): %s", request_id, e)
             return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 content={"error": "Ingestion failed"},

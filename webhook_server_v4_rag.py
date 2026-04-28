@@ -54,6 +54,15 @@ except ImportError:
     RAG_AVAILABLE = False
     logging.warning("RAG client not available - RAG routing disabled")
 
+# Phase 2 imports
+try:
+    from lead_scorer import get_scorer
+    from rag_client_webhook import rag_health as rag_backend_health
+    SCORING_AVAILABLE = True
+except ImportError:
+    SCORING_AVAILABLE = False
+    logging.warning("Lead scorer not available - scoring disabled")
+
 # ─── Config (from .env) ───────────────────────────────────────────────────────
 # Critical: All secrets must be in .env - no fallbacks in source code
 DB_URL = os.environ["DATABASE_URL"]
@@ -402,15 +411,54 @@ def store_lead(data: dict) -> int:
             )
             lead_id = cur.fetchone()["id"]
         else:
+            # Phase 2: Score the lead
+            lead_score = None
+            score_band = None
+            rag_intent = None
+            rag_confidence = None
+            rag_method = None
+            recommended_action = None
+
+            if SCORING_AVAILABLE:
+                try:
+                    scorer = get_scorer()
+                    # Get RAG classification if available
+                    rag_result = None
+                    if RAG_AVAILABLE and RAG_ENABLED:
+                        try:
+                            from rag_client_webhook import classify_lead
+                            question = f"{data.get('company', '')} {services_arr} {data.get('message', '')}"
+                            rag_result = classify_lead(question)
+                            rag_intent = rag_result.get("intent")
+                            rag_confidence = rag_result.get("confidence")
+                            rag_method = rag_result.get("method")
+                        except Exception as e:
+                            log.warning(f"RAG classification failed: {e}")
+
+                    # Score the lead
+                    score_result = scorer.score(data, rag_result)
+                    lead_score = score_result.get("lead_score")
+                    score_band = score_result.get("score_band")
+                    recommended_action = score_result.get("recommended_action")
+                except Exception as e:
+                    log.warning(f"Lead scoring failed: {e}")
+
             cur.execute(
                 """INSERT INTO leads
                        (full_name, company_name, email, phone,
                         services_required, source, status, email_status,
+                        lead_score, score_band, rag_intent, rag_confidence, rag_method,
+                        recommended_action, scored_at,
                         created_at, updated_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, 'new', 'pending', NOW(), NOW())
+                   VALUES (%s, %s, %s, %s, %s, %s, 'new', 'pending',
+                           %s, %s, %s, %s, %s, %s,
+                           CASE WHEN %s IS NOT NULL THEN NOW() ELSE NULL END,
+                           NOW(), NOW())
                    RETURNING id""",
                 (data.get("name"), data.get("company"), data.get("email"),
-                 data.get("phone"), services_arr, data.get("source", "website_form"))
+                 data.get("phone"), services_arr, data.get("source", "website_form"),
+                 lead_score, score_band, rag_intent, rag_confidence, rag_method,
+                 recommended_action, lead_score)
             )
             lead_id = cur.fetchone()["id"]
         conn.commit()
@@ -594,7 +642,24 @@ def dispatch_emails(lead: dict, lead_id: int, source: str):
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "4.0", "rag_enabled": RAG_ENABLED and RAG_AVAILABLE}
+    """Health check with RAG status."""
+    rag_status = {"available": RAG_AVAILABLE, "enabled": RAG_ENABLED}
+    if RAG_AVAILABLE and RAG_ENABLED:
+        try:
+            rag_health_result = rag_backend_health()
+            rag_status["healthy"] = rag_health_result.get("healthy", False)
+            rag_status["pipeline_ready"] = rag_health_result.get("pipeline_ready", False)
+        except Exception as e:
+            rag_status["healthy"] = False
+            rag_status["error"] = str(e)
+
+    return {
+        "status": "ok",
+        "version": "4.1",
+        "phase": "2",
+        "rag": rag_status,
+        "scoring_available": SCORING_AVAILABLE,
+    }
 
 
 @app.get("/rag/health")
@@ -868,6 +933,45 @@ async def get_lead_events(
                     event_dict[k] = v.isoformat()
             events_serializable.append(event_dict)
         return JSONResponse({"lead_id": lead_id, "events": events_serializable})
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/leads/hot")
+async def get_hot_leads(limit: int = 20):
+    """Get HOT and WARM leads with scores and RAG intent."""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT id, full_name, company_name, email, phone,
+                   services_required, lead_score, score_band,
+                   rag_intent, rag_confidence, recommended_action,
+                   scored_at, created_at
+            FROM leads
+            WHERE score_band IN ('HOT', 'WARM')
+            ORDER BY lead_score DESC, scored_at DESC NULLS LAST
+            LIMIT %s
+            """,
+            (limit,)
+        )
+        leads = cur.fetchall()
+
+        # Serialize
+        results = []
+        for lead in leads:
+            lead_dict = dict(lead)
+            for k, v in lead_dict.items():
+                if isinstance(v, datetime):
+                    lead_dict[k] = v.isoformat() if v else None
+            results.append(lead_dict)
+
+        return JSONResponse({
+            "count": len(results),
+            "leads": results
+        })
     finally:
         cur.close()
         conn.close()
