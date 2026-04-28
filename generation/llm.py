@@ -92,6 +92,10 @@ class LLMClient:
         user_message = (
             f"Context:\n{context}\n\n"
             f"Question: {query}\n\n"
+            "Answer the question using ONLY the provided context.\n"
+            "Cite sources as [S1], [S2], etc. when referencing information.\n"
+            "Do NOT invent sources or citations.\n"
+            "If the context does not contain the answer, respond exactly: Insufficient data.\n\n"
             "Answer:"
         )
 
@@ -122,6 +126,36 @@ class LLMClient:
                 time.sleep(2**attempt)
 
         # Graceful degradation: return refusal instead of raising on timeout/failure
+        return "Insufficient data."
+
+    def _generate_with_prompt(self, prompt: str) -> str:
+        """Generate answer using custom prompt (for self-correction retries)."""
+        last_exc: Exception | None = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = self.session.post(
+                    f"{self.base_url}/api/chat",
+                    json={
+                        "model": self.model,
+                        "stream": False,
+                        "messages": [
+                            {"role": "system", "content": self._SYSTEM_PROMPT},
+                            {"role": "user", "content": prompt},
+                        ],
+                        "options": {"temperature": 0.1, "top_p": 0.9, "num_predict": 256},
+                    },
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                text = response.json()["message"]["content"].strip()
+                return self._enforce_english_only(text)
+            except requests.exceptions.Timeout as exc:
+                last_exc = exc
+                time.sleep(2**attempt)
+            except Exception as exc:
+                last_exc = exc
+                time.sleep(2**attempt)
+
         return "Insufficient data."
 
     @staticmethod

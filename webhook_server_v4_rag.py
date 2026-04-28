@@ -35,6 +35,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timezone
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import psycopg2
 import psycopg2.extras
@@ -820,11 +823,23 @@ async def get_leads(
             filtered_leads = []
             for lead in leads:
                 lead_dict = dict(lead)
+                # Convert datetime objects to ISO strings
+                for k, v in lead_dict.items():
+                    if isinstance(v, datetime):
+                        lead_dict[k] = v.isoformat()
                 filtered = {k: v for k, v in lead_dict.items() if k in field_list}
                 filtered_leads.append(filtered)
             return JSONResponse({"leads": filtered_leads, "count": len(filtered_leads)})
 
-        return JSONResponse({"leads": [dict(r) for r in leads], "count": len(leads)})
+        # Convert datetime objects to ISO strings
+        leads_serializable = []
+        for lead in leads:
+            lead_dict = dict(lead)
+            for k, v in lead_dict.items():
+                if isinstance(v, datetime):
+                    lead_dict[k] = v.isoformat()
+            leads_serializable.append(lead_dict)
+        return JSONResponse({"leads": leads_serializable, "count": len(leads_serializable)})
     finally:
         cur.close()
         conn.close()
@@ -844,7 +859,15 @@ async def get_lead_events(
             (lead_id,)
         )
         events = cur.fetchall()
-        return JSONResponse({"lead_id": lead_id, "events": [dict(e) for e in events]})
+        # Convert datetime objects to ISO strings
+        events_serializable = []
+        for event in events:
+            event_dict = dict(event)
+            for k, v in event_dict.items():
+                if isinstance(v, datetime):
+                    event_dict[k] = v.isoformat()
+            events_serializable.append(event_dict)
+        return JSONResponse({"lead_id": lead_id, "events": events_serializable})
     finally:
         cur.close()
         conn.close()

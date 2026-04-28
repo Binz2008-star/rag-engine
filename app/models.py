@@ -19,6 +19,7 @@ class FailureType(str, Enum):
     TERM_OVERLAP_MISS = "term_overlap_miss"
     GROUNDING_REJECT = "grounding_reject"
     SPECULATIVE_REJECT = "speculative_reject"
+    REASONING_REJECT = "reasoning_reject"
     INJECTION_REJECT = "injection_reject"  # RESERVED: No active gate, future use only
     SENSITIVE_REJECT = "sensitive_reject"
     TRANSLATION_FAILURE = "translation_failure"
@@ -84,6 +85,8 @@ class RetrievalHit:
     score: float
     path: str
     doc_type: str
+    page: int | None = None
+    section: str | None = None
 
 
 @dataclass
@@ -129,3 +132,5 @@ class PipelineResult:
     latency_ms: int = 0
     model_version: str = ""
     retriever_version: str = ""
+    retry_attempts: int = 0
+    corrected: bool = False

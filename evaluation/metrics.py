@@ -31,6 +31,10 @@ def compute_metrics(results: list[dict], ocr_presence_check: bool = False) -> di
         1 for row in results
         if row.get("failure_type") in {"grounding_reject", "speculative_reject"}
     )
+    reasoning_failures = sum(
+        1 for row in results
+        if row.get("failure_type") == "reasoning_reject"
+    )
     safety_failures = sum(
         1 for row in results
         if row.get("failure_type") in {"sensitive_reject", "injection_reject"}
@@ -64,12 +68,19 @@ def compute_metrics(results: list[dict], ocr_presence_check: bool = False) -> di
         sum(float(row.get("latency_ms", 0)) for row in results) / total, 1
     ) if total else 0.0
 
+    # Self-correction metrics
+    total_retries = sum(row.get("retry_attempts", 0) for row in results)
+    corrected_queries = sum(1 for row in results if row.get("corrected") is True)
+    correction_rate = round(corrected_queries / total, 3) if total else 0.0
+    avg_retries = round(total_retries / total, 2) if total else 0.0
+
     return {
         "total": total,
         "passed": passed,
         "pass_rate": round(passed / total, 3) if total else 0.0,
         "retrieval_failure_rate": round(retrieval_failures / total, 3) if total else 0.0,
         "grounding_failure_rate": round(grounding_failures / total, 3) if total else 0.0,
+        "reasoning_failure_rate": round(reasoning_failures / total, 3) if total else 0.0,
         "safety_failure_rate": round(safety_failures / total, 3) if total else 0.0,
         "routing_failure_rate": round(routing_failures / total, 3) if total else 0.0,
         "translation_failure_rate": round(translation_failures / total, 3) if total else 0.0,
@@ -77,4 +88,6 @@ def compute_metrics(results: list[dict], ocr_presence_check: bool = False) -> di
         "refusal_accuracy": round(refusal_correct / len(refusal_rows), 3) if refusal_rows else 1.0,
         "domain_accuracy": round(domain_correct / len(domain_rows), 3) if domain_rows else 0.0,
         "ocr_presence_check": ocr_presence_check,
+        "correction_rate": correction_rate,
+        "avg_retries": avg_retries,
     }

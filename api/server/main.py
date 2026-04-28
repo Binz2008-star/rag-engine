@@ -19,8 +19,10 @@ if str(_PROJECT_ROOT) not in sys.path:
 from .core.config import get_settings  # noqa: E402
 from .core.logging import configure_logging  # noqa: E402
 from .infra.ollama_health import OllamaUnavailableError, check_ollama  # noqa: E402
+from .schemas import JotformWebhookResponse  # noqa: E402
 from .services.agent_executor import AgentExecutor  # noqa: E402
 from .services.execution_guard import ExecutionGuard  # noqa: E402
+from .services.jotform_ingest_service import ingest_jotform_payload  # noqa: E402
 from .services.rag_service import RagService  # noqa: E402
 from .services.scheduler_service import SchedulerService  # noqa: E402
 from .services.scheduler_worker import SchedulerWorker  # noqa: E402
@@ -167,6 +169,64 @@ def create_app() -> FastAPI:
             "name": settings.app_name,
             "version": settings.version,
         }
+
+    @app.post("/api/webhooks/jotform-agent")
+    async def jotform_webhook(request: Request) -> JSONResponse:
+        """Ingest Jotform AI Agent webhook payload as structured lead + RAG memory."""
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Invalid JSON payload"},
+            )
+
+        if not payload or not isinstance(payload, dict):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Payload must be a non-empty object"},
+            )
+
+        # Optional secret validation
+        webhook_secret = os.getenv("JOTFORM_WEBHOOK_SECRET")
+        if webhook_secret:
+            provided_secret = request.headers.get("X-Jotform-Secret")
+            if provided_secret != webhook_secret:
+                logger.warning("Jotform webhook secret validation failed")
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"error": "Invalid webhook secret"},
+                )
+
+        # Check if webhook is enabled
+        if not os.getenv("JOTFORM_WEBHOOK_ENABLED", "true").lower() in ("true", "1", "yes"):
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"error": "Jotform webhook is disabled"},
+            )
+
+        try:
+            lead = ingest_jotform_payload(payload)
+            response = JotformWebhookResponse(
+                status="ok",
+                source="jotform",
+                lead_id=lead.lead_id,
+                intent=lead.intent,
+                indexed=True,
+            )
+            return JSONResponse(content=response.model_dump(), status_code=status.HTTP_200_OK)
+        except ValueError as e:
+            logger.error("Jotform webhook validation error: %s", e)
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": str(e)},
+            )
+        except Exception as e:
+            logger.exception("Jotform webhook ingestion failed: %s", e)
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"error": "Ingestion failed"},
+            )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(
