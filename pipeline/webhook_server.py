@@ -31,10 +31,12 @@ import smtplib
 import logging
 import hashlib
 import time
+import secrets
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timezone
 from typing import Optional
+from decimal import Decimal
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -43,7 +45,7 @@ import psycopg2
 import psycopg2.extras
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, HTTPBasic, HTTPBasicCredentials
 from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
 
 # RAG client import
@@ -110,6 +112,36 @@ app = FastAPI(title="ECO Technology Lead Pipeline", version="4.0")
 
 # API key authentication
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+# HTTP Basic auth for admin endpoints
+_http_basic = HTTPBasic()
+
+
+def require_admin(credentials: HTTPBasicCredentials = Depends(_http_basic)) -> bool:
+    """HTTP Basic auth for admin endpoints. Reads ADMIN_USERNAME / ADMIN_PASSWORD from env."""
+    username = os.environ.get("ADMIN_USERNAME", "")
+    password = os.environ.get("ADMIN_PASSWORD", "")
+    if not username or not password:
+        raise HTTPException(status_code=500, detail="Admin auth not configured")
+    ok = secrets.compare_digest(credentials.username, username) and secrets.compare_digest(credentials.password, password)
+    if not ok:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return True
+
+
+def _serialize_row(row: dict) -> dict:
+    """Convert psycopg2 non-JSON types to JSON-safe equivalents."""
+    out = {}
+    for k, v in row.items():
+        if isinstance(v, datetime):
+            out[k] = v.isoformat() if v else None
+        elif isinstance(v, Decimal):
+            out[k] = str(v)
+        elif isinstance(v, list):
+            out[k] = list(v) if v else []
+        else:
+            out[k] = v
+    return out
 
 async def verify_api_key(api_key: str = Depends(api_key_header)):
     """Verify API key for protected endpoints."""
@@ -1081,6 +1113,64 @@ async def get_hot_leads(limit: int = 20):
             conn.close()
 
 
+@app.get("/admin/stats")
+async def admin_stats(_: bool = Depends(require_admin)):
+    """Aggregate lead KPIs. Requires HTTP Basic auth (ADMIN_USERNAME / ADMIN_PASSWORD)."""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT
+                COUNT(*)::INT                                       AS total,
+                COUNT(*) FILTER (WHERE score_band = 'HOT')::INT    AS hot,
+                COUNT(*) FILTER (WHERE score_band = 'WARM')::INT   AS warm,
+                COUNT(*) FILTER (WHERE score_band = 'MEDIUM')::INT AS medium,
+                COUNT(*) FILTER (WHERE score_band = 'COLD')::INT   AS cold,
+                AVG(lead_score)                                     AS avg_score
+            FROM leads
+        """)
+        row = dict(cur.fetchone())
+        row["avg_score"] = str(row["avg_score"]) if row["avg_score"] is not None else None
+        return JSONResponse(content=row)
+    except Exception as e:
+        log.exception("GET /admin/stats failed")
+        return JSONResponse(status_code=500, content={"error": "Stats query failed", "detail": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.get("/admin/leads/{lead_id}")
+async def admin_lead_detail(lead_id: int, _: bool = Depends(require_admin)):
+    """Single lead detail by ID. Requires HTTP Basic auth."""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT id, full_name, company_name, email, phone,
+                   services_required, source, status,
+                   lead_score, score_band, rag_intent,
+                   rag_confidence, rag_method, recommended_action,
+                   scored_at, created_at
+            FROM leads
+            WHERE id = %s
+            LIMIT 1
+            """,
+            (lead_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return JSONResponse(status_code=404, content={"error": "Lead not found"})
+        return JSONResponse(content=_serialize_row(dict(row)))
+    except Exception as e:
+        log.exception("GET /admin/leads/%s failed", lead_id)
+        return JSONResponse(status_code=500, content={"error": "Lead query failed", "detail": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("webhook_server_v4_rag:app", host="0.0.0.0", port=8080, reload=False)
+    uvicorn.run("webhook_server:app", host="0.0.0.0", port=8080, reload=False)
