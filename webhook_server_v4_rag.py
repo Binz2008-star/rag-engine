@@ -227,6 +227,38 @@ async def startup_event():
         log.warning("Database schema validation skipped (SKIP_DB_VALIDATION=true)")
 
 
+# ─── Schema Normalization ─────────────────────────────────────────────────────
+def normalize_lead_for_scoring(data: dict) -> dict:
+    """
+    Normalize lead data to canonical schema before scoring.
+
+    Ensures consistency across webhook, API, and backfill paths.
+    Message is treated as optional minor signal only.
+    """
+    # Extract services from various field names
+    services = []
+    if data.get("services_required"):
+        services = data["services_required"] if isinstance(data["services_required"], list) else [data["services_required"]]
+    elif data.get("service"):
+        services = [data["service"]] if isinstance(data["service"], str) else data["service"]
+    elif data.get("services"):
+        services = data["services"] if isinstance(data["services"], list) else [data["services"]]
+
+    # Build canonical schema
+    canonical = {
+        "services_required": services,
+        "company_name": data.get("company") or data.get("company_name", ""),
+        "location": data.get("location") or data.get("emirate") or data.get("address", ""),
+        "source": data.get("source", ""),
+        "message": data.get("message", ""),  # Optional minor signal
+        "email": data.get("email", ""),
+        "full_name": data.get("name") or data.get("full_name", ""),
+        "phone": data.get("phone", ""),
+    }
+
+    return canonical
+
+
 # ─── RAG Routing Logic ─────────────────────────────────────────────────────────
 def should_route_to_rag(intent: str, message: str) -> bool:
     """Determine if a query should route to RAG based on intent and content."""
@@ -440,8 +472,9 @@ def store_lead(data: dict) -> int:
                         except Exception as e:
                             log.warning(f"RAG classification failed: {e}")
 
-                    # Score the lead
-                    score_result = scorer.score(data, rag_result)
+                    # Normalize to canonical schema before scoring
+                    canonical_lead = normalize_lead_for_scoring(data)
+                    score_result = scorer.score(canonical_lead, rag_result)
                     lead_score = score_result.get("lead_score")
                     score_band = score_result.get("score_band")
                     recommended_action = score_result.get("recommended_action")
@@ -686,6 +719,37 @@ async def rag_health():
         RAG_HEALTHY = False
         log.warning(f"RAG health check failed: {e} - routing disabled")
         return {"rag_healthy": False, "reason": str(e), "routing_enabled": False}
+
+
+@app.post("/api/leads/score")
+async def score_lead_endpoint(request: Request):
+    """Score a lead using the ECO 6-dimension heuristic engine."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid JSON"})
+
+    try:
+        from lead_scorer import get_scorer
+        scorer = get_scorer()
+
+        # Normalize to canonical schema
+        canonical_lead = normalize_lead_for_scoring(data)
+
+        # Optional: enrich with RAG intent if provided
+        rag_result = None
+        if data.get("rag_intent"):
+            rag_result = {
+                "intent": data.get("rag_intent", "eco"),
+                "confidence": float(data.get("rag_confidence", 0.5)),
+                "method": data.get("rag_method", "external"),
+            }
+
+        result = scorer.score(canonical_lead, rag_result)
+        return JSONResponse(content=result)
+    except Exception as e:
+        log.exception("Lead scoring failed")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.post("/webhook/jotform")
