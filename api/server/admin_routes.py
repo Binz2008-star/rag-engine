@@ -2,11 +2,16 @@
 
 Adds the following endpoints consumed by the admin dashboard:
 
-- GET  /api/health     – lightweight health probe
-- GET  /admin/stats    – system-wide statistics
-- GET  /leads          – all leads (most recent first)
-- GET  /leads/hot      – hot leads only
-- POST /api/dispatch   – forward a query through the RAG pipeline
+- GET  /api/health     -- lightweight health probe
+- GET  /admin/stats    -- system-wide statistics + monitoring
+- GET  /leads          -- all leads (most recent first)
+- GET  /leads/hot      -- hot leads only
+- GET  /leads/failures -- queries that hit retrieval_miss or other failures
+- GET  /leads/flagged  -- manually flagged bad answers
+- POST /leads/{id}/flag -- toggle flag on a lead
+- POST /leads/{id}/rerun -- re-dispatch a lead's query
+- GET  /admin/monitoring -- aggregate latency / failure stats
+- POST /api/dispatch   -- forward a query through the RAG pipeline
 """
 
 from __future__ import annotations
@@ -34,7 +39,7 @@ def _generate_default_token() -> str:
     """Return a random token when none is configured (dev convenience)."""
     token = secrets.token_urlsafe(32)
     logger.warning(
-        "No ADMIN_TOKEN configured – generated ephemeral token: %s", token
+        "No ADMIN_TOKEN configured -- generated ephemeral token: %s", token
     )
     return token
 
@@ -147,6 +152,8 @@ def register_admin_routes(app: FastAPI) -> None:
         from .core.config import get_settings
         settings = get_settings()
 
+        monitoring = store.monitoring_stats()
+
         return {
             "system": {
                 "status": "ok",
@@ -161,7 +168,15 @@ def register_admin_routes(app: FastAPI) -> None:
                 "warm": counts.get("warm", 0),
                 "cold": counts.get("cold", 0),
             },
+            "monitoring": monitoring,
         }
+
+    # ---- Monitoring (protected) ----------------------------------------
+
+    @app.get("/admin/monitoring", dependencies=[Depends(verify_admin_token)])
+    async def admin_monitoring() -> Dict[str, Any]:
+        store = get_leads_store()
+        return store.monitoring_stats()
 
     # ---- Leads (protected) ---------------------------------------------
 
@@ -176,6 +191,75 @@ def register_admin_routes(app: FastAPI) -> None:
         store = get_leads_store()
         leads = store.list_by_temperature("hot", limit=200)
         return {"leads": leads, "total": len(leads)}
+
+    @app.get("/leads/failures", dependencies=[Depends(verify_admin_token)])
+    async def list_failures() -> Dict[str, Any]:
+        store = get_leads_store()
+        leads = store.list_failures(limit=200)
+        return {"leads": leads, "total": len(leads)}
+
+    @app.get("/leads/flagged", dependencies=[Depends(verify_admin_token)])
+    async def list_flagged() -> Dict[str, Any]:
+        store = get_leads_store()
+        leads = store.list_flagged(limit=200)
+        return {"leads": leads, "total": len(leads)}
+
+    # ---- Lead actions (protected) --------------------------------------
+
+    @app.post("/leads/{lead_id}/flag", dependencies=[Depends(verify_admin_token)])
+    async def toggle_flag(lead_id: int) -> Dict[str, Any]:
+        store = get_leads_store()
+        lead = store.get_by_id(lead_id)
+        if lead is None:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        new_state = not bool(lead.get("flagged", 0))
+        store.flag(lead_id, flagged=new_state)
+        return {"id": lead_id, "flagged": new_state}
+
+    @app.post("/leads/{lead_id}/rerun", dependencies=[Depends(verify_admin_token)])
+    async def rerun_query(lead_id: int, request: Request) -> Dict[str, Any]:
+        store = get_leads_store()
+        lead = store.get_by_id(lead_id)
+        if lead is None:
+            raise HTTPException(status_code=404, detail="Lead not found")
+
+        rag_service = getattr(request.app.state, "rag_service", None)
+        if rag_service is None or not rag_service.ready:
+            raise HTTPException(
+                status_code=503, detail="RAG pipeline not ready"
+            )
+
+        question = lead["query"]
+        t0 = time.perf_counter()
+        result = await rag_service.query(question)
+        wall_ms = int((time.perf_counter() - t0) * 1000)
+
+        intent = result.get("intent", "general")
+        confidence = result.get("intent_confidence", 0.0)
+        temperature = classify_lead_temperature(intent, confidence)
+        failure_type = result.get("failure_type")
+        answer = result.get("answer", "")
+
+        new_id = store.capture(
+            query=question,
+            intent=intent,
+            temperature=temperature,
+            source="admin_rerun",
+            channel="api",
+            latency_ms=wall_ms,
+            failure_type=failure_type,
+            answer=answer,
+            metadata={"dispatch_result": result, "rerun_of": lead_id},
+        )
+
+        return {
+            "original_id": lead_id,
+            "new_id": new_id,
+            "capability": "rag",
+            "kind": intent,
+            "status": "ok",
+            "payload": result,
+        }
 
     # ---- Dispatch (protected) ------------------------------------------
 
@@ -195,11 +279,15 @@ def register_admin_routes(app: FastAPI) -> None:
                 status_code=503, detail="RAG pipeline not ready"
             )
 
+        t0 = time.perf_counter()
         result = await rag_service.query(question)
+        wall_ms = int((time.perf_counter() - t0) * 1000)
 
         intent = result.get("intent", "general")
         confidence = result.get("intent_confidence", 0.0)
         temperature = classify_lead_temperature(intent, confidence)
+        failure_type = result.get("failure_type")
+        answer = result.get("answer", "")
 
         store = get_leads_store()
         store.capture(
@@ -209,6 +297,10 @@ def register_admin_routes(app: FastAPI) -> None:
             source="admin_dispatch",
             session_id=session_id,
             user_id=user_id,
+            channel="api",
+            latency_ms=wall_ms,
+            failure_type=failure_type,
+            answer=answer,
             metadata={"dispatch_result": result},
         )
 

@@ -7,7 +7,8 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0f1117;--card:#1a1d27;--border:#2a2d3a;--text:#e0e0e6;--muted:#8b8fa3;
---accent:#6c63ff;--green:#22c55e;--yellow:#eab308;--red:#ef4444;--blue:#3b82f6}
+--accent:#6c63ff;--green:#22c55e;--yellow:#eab308;--red:#ef4444;--blue:#3b82f6;
+--orange:#f97316}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 background:var(--bg);color:var(--text);line-height:1.5}
 a{color:var(--accent);text-decoration:none}
@@ -34,8 +35,17 @@ header .logout{font-size:.85rem;cursor:pointer;color:var(--muted)}
 header .logout:hover{color:var(--text)}
 .container{max-width:1200px;margin:0 auto;padding:1.5rem}
 
+/* ---------- Tabs ---------- */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
+.tab{padding:.6rem 1.25rem;cursor:pointer;font-size:.9rem;color:var(--muted);
+border-bottom:2px solid transparent;transition:.2s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
 /* ---------- Cards grid ---------- */
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
 .card{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1.25rem}
 .card .label{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .card .value{font-size:1.8rem;font-weight:700;margin-top:.25rem}
@@ -56,6 +66,17 @@ tr:last-child td{border-bottom:none}
 .temp-badge.hot{background:rgba(239,68,68,.15);color:var(--red)}
 .temp-badge.warm{background:rgba(234,179,8,.15);color:var(--yellow)}
 .temp-badge.cold{background:rgba(59,130,246,.15);color:var(--blue)}
+.channel-badge{display:inline-block;padding:.15rem .5rem;border-radius:.25rem;font-size:.75rem;font-weight:600}
+.channel-badge.whatsapp{background:rgba(34,197,94,.15);color:var(--green)}
+.channel-badge.api{background:rgba(108,99,255,.15);color:var(--accent)}
+.failure-badge{display:inline-block;padding:.15rem .5rem;border-radius:.25rem;
+font-size:.75rem;font-weight:600;background:rgba(239,68,68,.15);color:var(--red)}
+
+/* ---------- Action buttons ---------- */
+.btn-sm{padding:.2rem .5rem;border:1px solid var(--border);border-radius:.25rem;
+background:var(--bg);color:var(--muted);font-size:.75rem;cursor:pointer}
+.btn-sm:hover{color:var(--text);border-color:var(--muted)}
+.btn-sm.flagged{color:var(--orange);border-color:var(--orange)}
 
 /* ---------- Dispatch box ---------- */
 .dispatch-form{display:flex;gap:.75rem;margin-bottom:1rem}
@@ -69,12 +90,31 @@ background:var(--accent);color:#fff;font-size:.9rem;cursor:pointer;white-space:n
 padding:1rem;font-family:'Fira Code',monospace;font-size:.8rem;white-space:pre-wrap;
 max-height:300px;overflow-y:auto;display:none}
 
-/* ---------- Refresh ---------- */
+/* ---------- Toolbar ---------- */
 .toolbar{display:flex;align-items:center;gap:1rem;margin-bottom:1rem}
 .toolbar button{padding:.4rem 1rem;border:none;border-radius:.4rem;
 background:var(--accent);color:#fff;font-size:.85rem;cursor:pointer}
 .toolbar button:hover{opacity:.9}
 .toolbar .status{font-size:.8rem;color:var(--muted)}
+
+/* ---------- Query detail modal ---------- */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;
+align-items:center;justify-content:center}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:.75rem;
+padding:1.5rem;width:600px;max-width:90vw;max-height:80vh;overflow-y:auto}
+.modal h3{margin-bottom:1rem;font-size:1rem}
+.modal pre{background:var(--bg);border:1px solid var(--border);border-radius:.5rem;
+padding:.75rem;font-size:.8rem;white-space:pre-wrap;max-height:300px;overflow-y:auto}
+.modal .close{float:right;cursor:pointer;color:var(--muted);font-size:1.2rem}
+.modal .close:hover{color:var(--text)}
+
+/* ---------- Filters ---------- */
+.filters{display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap}
+.filter-btn{padding:.3rem .75rem;border:1px solid var(--border);border-radius:.35rem;
+background:var(--bg);color:var(--muted);font-size:.8rem;cursor:pointer}
+.filter-btn:hover{color:var(--text);border-color:var(--muted)}
+.filter-btn.active{color:var(--accent);border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -92,13 +132,23 @@ background:var(--accent);color:#fff;font-size:.85rem;cursor:pointer}
 <!-- ============= Dashboard ============= -->
 <div id="app" style="display:none">
 <header>
-  <h1>RAG Admin Dashboard</h1>
+  <h1>RAG Control Center</h1>
   <span class="logout" onclick="doLogout()">Sign out</span>
 </header>
 
 <div class="container">
 
-<!-- Toolbar -->
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</div>
+  <div class="tab" data-tab="queries" onclick="switchTab('queries')">Query History</div>
+  <div class="tab" data-tab="monitoring" onclick="switchTab('monitoring')">Monitoring</div>
+  <div class="tab" data-tab="dispatch" onclick="switchTab('dispatch')">Dispatch Test</div>
+</div>
+
+<!-- ============= TAB: Overview ============= -->
+<div class="tab-content active" id="tab-overview">
+
 <div class="toolbar">
   <button onclick="refresh()">Refresh</button>
   <span class="status" id="last-refresh">—</span>
@@ -115,36 +165,112 @@ background:var(--accent);color:#fff;font-size:.85rem;cursor:pointer}
   <div class="card"><div class="label">Cold</div><div class="value cold" id="c-cold">—</div></div>
 </div>
 
+<!-- Monitoring summary cards -->
+<div class="cards" id="monitor-cards">
+  <div class="card"><div class="label">Avg Latency</div><div class="value" id="c-avg-lat">—</div></div>
+  <div class="card"><div class="label">P95 Latency</div><div class="value" id="c-p95-lat">—</div></div>
+  <div class="card"><div class="label">Failure Rate</div><div class="value" id="c-fail-rate">—</div></div>
+  <div class="card"><div class="label">Flagged</div><div class="value" id="c-flagged" style="color:var(--orange)">—</div></div>
+  <div class="card"><div class="label">WhatsApp</div><div class="value" id="c-wa-count" style="color:var(--green)">—</div></div>
+</div>
+
 <!-- Recent leads table -->
 <div class="section">
   <h2>Recent Leads</h2>
   <div style="overflow-x:auto">
     <table>
       <thead><tr>
-        <th>#</th><th>Query</th><th>Intent</th><th>Temp</th><th>Source</th><th>Time</th>
+        <th>#</th><th>Query</th><th>Intent</th><th>Temp</th><th>Channel</th><th>Latency</th><th>Status</th><th>Time</th><th></th>
       </tr></thead>
-      <tbody id="leads-body"><tr><td colspan="6" style="color:var(--muted)">No leads yet</td></tr></tbody>
+      <tbody id="leads-body"><tr><td colspan="9" style="color:var(--muted)">No leads yet</td></tr></tbody>
     </table>
   </div>
 </div>
+</div>
 
-<!-- Dispatch test box -->
+<!-- ============= TAB: Query History ============= -->
+<div class="tab-content" id="tab-queries">
+
+<div class="toolbar">
+  <button onclick="loadQueries()">Refresh</button>
+</div>
+
+<div class="filters">
+  <button class="filter-btn active" data-filter="all" onclick="filterQueries('all')">All</button>
+  <button class="filter-btn" data-filter="failures" onclick="filterQueries('failures')">Failures</button>
+  <button class="filter-btn" data-filter="flagged" onclick="filterQueries('flagged')">Flagged</button>
+  <button class="filter-btn" data-filter="whatsapp" onclick="filterQueries('whatsapp')">WhatsApp</button>
+</div>
+
+<div class="section">
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Query</th><th>Intent</th><th>Answer</th><th>Channel</th>
+        <th>Latency</th><th>Failure</th><th>Time</th><th>Actions</th>
+      </tr></thead>
+      <tbody id="queries-body"><tr><td colspan="9" style="color:var(--muted)">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ============= TAB: Monitoring ============= -->
+<div class="tab-content" id="tab-monitoring">
+<div class="toolbar">
+  <button onclick="loadMonitoring()">Refresh</button>
+</div>
+
+<div class="cards" id="mon-detail-cards">
+  <div class="card"><div class="label">Total Queries</div><div class="value" id="m-total">—</div></div>
+  <div class="card"><div class="label">Failures</div><div class="value bad" id="m-failures">—</div></div>
+  <div class="card"><div class="label">Failure Rate</div><div class="value" id="m-fail-rate">—</div></div>
+  <div class="card"><div class="label">Avg Latency</div><div class="value" id="m-avg-lat">—</div></div>
+  <div class="card"><div class="label">P95 Latency</div><div class="value" id="m-p95-lat">—</div></div>
+  <div class="card"><div class="label">Flagged</div><div class="value" id="m-flagged" style="color:var(--orange)">—</div></div>
+</div>
+
+<div class="section">
+  <h2>By Channel</h2>
+  <div id="mon-channels">—</div>
+</div>
+
+<div class="section">
+  <h2>By Failure Type</h2>
+  <div id="mon-failures">—</div>
+</div>
+</div>
+
+<!-- ============= TAB: Dispatch Test ============= -->
+<div class="tab-content" id="tab-dispatch">
 <div class="section">
   <h2>Test Query — /api/dispatch</h2>
   <div class="dispatch-form">
-    <input id="dispatch-input" type="text" placeholder="Enter a test query…" />
+    <input id="dispatch-input" type="text" placeholder="Enter a test query..." />
     <button id="dispatch-btn" onclick="doDispatch()">Send</button>
   </div>
   <pre id="dispatch-result"></pre>
+</div>
 </div>
 
 </div><!-- .container -->
 </div><!-- #app -->
 
+<!-- ============= Query Detail Modal ============= -->
+<div class="modal-backdrop" id="detail-modal">
+  <div class="modal">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <h3 id="modal-title">Query Detail</h3>
+    <pre id="modal-body"></pre>
+  </div>
+</div>
+
 <script>
 /* ---------- State ---------- */
 let TOKEN = sessionStorage.getItem('admin_token') || '';
 const API = window.location.origin;
+let allLeads = [];
+let currentFilter = 'all';
 
 /* ---------- Auth ---------- */
 function headers(){return {'X-Admin-Token':TOKEN,'Content-Type':'application/json'}}
@@ -185,7 +311,15 @@ function doLogout(){
   }catch(_){sessionStorage.removeItem('admin_token');TOKEN=''}
 })();
 
-/* ---------- Dashboard data ---------- */
+/* ---------- Tabs ---------- */
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+tab));
+  if(tab==='queries') loadQueries();
+  if(tab==='monitoring') loadMonitoring();
+}
+
+/* ---------- Overview ---------- */
 async function refresh(){
   try{
     const [statsR, leadsR] = await Promise.all([
@@ -196,7 +330,6 @@ async function refresh(){
     const stats = await statsR.json();
     const leads = await leadsR.json();
 
-    // KPI cards
     const sys = stats.system||{};
     setText('c-status', sys.status||'—');
     setClass('c-status', sys.status==='ok'?'ok':'bad');
@@ -209,29 +342,171 @@ async function refresh(){
     setText('c-warm', ld.warm??0);
     setText('c-cold', ld.cold??0);
 
-    // Leads table
-    const tbody = document.getElementById('leads-body');
-    const rows = (leads.leads||[]).slice(0,50);
-    if(!rows.length){
-      tbody.innerHTML='<tr><td colspan="6" style="color:var(--muted)">No leads yet</td></tr>';
-    }else{
-      tbody.innerHTML = rows.map((l,i)=>{
-        const d = new Date(l.created_at*1000);
-        const ts = d.toLocaleString();
-        return `<tr>
-          <td>${l.id??i+1}</td>
-          <td>${esc(trunc(l.query,80))}</td>
-          <td>${esc(l.intent)}</td>
-          <td><span class="temp-badge ${l.temperature}">${l.temperature}</span></td>
-          <td>${esc(l.source)}</td>
-          <td>${ts}</td>
-        </tr>`;
-      }).join('');
-    }
+    const mon = stats.monitoring||{};
+    setText('c-avg-lat', (mon.avg_latency_ms||0)+'ms');
+    setText('c-p95-lat', (mon.p95_latency_ms||0)+'ms');
+    const fr = mon.failure_rate||0;
+    setText('c-fail-rate', fr+'%');
+    setClass('c-fail-rate', fr>10?'bad':fr>5?'warn':'ok');
+    setText('c-flagged', mon.flagged||0);
+    setText('c-wa-count', (mon.by_channel||{}).whatsapp||0);
 
+    allLeads = (leads.leads||[]);
+    renderLeadsTable(allLeads.slice(0,50));
     document.getElementById('last-refresh').textContent='Updated '+new Date().toLocaleTimeString();
   }catch(e){console.error('refresh failed',e)}
 }
+
+function renderLeadsTable(rows){
+  const tbody = document.getElementById('leads-body');
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="9" style="color:var(--muted)">No leads yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(l=>{
+    const d = new Date(l.created_at*1000);
+    const ts = d.toLocaleString();
+    const ch = l.channel||'api';
+    const lat = l.latency_ms!=null ? l.latency_ms+'ms' : '—';
+    const fail = l.failure_type ? `<span class="failure-badge">${esc(l.failure_type)}</span>` : 'ok';
+    const flagCls = l.flagged ? 'flagged' : '';
+    return `<tr>
+      <td>${l.id??''}</td>
+      <td><a href="#" onclick="showDetail(${l.id});return false">${esc(trunc(l.query,60))}</a></td>
+      <td>${esc(l.intent)}</td>
+      <td><span class="temp-badge ${l.temperature}">${l.temperature}</span></td>
+      <td><span class="channel-badge ${ch}">${ch}</span></td>
+      <td>${lat}</td>
+      <td>${fail}</td>
+      <td>${ts}</td>
+      <td>
+        <button class="btn-sm ${flagCls}" onclick="toggleFlag(${l.id})" title="Flag">${l.flagged?'\u2691':'\u2690'}</button>
+        <button class="btn-sm" onclick="rerunQuery(${l.id})" title="Re-run">\u21BB</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ---------- Query History tab ---------- */
+async function loadQueries(){
+  let url = API+'/leads';
+  if(currentFilter==='failures') url = API+'/leads/failures';
+  else if(currentFilter==='flagged') url = API+'/leads/flagged';
+
+  try{
+    const r = await fetch(url,{headers:headers()});
+    if(r.status===401){doLogout();return}
+    const data = await r.json();
+    let rows = data.leads||[];
+    if(currentFilter==='whatsapp') rows = rows.filter(l=>(l.channel||'api')==='whatsapp');
+    renderQueryTable(rows.slice(0,200));
+  }catch(e){console.error('loadQueries',e)}
+}
+
+function filterQueries(f){
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===f));
+  loadQueries();
+}
+
+function renderQueryTable(rows){
+  const tbody = document.getElementById('queries-body');
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="9" style="color:var(--muted)">No queries found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(l=>{
+    const d = new Date(l.created_at*1000);
+    const ts = d.toLocaleString();
+    const ch = l.channel||'api';
+    const lat = l.latency_ms!=null ? l.latency_ms+'ms' : '—';
+    const fail = l.failure_type ? `<span class="failure-badge">${esc(l.failure_type)}</span>` : '—';
+    const ans = l.answer ? trunc(l.answer,40) : '—';
+    const flagCls = l.flagged ? 'flagged' : '';
+    return `<tr>
+      <td>${l.id??''}</td>
+      <td><a href="#" onclick="showDetail(${l.id});return false">${esc(trunc(l.query,50))}</a></td>
+      <td>${esc(l.intent)}</td>
+      <td>${esc(ans)}</td>
+      <td><span class="channel-badge ${ch}">${ch}</span></td>
+      <td>${lat}</td>
+      <td>${fail}</td>
+      <td>${ts}</td>
+      <td>
+        <button class="btn-sm ${flagCls}" onclick="toggleFlag(${l.id})" title="Flag">${l.flagged?'\u2691':'\u2690'}</button>
+        <button class="btn-sm" onclick="rerunQuery(${l.id})" title="Re-run">\u21BB</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ---------- Monitoring tab ---------- */
+async function loadMonitoring(){
+  try{
+    const r = await fetch(API+'/admin/monitoring',{headers:headers()});
+    if(r.status===401){doLogout();return}
+    const m = await r.json();
+    setText('m-total', m.total_queries||0);
+    setText('m-failures', m.failures||0);
+    const fr = m.failure_rate||0;
+    setText('m-fail-rate', fr+'%');
+    setClass('m-fail-rate', fr>10?'bad':fr>5?'warn':'ok');
+    setText('m-avg-lat', (m.avg_latency_ms||0)+'ms');
+    setText('m-p95-lat', (m.p95_latency_ms||0)+'ms');
+    setText('m-flagged', m.flagged||0);
+
+    const chDiv = document.getElementById('mon-channels');
+    const ch = m.by_channel||{};
+    chDiv.innerHTML = Object.keys(ch).length
+      ? Object.entries(ch).map(([k,v])=>`<span class="channel-badge ${k}" style="margin-right:.5rem">${k}: ${v}</span>`).join('')
+      : '<span style="color:var(--muted)">No data</span>';
+
+    const fDiv = document.getElementById('mon-failures');
+    const ft = m.by_failure_type||{};
+    fDiv.innerHTML = Object.keys(ft).length
+      ? Object.entries(ft).map(([k,v])=>`<span class="failure-badge" style="margin-right:.5rem">${k}: ${v}</span>`).join('')
+      : '<span style="color:var(--muted)">No failures</span>';
+  }catch(e){console.error('loadMonitoring',e)}
+}
+
+/* ---------- Actions ---------- */
+async function toggleFlag(id){
+  try{
+    await fetch(API+'/leads/'+id+'/flag',{method:'POST',headers:headers()});
+    refresh(); loadQueries();
+  }catch(e){console.error('flag',e)}
+}
+
+async function rerunQuery(id){
+  try{
+    const r = await fetch(API+'/leads/'+id+'/rerun',{method:'POST',headers:headers()});
+    const data = await r.json();
+    if(r.status===503){alert(data.detail||'RAG not ready');return}
+    showModal('Re-run Result (original #'+id+')', JSON.stringify(data,null,2));
+    refresh(); loadQueries();
+  }catch(e){console.error('rerun',e)}
+}
+
+async function showDetail(id){
+  const lead = allLeads.find(l=>l.id===id);
+  if(lead){
+    showModal('Query #'+id, JSON.stringify(lead,null,2));
+    return;
+  }
+  try{
+    const r = await fetch(API+'/leads',{headers:headers()});
+    const data = await r.json();
+    const found = (data.leads||[]).find(l=>l.id===id);
+    showModal('Query #'+id, found ? JSON.stringify(found,null,2) : 'Not found');
+  }catch(e){showModal('Error',e.message)}
+}
+
+function showModal(title,body){
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-body').textContent=body;
+  document.getElementById('detail-modal').classList.add('open');
+}
+function closeModal(){document.getElementById('detail-modal').classList.remove('open')}
 
 /* ---------- Dispatch ---------- */
 async function doDispatch(){
@@ -240,8 +515,8 @@ async function doDispatch(){
   const pre   = document.getElementById('dispatch-result');
   const q = input.value.trim();
   if(!q) return;
-  btn.disabled=true; btn.textContent='Sending…';
-  pre.style.display='block'; pre.textContent='Loading…';
+  btn.disabled=true; btn.textContent='Sending...';
+  pre.style.display='block'; pre.textContent='Loading...';
   try{
     const r = await fetch(API+'/api/dispatch',{
       method:'POST',headers:headers(),body:JSON.stringify({question:q})
@@ -261,12 +536,14 @@ function setClass(id,cls){
   el.className='value';el.classList.add(cls);
 }
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
-function trunc(s,n){return s&&s.length>n?s.slice(0,n)+'…':s||''}
+function trunc(s,n){return s&&s.length>n?s.slice(0,n)+'...':s||''}
 
 /* Enter key on token input */
 document.getElementById('token-input').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 /* Enter key on dispatch input */
 document.getElementById('dispatch-input').addEventListener('keydown',e=>{if(e.key==='Enter')doDispatch()});
+/* Click outside modal to close */
+document.getElementById('detail-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal()});
 </script>
 </body>
 </html>

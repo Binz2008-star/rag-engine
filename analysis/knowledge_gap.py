@@ -2,12 +2,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
 import requests
 
 from app.config import MAX_RETRIES, TIMEOUT, CHAT_MODEL, OLLAMA_BASE_URL
+
+log = logging.getLogger(__name__)
+
+# Hard ceiling for the entire gap analysis (LLM call + retries).
+# Prevents 20-30s hangs when Ollama is slow.  Configurable via env.
+_GAP_TIMEOUT_S = int(os.environ.get("KGAP_TIMEOUT_S", "5"))
+_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="kgap")
 from app.models import KnowledgeGap
 
 
@@ -53,7 +63,33 @@ class KnowledgeGapAnalyzer:
         key = hashlib.md5(f"{intent}:{normalized_query}".encode()).hexdigest()
         if key in self._cache:
             return self._cache[key]
-        result = self._run(query, intent, normalized_query)
+
+        t0 = time.perf_counter()
+        try:
+            future = _EXECUTOR.submit(self._run, query, intent, normalized_query)
+            result = future.result(timeout=_GAP_TIMEOUT_S)
+        except FuturesTimeout:
+            elapsed = time.perf_counter() - t0
+            log.warning(
+                "knowledge_gap: LLM call timed out after %.1fs (limit=%ds), "
+                "returning fallback",
+                elapsed, _GAP_TIMEOUT_S,
+            )
+            result = KnowledgeGap(
+                gap_type="missing_information",
+                confidence_if_adversarial=0.0,
+                suggested_action="add_relevant_documents",
+            )
+        except Exception:
+            log.exception("knowledge_gap: unexpected error")
+            result = KnowledgeGap(
+                gap_type="missing_information",
+                confidence_if_adversarial=0.0,
+                suggested_action="add_relevant_documents",
+            )
+
+        elapsed = time.perf_counter() - t0
+        log.info("knowledge_gap: completed in %.1fs", elapsed)
         self._cache[key] = result
         return result
 

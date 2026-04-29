@@ -17,6 +17,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from .admin_routes import register_admin_routes  # noqa: E402
+from .whatsapp_routes import register_whatsapp_routes  # noqa: E402
 from .core.config import get_settings  # noqa: E402
 from .core.logging import configure_logging  # noqa: E402
 from .infra.ollama_health import OllamaUnavailableError, check_ollama  # noqa: E402
@@ -200,6 +201,7 @@ def create_app() -> FastAPI:
         )
 
     register_admin_routes(app)
+    register_whatsapp_routes(app)
 
     return app
 
