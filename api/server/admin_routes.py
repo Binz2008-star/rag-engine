@@ -12,15 +12,19 @@ Adds the following endpoints consumed by the admin dashboard:
 - POST /leads/{id}/rerun -- re-dispatch a lead's query
 - GET  /admin/monitoring -- aggregate latency / failure stats
 - POST /api/dispatch   -- forward a query through the RAG pipeline
+- POST /api/dashboard/eval-cases -- save an eval case (JSONL)
+- GET  /api/dashboard/eval-cases -- list recent eval cases
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import secrets
 import time
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, List
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
@@ -311,3 +315,77 @@ def register_admin_routes(app: FastAPI) -> None:
             "request_id": result.get("request_id", ""),
             "payload": result,
         }
+
+    # ---- Eval cases (protected) ----------------------------------------
+
+    _EVAL_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+    _EVAL_FILE = _EVAL_DIR / "eval_cases.jsonl"
+
+    _VALID_FEEDBACK_LABELS = {
+        "good", "bad", "wrong_source", "too_slow", "false_refusal",
+    }
+
+    @app.post(
+        "/api/dashboard/eval-cases",
+        dependencies=[Depends(verify_admin_token)],
+    )
+    async def save_eval_case(request: Request) -> Dict[str, Any]:
+        body = await request.json()
+
+        query = (body.get("query") or "").strip()
+        if not query:
+            raise HTTPException(status_code=422, detail="query is required")
+
+        feedback_label = (body.get("feedback_label") or "").strip().lower()
+        if not feedback_label:
+            raise HTTPException(
+                status_code=422, detail="feedback_label is required"
+            )
+
+        must_include = body.get("must_include", [])
+        if isinstance(must_include, str):
+            must_include = [s.strip() for s in must_include.split(",") if s.strip()]
+
+        case: Dict[str, Any] = {
+            "query": query,
+            "actual_answer": body.get("actual_answer"),
+            "expected_intent": body.get("expected_intent"),
+            "expected_source": body.get("expected_source"),
+            "must_include": must_include,
+            "feedback_label": feedback_label,
+            "notes": body.get("notes"),
+            "actual_intent": body.get("actual_intent"),
+            "actual_failure_type": body.get("actual_failure_type"),
+            "actual_sources": body.get("actual_sources"),
+            "latency_ms": body.get("latency_ms"),
+            "request_id": body.get("request_id"),
+            "created_at": time.time(),
+        }
+
+        _EVAL_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_EVAL_FILE, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(case, ensure_ascii=False) + "\n")
+
+        logger.info("eval_case: saved query=%r label=%s", query[:60], feedback_label)
+        return {"status": "ok", "saved": True}
+
+    @app.get(
+        "/api/dashboard/eval-cases",
+        dependencies=[Depends(verify_admin_token)],
+    )
+    async def list_eval_cases() -> Dict[str, Any]:
+        if not _EVAL_FILE.exists():
+            return {"cases": [], "total": 0}
+
+        cases: List[Dict[str, Any]] = []
+        for line in _EVAL_FILE.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                cases.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+        cases.reverse()
+        return {"cases": cases, "total": len(cases)}

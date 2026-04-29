@@ -36,7 +36,7 @@ header .logout:hover{color:var(--text)}
 .container{max-width:1200px;margin:0 auto;padding:1.5rem}
 
 /* ---------- Tabs ---------- */
-.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.5rem;flex-wrap:wrap}
 .tab{padding:.6rem 1.25rem;cursor:pointer;font-size:.9rem;color:var(--muted);
 border-bottom:2px solid transparent;transition:.2s}
 .tab:hover{color:var(--text)}
@@ -78,7 +78,7 @@ background:var(--bg);color:var(--muted);font-size:.75rem;cursor:pointer}
 .btn-sm:hover{color:var(--text);border-color:var(--muted)}
 .btn-sm.flagged{color:var(--orange);border-color:var(--orange)}
 
-/* ---------- Dispatch box ---------- */
+/* ---------- Dispatch / Test Lab form ---------- */
 .dispatch-form{display:flex;gap:.75rem;margin-bottom:1rem}
 .dispatch-form input{flex:1;padding:.6rem .8rem;border-radius:.5rem;
 border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.9rem}
@@ -102,7 +102,7 @@ background:var(--accent);color:#fff;font-size:.85rem;cursor:pointer}
 align-items:center;justify-content:center}
 .modal-backdrop.open{display:flex}
 .modal{background:var(--card);border:1px solid var(--border);border-radius:.75rem;
-padding:1.5rem;width:600px;max-width:90vw;max-height:80vh;overflow-y:auto}
+padding:1.5rem;width:640px;max-width:90vw;max-height:80vh;overflow-y:auto}
 .modal h3{margin-bottom:1rem;font-size:1rem}
 .modal pre{background:var(--bg);border:1px solid var(--border);border-radius:.5rem;
 padding:.75rem;font-size:.8rem;white-space:pre-wrap;max-height:300px;overflow-y:auto}
@@ -115,6 +115,37 @@ padding:.75rem;font-size:.8rem;white-space:pre-wrap;max-height:300px;overflow-y:
 background:var(--bg);color:var(--muted);font-size:.8rem;cursor:pointer}
 .filter-btn:hover{color:var(--text);border-color:var(--muted)}
 .filter-btn.active{color:var(--accent);border-color:var(--accent)}
+
+/* ---------- AI Test Lab ---------- */
+.lab-response{background:var(--bg);border:1px solid var(--border);border-radius:.5rem;
+padding:1rem;margin-bottom:1rem;display:none}
+.lab-response .answer{font-size:.95rem;margin-bottom:.75rem;line-height:1.6}
+.lab-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.5rem;
+margin-bottom:.75rem;font-size:.82rem}
+.lab-meta .item{background:var(--card);border:1px solid var(--border);border-radius:.35rem;padding:.4rem .6rem}
+.lab-meta .item .lbl{color:var(--muted);font-size:.7rem;text-transform:uppercase}
+.lab-meta .item .val{font-weight:600}
+.lab-sources{margin-bottom:.75rem}
+.lab-sources table{font-size:.82rem}
+.feedback-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.fb-btn{padding:.35rem .8rem;border:1px solid var(--border);border-radius:.35rem;
+background:var(--bg);color:var(--muted);font-size:.82rem;cursor:pointer;transition:.2s}
+.fb-btn:hover{border-color:var(--accent);color:var(--text)}
+.fb-btn.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+.fb-btn.good.selected{background:var(--green);border-color:var(--green)}
+.fb-btn.bad.selected{background:var(--red);border-color:var(--red)}
+.eval-form{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:1rem}
+.eval-form label{font-size:.8rem;color:var(--muted)}
+.eval-form input,.eval-form textarea{width:100%;padding:.45rem .6rem;border-radius:.35rem;
+border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem}
+.eval-form textarea{grid-column:1/-1;min-height:60px;resize:vertical}
+.eval-form .full{grid-column:1/-1}
+.save-bar{display:flex;gap:.75rem;align-items:center;margin-bottom:1.5rem}
+.save-bar button{padding:.5rem 1.25rem;border:none;border-radius:.4rem;
+background:var(--green);color:#fff;font-size:.85rem;cursor:pointer}
+.save-bar button:hover{opacity:.9}
+.save-bar button:disabled{opacity:.5;cursor:not-allowed}
+.save-bar .save-status{font-size:.82rem;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -143,6 +174,7 @@ background:var(--bg);color:var(--muted);font-size:.8rem;cursor:pointer}
   <div class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</div>
   <div class="tab" data-tab="queries" onclick="switchTab('queries')">Query History</div>
   <div class="tab" data-tab="monitoring" onclick="switchTab('monitoring')">Monitoring</div>
+  <div class="tab" data-tab="testlab" onclick="switchTab('testlab')">AI Test Lab</div>
   <div class="tab" data-tab="dispatch" onclick="switchTab('dispatch')">Dispatch Test</div>
 </div>
 
@@ -151,27 +183,27 @@ background:var(--bg);color:var(--muted);font-size:.8rem;cursor:pointer}
 
 <div class="toolbar">
   <button onclick="refresh()">Refresh</button>
-  <span class="status" id="last-refresh">—</span>
+  <span class="status" id="last-refresh">&mdash;</span>
 </div>
 
 <!-- KPI cards -->
 <div class="cards">
-  <div class="card"><div class="label">System Status</div><div class="value" id="c-status">—</div></div>
-  <div class="card"><div class="label">RAG Ready</div><div class="value" id="c-rag">—</div></div>
-  <div class="card"><div class="label">Indexes</div><div class="value" id="c-indexes">—</div></div>
-  <div class="card"><div class="label">Total Leads</div><div class="value" id="c-total">—</div></div>
-  <div class="card"><div class="label">Hot</div><div class="value hot" id="c-hot">—</div></div>
-  <div class="card"><div class="label">Warm</div><div class="value warm" id="c-warm">—</div></div>
-  <div class="card"><div class="label">Cold</div><div class="value cold" id="c-cold">—</div></div>
+  <div class="card"><div class="label">System Status</div><div class="value" id="c-status">&mdash;</div></div>
+  <div class="card"><div class="label">RAG Ready</div><div class="value" id="c-rag">&mdash;</div></div>
+  <div class="card"><div class="label">Indexes</div><div class="value" id="c-indexes">&mdash;</div></div>
+  <div class="card"><div class="label">Total Leads</div><div class="value" id="c-total">&mdash;</div></div>
+  <div class="card"><div class="label">Hot</div><div class="value hot" id="c-hot">&mdash;</div></div>
+  <div class="card"><div class="label">Warm</div><div class="value warm" id="c-warm">&mdash;</div></div>
+  <div class="card"><div class="label">Cold</div><div class="value cold" id="c-cold">&mdash;</div></div>
 </div>
 
 <!-- Monitoring summary cards -->
 <div class="cards" id="monitor-cards">
-  <div class="card"><div class="label">Avg Latency</div><div class="value" id="c-avg-lat">—</div></div>
-  <div class="card"><div class="label">P95 Latency</div><div class="value" id="c-p95-lat">—</div></div>
-  <div class="card"><div class="label">Failure Rate</div><div class="value" id="c-fail-rate">—</div></div>
-  <div class="card"><div class="label">Flagged</div><div class="value" id="c-flagged" style="color:var(--orange)">—</div></div>
-  <div class="card"><div class="label">WhatsApp</div><div class="value" id="c-wa-count" style="color:var(--green)">—</div></div>
+  <div class="card"><div class="label">Avg Latency</div><div class="value" id="c-avg-lat">&mdash;</div></div>
+  <div class="card"><div class="label">P95 Latency</div><div class="value" id="c-p95-lat">&mdash;</div></div>
+  <div class="card"><div class="label">Failure Rate</div><div class="value" id="c-fail-rate">&mdash;</div></div>
+  <div class="card"><div class="label">Flagged</div><div class="value" id="c-flagged" style="color:var(--orange)">&mdash;</div></div>
+  <div class="card"><div class="label">WhatsApp</div><div class="value" id="c-wa-count" style="color:var(--green)">&mdash;</div></div>
 </div>
 
 <!-- Recent leads table -->
@@ -222,29 +254,103 @@ background:var(--bg);color:var(--muted);font-size:.8rem;cursor:pointer}
 </div>
 
 <div class="cards" id="mon-detail-cards">
-  <div class="card"><div class="label">Total Queries</div><div class="value" id="m-total">—</div></div>
-  <div class="card"><div class="label">Failures</div><div class="value bad" id="m-failures">—</div></div>
-  <div class="card"><div class="label">Failure Rate</div><div class="value" id="m-fail-rate">—</div></div>
-  <div class="card"><div class="label">Avg Latency</div><div class="value" id="m-avg-lat">—</div></div>
-  <div class="card"><div class="label">P95 Latency</div><div class="value" id="m-p95-lat">—</div></div>
-  <div class="card"><div class="label">Flagged</div><div class="value" id="m-flagged" style="color:var(--orange)">—</div></div>
+  <div class="card"><div class="label">Total Queries</div><div class="value" id="m-total">&mdash;</div></div>
+  <div class="card"><div class="label">Failures</div><div class="value bad" id="m-failures">&mdash;</div></div>
+  <div class="card"><div class="label">Failure Rate</div><div class="value" id="m-fail-rate">&mdash;</div></div>
+  <div class="card"><div class="label">Avg Latency</div><div class="value" id="m-avg-lat">&mdash;</div></div>
+  <div class="card"><div class="label">P95 Latency</div><div class="value" id="m-p95-lat">&mdash;</div></div>
+  <div class="card"><div class="label">Flagged</div><div class="value" id="m-flagged" style="color:var(--orange)">&mdash;</div></div>
 </div>
 
 <div class="section">
   <h2>By Channel</h2>
-  <div id="mon-channels">—</div>
+  <div id="mon-channels">&mdash;</div>
 </div>
 
 <div class="section">
   <h2>By Failure Type</h2>
-  <div id="mon-failures">—</div>
+  <div id="mon-failures">&mdash;</div>
 </div>
+</div>
+
+<!-- ============= TAB: AI Test Lab ============= -->
+<div class="tab-content" id="tab-testlab">
+
+<!-- Query input -->
+<div class="section">
+  <h2>AI Test Lab</h2>
+  <div class="dispatch-form">
+    <input id="lab-input" type="text" placeholder="Enter a test query (e.g. What are your grease trap prices?)" />
+    <button id="lab-send-btn" onclick="labSend()">Send</button>
+  </div>
+
+  <!-- Response panel -->
+  <div class="lab-response" id="lab-response">
+    <div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem">ANSWER</div>
+    <div class="answer" id="lab-answer"></div>
+
+    <div class="lab-meta" id="lab-meta"></div>
+
+    <!-- Sources table -->
+    <div class="lab-sources" id="lab-sources-section" style="display:none">
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem">SOURCES</div>
+      <table>
+        <thead><tr><th>Source</th><th>Chunk ID</th><th>Doc Type</th><th>Score</th></tr></thead>
+        <tbody id="lab-sources-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Feedback buttons -->
+    <div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem;margin-top:.75rem">FEEDBACK</div>
+    <div class="feedback-bar" id="lab-feedback-bar">
+      <button class="fb-btn good" data-label="good" onclick="labFeedback(this)">Good</button>
+      <button class="fb-btn bad" data-label="bad" onclick="labFeedback(this)">Bad</button>
+      <button class="fb-btn" data-label="wrong_source" onclick="labFeedback(this)">Wrong Source</button>
+      <button class="fb-btn" data-label="too_slow" onclick="labFeedback(this)">Too Slow</button>
+      <button class="fb-btn" data-label="false_refusal" onclick="labFeedback(this)">False Refusal</button>
+    </div>
+
+    <!-- Save as eval case form -->
+    <div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem">SAVE AS EVAL CASE</div>
+    <div class="eval-form" id="lab-eval-form">
+      <div><label>Expected Intent</label><input id="eval-intent" type="text" placeholder="e.g. eco" /></div>
+      <div><label>Expected Source</label><input id="eval-source" type="text" placeholder="e.g. pricing.md" /></div>
+      <div><label>Must Include</label><input id="eval-must" type="text" placeholder="e.g. AED, grease trap (comma-separated)" /></div>
+      <div><label>Feedback Label</label><input id="eval-label" type="text" readonly /></div>
+      <textarea id="eval-notes" placeholder="Notes (optional)"></textarea>
+    </div>
+    <div class="save-bar">
+      <button id="lab-save-btn" onclick="labSaveEval()" disabled>Save Eval Case</button>
+      <span class="save-status" id="lab-save-status"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Saved eval cases -->
+<div class="section">
+  <h2>Saved Eval Cases</h2>
+  <div class="toolbar">
+    <button onclick="loadEvalCases()">Refresh</button>
+    <button onclick="exportEvalCases()">Export JSON</button>
+    <span class="status" id="eval-count">&mdash;</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Query</th><th>Label</th><th>Exp. Intent</th><th>Exp. Source</th>
+        <th>Act. Intent</th><th>Failure</th><th>Latency</th><th>Time</th><th></th>
+      </tr></thead>
+      <tbody id="eval-body"><tr><td colspan="9" style="color:var(--muted)">No eval cases yet</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
 </div>
 
 <!-- ============= TAB: Dispatch Test ============= -->
 <div class="tab-content" id="tab-dispatch">
 <div class="section">
-  <h2>Test Query — /api/dispatch</h2>
+  <h2>Test Query &mdash; /api/dispatch</h2>
   <div class="dispatch-form">
     <input id="dispatch-input" type="text" placeholder="Enter a test query..." />
     <button id="dispatch-btn" onclick="doDispatch()">Send</button>
@@ -266,13 +372,24 @@ background:var(--bg);color:var(--muted);font-size:.8rem;cursor:pointer}
 </div>
 
 <script>
-/* ---------- State ---------- */
+/* ================================================================
+   State
+   ================================================================ */
 let TOKEN = sessionStorage.getItem('admin_token') || '';
 const API = window.location.origin;
 let allLeads = [];
 let currentFilter = 'all';
 
-/* ---------- Auth ---------- */
+// AI Test Lab state
+let labResult = null;
+let labQuery = '';
+let labFeedbackLabel = '';
+let labWallMs = 0;
+let evalCasesCache = [];
+
+/* ================================================================
+   Auth
+   ================================================================ */
 function headers(){return {'X-Admin-Token':TOKEN,'Content-Type':'application/json'}}
 
 async function doLogin(){
@@ -298,7 +415,7 @@ function doLogout(){
   document.getElementById('token-input').value='';
 }
 
-/* ---------- Auto-login if token saved ---------- */
+/* Auto-login if token saved */
 (async function(){
   if(!TOKEN) return;
   try{
@@ -311,15 +428,20 @@ function doLogout(){
   }catch(_){sessionStorage.removeItem('admin_token');TOKEN=''}
 })();
 
-/* ---------- Tabs ---------- */
+/* ================================================================
+   Tabs
+   ================================================================ */
 function switchTab(tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+tab));
   if(tab==='queries') loadQueries();
   if(tab==='monitoring') loadMonitoring();
+  if(tab==='testlab') loadEvalCases();
 }
 
-/* ---------- Overview ---------- */
+/* ================================================================
+   Overview
+   ================================================================ */
 async function refresh(){
   try{
     const [statsR, leadsR] = await Promise.all([
@@ -331,11 +453,11 @@ async function refresh(){
     const leads = await leadsR.json();
 
     const sys = stats.system||{};
-    setText('c-status', sys.status||'—');
+    setText('c-status', sys.status||'\u2014');
     setClass('c-status', sys.status==='ok'?'ok':'bad');
     setText('c-rag', sys.rag_ready?'Ready':'Not Ready');
     setClass('c-rag', sys.rag_ready?'ok':'warn');
-    setText('c-indexes', sys.index_count??'—');
+    setText('c-indexes', sys.index_count??'\u2014');
     const ld = stats.leads||{};
     setText('c-total', ld.total??0);
     setText('c-hot', ld.hot??0);
@@ -367,27 +489,29 @@ function renderLeadsTable(rows){
     const d = new Date(l.created_at*1000);
     const ts = d.toLocaleString();
     const ch = l.channel||'api';
-    const lat = l.latency_ms!=null ? l.latency_ms+'ms' : '—';
-    const fail = l.failure_type ? `<span class="failure-badge">${esc(l.failure_type)}</span>` : 'ok';
+    const lat = l.latency_ms!=null ? l.latency_ms+'ms' : '\u2014';
+    const fail = l.failure_type ? '<span class="failure-badge">'+esc(l.failure_type)+'</span>' : 'ok';
     const flagCls = l.flagged ? 'flagged' : '';
-    return `<tr>
-      <td>${l.id??''}</td>
-      <td><a href="#" onclick="showDetail(${l.id});return false">${esc(trunc(l.query,60))}</a></td>
-      <td>${esc(l.intent)}</td>
-      <td><span class="temp-badge ${l.temperature}">${l.temperature}</span></td>
-      <td><span class="channel-badge ${ch}">${ch}</span></td>
-      <td>${lat}</td>
-      <td>${fail}</td>
-      <td>${ts}</td>
-      <td>
-        <button class="btn-sm ${flagCls}" onclick="toggleFlag(${l.id})" title="Flag">${l.flagged?'\u2691':'\u2690'}</button>
-        <button class="btn-sm" onclick="rerunQuery(${l.id})" title="Re-run">\u21BB</button>
-      </td>
-    </tr>`;
+    return '<tr>'+
+      '<td>'+(l.id??'')+'</td>'+
+      '<td><a href="#" onclick="showDetail('+l.id+');return false">'+esc(trunc(l.query,60))+'</a></td>'+
+      '<td>'+esc(l.intent)+'</td>'+
+      '<td><span class="temp-badge '+l.temperature+'">'+l.temperature+'</span></td>'+
+      '<td><span class="channel-badge '+ch+'">'+ch+'</span></td>'+
+      '<td>'+lat+'</td>'+
+      '<td>'+fail+'</td>'+
+      '<td>'+ts+'</td>'+
+      '<td>'+
+        '<button class="btn-sm '+flagCls+'" onclick="toggleFlag('+l.id+')" title="Flag">'+(l.flagged?'\u2691':'\u2690')+'</button> '+
+        '<button class="btn-sm" onclick="rerunQuery('+l.id+')" title="Re-run">\u21BB</button>'+
+      '</td>'+
+    '</tr>';
   }).join('');
 }
 
-/* ---------- Query History tab ---------- */
+/* ================================================================
+   Query History
+   ================================================================ */
 async function loadQueries(){
   let url = API+'/leads';
   if(currentFilter==='failures') url = API+'/leads/failures';
@@ -419,28 +543,30 @@ function renderQueryTable(rows){
     const d = new Date(l.created_at*1000);
     const ts = d.toLocaleString();
     const ch = l.channel||'api';
-    const lat = l.latency_ms!=null ? l.latency_ms+'ms' : '—';
-    const fail = l.failure_type ? `<span class="failure-badge">${esc(l.failure_type)}</span>` : '—';
-    const ans = l.answer ? trunc(l.answer,40) : '—';
+    const lat = l.latency_ms!=null ? l.latency_ms+'ms' : '\u2014';
+    const fail = l.failure_type ? '<span class="failure-badge">'+esc(l.failure_type)+'</span>' : '\u2014';
+    const ans = l.answer ? trunc(l.answer,40) : '\u2014';
     const flagCls = l.flagged ? 'flagged' : '';
-    return `<tr>
-      <td>${l.id??''}</td>
-      <td><a href="#" onclick="showDetail(${l.id});return false">${esc(trunc(l.query,50))}</a></td>
-      <td>${esc(l.intent)}</td>
-      <td>${esc(ans)}</td>
-      <td><span class="channel-badge ${ch}">${ch}</span></td>
-      <td>${lat}</td>
-      <td>${fail}</td>
-      <td>${ts}</td>
-      <td>
-        <button class="btn-sm ${flagCls}" onclick="toggleFlag(${l.id})" title="Flag">${l.flagged?'\u2691':'\u2690'}</button>
-        <button class="btn-sm" onclick="rerunQuery(${l.id})" title="Re-run">\u21BB</button>
-      </td>
-    </tr>`;
+    return '<tr>'+
+      '<td>'+(l.id??'')+'</td>'+
+      '<td><a href="#" onclick="showDetail('+l.id+');return false">'+esc(trunc(l.query,50))+'</a></td>'+
+      '<td>'+esc(l.intent)+'</td>'+
+      '<td>'+esc(ans)+'</td>'+
+      '<td><span class="channel-badge '+ch+'">'+ch+'</span></td>'+
+      '<td>'+lat+'</td>'+
+      '<td>'+fail+'</td>'+
+      '<td>'+ts+'</td>'+
+      '<td>'+
+        '<button class="btn-sm '+flagCls+'" onclick="toggleFlag('+l.id+')" title="Flag">'+(l.flagged?'\u2691':'\u2690')+'</button> '+
+        '<button class="btn-sm" onclick="rerunQuery('+l.id+')" title="Re-run">\u21BB</button>'+
+      '</td>'+
+    '</tr>';
   }).join('');
 }
 
-/* ---------- Monitoring tab ---------- */
+/* ================================================================
+   Monitoring
+   ================================================================ */
 async function loadMonitoring(){
   try{
     const r = await fetch(API+'/admin/monitoring',{headers:headers()});
@@ -458,18 +584,20 @@ async function loadMonitoring(){
     const chDiv = document.getElementById('mon-channels');
     const ch = m.by_channel||{};
     chDiv.innerHTML = Object.keys(ch).length
-      ? Object.entries(ch).map(([k,v])=>`<span class="channel-badge ${k}" style="margin-right:.5rem">${k}: ${v}</span>`).join('')
+      ? Object.entries(ch).map(function(e){return '<span class="channel-badge '+e[0]+'" style="margin-right:.5rem">'+e[0]+': '+e[1]+'</span>'}).join('')
       : '<span style="color:var(--muted)">No data</span>';
 
     const fDiv = document.getElementById('mon-failures');
     const ft = m.by_failure_type||{};
     fDiv.innerHTML = Object.keys(ft).length
-      ? Object.entries(ft).map(([k,v])=>`<span class="failure-badge" style="margin-right:.5rem">${k}: ${v}</span>`).join('')
+      ? Object.entries(ft).map(function(e){return '<span class="failure-badge" style="margin-right:.5rem">'+e[0]+': '+e[1]+'</span>'}).join('')
       : '<span style="color:var(--muted)">No failures</span>';
   }catch(e){console.error('loadMonitoring',e)}
 }
 
-/* ---------- Actions ---------- */
+/* ================================================================
+   Actions (flag / rerun / detail)
+   ================================================================ */
 async function toggleFlag(id){
   try{
     await fetch(API+'/leads/'+id+'/flag',{method:'POST',headers:headers()});
@@ -488,7 +616,7 @@ async function rerunQuery(id){
 }
 
 async function showDetail(id){
-  const lead = allLeads.find(l=>l.id===id);
+  const lead = allLeads.find(function(l){return l.id===id});
   if(lead){
     showModal('Query #'+id, JSON.stringify(lead,null,2));
     return;
@@ -496,7 +624,7 @@ async function showDetail(id){
   try{
     const r = await fetch(API+'/leads',{headers:headers()});
     const data = await r.json();
-    const found = (data.leads||[]).find(l=>l.id===id);
+    const found = (data.leads||[]).find(function(l){return l.id===id});
     showModal('Query #'+id, found ? JSON.stringify(found,null,2) : 'Not found');
   }catch(e){showModal('Error',e.message)}
 }
@@ -508,7 +636,9 @@ function showModal(title,body){
 }
 function closeModal(){document.getElementById('detail-modal').classList.remove('open')}
 
-/* ---------- Dispatch ---------- */
+/* ================================================================
+   Dispatch Test (simple)
+   ================================================================ */
 async function doDispatch(){
   const input = document.getElementById('dispatch-input');
   const btn   = document.getElementById('dispatch-btn');
@@ -529,7 +659,208 @@ async function doDispatch(){
   finally{btn.disabled=false;btn.textContent='Send'}
 }
 
-/* ---------- Helpers ---------- */
+/* ================================================================
+   AI Test Lab
+   ================================================================ */
+async function labSend(){
+  const input = document.getElementById('lab-input');
+  const btn   = document.getElementById('lab-send-btn');
+  const q = input.value.trim();
+  if(!q) return;
+
+  // Reset state
+  labResult = null; labQuery = q; labFeedbackLabel = '';
+  document.querySelectorAll('.fb-btn').forEach(function(b){b.classList.remove('selected')});
+  document.getElementById('eval-label').value = '';
+  document.getElementById('lab-save-btn').disabled = true;
+  document.getElementById('lab-save-status').textContent = '';
+
+  btn.disabled=true; btn.textContent='Sending...';
+  const respPanel = document.getElementById('lab-response');
+  respPanel.style.display='block';
+  document.getElementById('lab-answer').textContent='Loading...';
+  document.getElementById('lab-meta').innerHTML='';
+  document.getElementById('lab-sources-section').style.display='none';
+
+  const t0 = performance.now();
+  try{
+    const r = await fetch(API+'/api/dispatch',{
+      method:'POST',headers:headers(),body:JSON.stringify({question:q})
+    });
+    labWallMs = Math.round(performance.now()-t0);
+
+    if(r.status===401){doLogout();return}
+    if(r.status===503){
+      document.getElementById('lab-answer').textContent='RAG pipeline not ready (503)';
+      labResult={payload:{}};
+      return;
+    }
+    const data = await r.json();
+    labResult = data;
+    renderLabResponse(data);
+  }catch(e){
+    document.getElementById('lab-answer').textContent='Error: '+e.message;
+  }finally{
+    btn.disabled=false; btn.textContent='Send';
+  }
+}
+
+function renderLabResponse(data){
+  const p = data.payload||{};
+  const answer = p.answer||p.detail||'(no answer)';
+  document.getElementById('lab-answer').textContent = answer;
+
+  // Meta cards
+  const meta = document.getElementById('lab-meta');
+  const items = [
+    {lbl:'Intent / Kind', val: data.kind || p.intent || '\u2014'},
+    {lbl:'Failure Type', val: p.failure_type || 'none'},
+    {lbl:'Latency (wall)', val: labWallMs+'ms'},
+    {lbl:'Grounded', val: p.grounded != null ? String(p.grounded) : '\u2014'},
+    {lbl:'Request ID', val: p.request_id || data.request_id || '\u2014'},
+    {lbl:'Confidence', val: p.intent_confidence != null ? Number(p.intent_confidence).toFixed(2) : '\u2014'},
+  ];
+  meta.innerHTML = items.map(function(it){
+    return '<div class="item"><div class="lbl">'+it.lbl+'</div><div class="val">'+esc(String(it.val))+'</div></div>';
+  }).join('');
+
+  // Sources table
+  const sources = p.sources || [];
+  const srcSection = document.getElementById('lab-sources-section');
+  const srcBody = document.getElementById('lab-sources-body');
+  if(sources.length){
+    srcSection.style.display='block';
+    srcBody.innerHTML = sources.map(function(s){
+      return '<tr>'+
+        '<td>'+esc(s.source||s.doc||'\u2014')+'</td>'+
+        '<td>'+esc(s.chunk_id||s.id||'\u2014')+'</td>'+
+        '<td>'+esc(s.doc_type||'\u2014')+'</td>'+
+        '<td>'+(s.score!=null?Number(s.score).toFixed(4):'\u2014')+'</td>'+
+      '</tr>';
+    }).join('');
+  }else{
+    srcSection.style.display='none';
+  }
+
+  // Pre-fill eval form with actual values
+  document.getElementById('eval-intent').value = data.kind || p.intent || '';
+  document.getElementById('eval-source').value = sources.length ? (sources[0].source||'') : '';
+  document.getElementById('eval-must').value = '';
+  document.getElementById('eval-notes').value = '';
+}
+
+function labFeedback(btn){
+  document.querySelectorAll('.fb-btn').forEach(function(b){b.classList.remove('selected')});
+  btn.classList.add('selected');
+  labFeedbackLabel = btn.dataset.label;
+  document.getElementById('eval-label').value = labFeedbackLabel;
+  document.getElementById('lab-save-btn').disabled = false;
+}
+
+async function labSaveEval(){
+  if(!labQuery||!labFeedbackLabel){
+    document.getElementById('lab-save-status').textContent='Query and feedback required';
+    return;
+  }
+  const btn = document.getElementById('lab-save-btn');
+  const statusEl = document.getElementById('lab-save-status');
+  btn.disabled = true; statusEl.textContent = 'Saving...';
+
+  const p = (labResult && labResult.payload) || {};
+  const sources = p.sources || [];
+
+  const evalCase = {
+    query: labQuery,
+    actual_answer: p.answer || null,
+    expected_intent: document.getElementById('eval-intent').value.trim() || null,
+    expected_source: document.getElementById('eval-source').value.trim() || null,
+    must_include: document.getElementById('eval-must').value.trim() || null,
+    feedback_label: labFeedbackLabel,
+    notes: document.getElementById('eval-notes').value.trim() || null,
+    actual_intent: labResult ? (labResult.kind || p.intent) : null,
+    actual_failure_type: p.failure_type || null,
+    actual_sources: sources.map(function(s){return s.source||s.doc||null}),
+    latency_ms: labWallMs,
+    request_id: p.request_id || (labResult && labResult.request_id) || null,
+  };
+
+  try{
+    const r = await fetch(API+'/api/dashboard/eval-cases',{
+      method:'POST',headers:headers(),body:JSON.stringify(evalCase)
+    });
+    if(r.status===401){doLogout();return}
+    const data = await r.json();
+    if(data.saved){
+      statusEl.textContent = 'Saved!';
+      statusEl.style.color = 'var(--green)';
+      loadEvalCases();
+    }else{
+      statusEl.textContent = 'Save failed: '+JSON.stringify(data);
+      statusEl.style.color = 'var(--red)';
+    }
+  }catch(e){
+    statusEl.textContent = 'Error: '+e.message;
+    statusEl.style.color = 'var(--red)';
+  }finally{
+    setTimeout(function(){btn.disabled=false},1000);
+  }
+}
+
+/* ================================================================
+   Eval Cases List
+   ================================================================ */
+async function loadEvalCases(){
+  try{
+    const r = await fetch(API+'/api/dashboard/eval-cases',{headers:headers()});
+    if(r.status===401){doLogout();return}
+    const data = await r.json();
+    evalCasesCache = data.cases || [];
+    document.getElementById('eval-count').textContent = data.total+' cases';
+    renderEvalTable(evalCasesCache);
+  }catch(e){console.error('loadEvalCases',e)}
+}
+
+function renderEvalTable(cases){
+  const tbody = document.getElementById('eval-body');
+  if(!cases.length){
+    tbody.innerHTML='<tr><td colspan="9" style="color:var(--muted)">No eval cases yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = cases.map(function(c,i){
+    const d = c.created_at ? new Date(c.created_at*1000).toLocaleString() : '\u2014';
+    const labelCls = c.feedback_label==='good'?'good':(c.feedback_label==='bad'?'bad':'');
+    return '<tr>'+
+      '<td>'+esc(trunc(c.query||'',50))+'</td>'+
+      '<td><span class="fb-btn '+labelCls+' selected" style="cursor:default;font-size:.75rem">'+esc(c.feedback_label||'')+'</span></td>'+
+      '<td>'+esc(c.expected_intent||'\u2014')+'</td>'+
+      '<td>'+esc(c.expected_source||'\u2014')+'</td>'+
+      '<td>'+esc(c.actual_intent||'\u2014')+'</td>'+
+      '<td>'+(c.actual_failure_type?'<span class="failure-badge">'+esc(c.actual_failure_type)+'</span>':'\u2014')+'</td>'+
+      '<td>'+(c.latency_ms!=null?c.latency_ms+'ms':'\u2014')+'</td>'+
+      '<td>'+d+'</td>'+
+      '<td><button class="btn-sm" onclick="showEvalDetail('+i+')" title="View">\u{1F50D}</button></td>'+
+    '</tr>';
+  }).join('');
+}
+
+function showEvalDetail(idx){
+  const c = evalCasesCache[idx];
+  if(c) showModal('Eval Case', JSON.stringify(c,null,2));
+}
+
+function exportEvalCases(){
+  if(!evalCasesCache.length){alert('No eval cases to export');return}
+  const json = JSON.stringify(evalCasesCache, null, 2);
+  const blob = new Blob([json],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='eval_cases.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ================================================================
+   Helpers
+   ================================================================ */
 function setText(id,v){document.getElementById(id).textContent=v}
 function setClass(id,cls){
   const el=document.getElementById(id);
@@ -538,12 +869,12 @@ function setClass(id,cls){
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function trunc(s,n){return s&&s.length>n?s.slice(0,n)+'...':s||''}
 
-/* Enter key on token input */
-document.getElementById('token-input').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
-/* Enter key on dispatch input */
-document.getElementById('dispatch-input').addEventListener('keydown',e=>{if(e.key==='Enter')doDispatch()});
+/* Enter key handlers */
+document.getElementById('token-input').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
+document.getElementById('dispatch-input').addEventListener('keydown',function(e){if(e.key==='Enter')doDispatch()});
+document.getElementById('lab-input').addEventListener('keydown',function(e){if(e.key==='Enter')labSend()});
 /* Click outside modal to close */
-document.getElementById('detail-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal()});
+document.getElementById('detail-modal').addEventListener('click',function(e){if(e.target===e.currentTarget)closeModal()});
 </script>
 </body>
 </html>
