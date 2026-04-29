@@ -25,7 +25,7 @@ from app.models import PipelineResult
 from app.pipeline import Pipeline
 from generation.llm import LLMClient
 from retrieval.embeddings import Embedder
-from retrieval.faiss_index import FaissIndex
+from retrieval.faiss_index import FaissIndex, IndexMismatchError
 from retrieval.multi_retriever import MultiRetriever
 from retrieval.reranker import Reranker
 from router.intent_router import IntentRouter
@@ -143,10 +143,17 @@ class RagService:
             except FileNotFoundError:
                 logger.warning("FAISS index missing for intent %s", name)
                 continue
+            except IndexMismatchError as exc:
+                logger.error(
+                    "Index/metadata mismatch for intent %s: %s "
+                    "— skipping this index (rebuild required)",
+                    name, exc,
+                )
+                continue
 
         if not indexes:
             raise RuntimeError(
-                f"No FAISS indexes found under {self._index_dir}; "
+                f"No usable FAISS indexes found under {self._index_dir}; "
                 "run scripts/build_indexes.py first"
             )
 

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import faiss
 import numpy as np
 
 from app.models import Chunk, RetrievalHit
+
+log = logging.getLogger(__name__)
+
+
+class IndexMismatchError(RuntimeError):
+    """FAISS vector count does not match chunk metadata length."""
 
 
 class FaissIndex:
@@ -37,11 +44,20 @@ class FaissIndex:
         query = query_vec.reshape(1, -1).astype(np.float32)
         scores, indices = self.index.search(query, min(top_k, len(self.chunks)))
         hits: list[RetrievalHit] = []
+        n_chunks = len(self.chunks)
 
         for score, idx in zip(scores[0], indices[0]):
             if idx < 0:
                 continue
-            chunk = self.chunks[int(idx)]
+            int_idx = int(idx)
+            if int_idx >= n_chunks:
+                log.warning(
+                    "FAISS returned index %d but only %d chunks in '%s' "
+                    "— skipping (index/metadata mismatch?)",
+                    int_idx, n_chunks, self.name,
+                )
+                continue
+            chunk = self.chunks[int_idx]
             hits.append(
                 RetrievalHit(
                     chunk_id=chunk.chunk_id,
@@ -74,4 +90,13 @@ class FaissIndex:
         meta = json.loads((out_dir / f"{name}.json").read_text(encoding="utf-8"))
         instance.chunks = [Chunk(**row) for row in meta]
         instance.dim = instance.index.d
+
+        n_vectors = instance.index.ntotal
+        n_chunks = len(instance.chunks)
+        if n_vectors != n_chunks:
+            raise IndexMismatchError(
+                f"Index '{name}': FAISS has {n_vectors} vectors but "
+                f"metadata has {n_chunks} chunks — rebuild with "
+                f"scripts/build_indexes.py"
+            )
         return instance
