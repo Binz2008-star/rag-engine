@@ -53,7 +53,10 @@ def test_extract_topic_handles_empty_and_unknown():
 
 
 def test_is_miss_detects_failure_type():
-    assert _is_miss(_event("q", failure_type="retrieval_miss")) is True
+    # Test with specific failure types - any non-None failure_type should be detected as miss
+    assert _is_miss(_event("q", failure_type="retrieval_empty")) is True
+    assert _is_miss(_event("q", failure_type="grounding_reject")) is True
+    assert _is_miss(_event("q", failure_type="term_overlap_miss")) is True
 
 
 def test_is_miss_detects_empty_retrieval():
@@ -138,13 +141,13 @@ def test_detect_drift_reports_top_missing_source():
     # Plus 4 healthy queries.
     miss_with_municipal = _event(
         "environmental permit scope",
-        failure_type="retrieval_miss",
+        failure_type="retrieval_empty",
         retrieval=[{"doc_id": "d1", "score": 0.3, "source": "municipal_regulations_2024.pdf"}],
         answer="Insufficient data.",
     )
     miss_with_eco = _event(
         "environmental permit coverage",
-        failure_type="retrieval_miss",
+        failure_type="retrieval_empty",
         retrieval=[{"doc_id": "d2", "score": 0.25, "source": "eco_profile.pdf"}],
         answer="Insufficient data.",
     )
@@ -271,7 +274,7 @@ def test_drift_detector_reads_from_sqlite_store(tmp_path: Path):
             "query": "environmental permit requirements",
             "normalized_query": "environmental permit requirements",
             "retrieval": [],
-            "failure_type": "retrieval_miss",
+            "failure_type": "retrieval_empty",
             "answer": "Insufficient data.",
         })
     for i in range(5):

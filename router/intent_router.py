@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import os
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,6 +52,31 @@ class IntentRouter:
         path: Path,
         threshold: float = ROUTER_CONFIDENCE_THRESHOLD,
     ) -> "IntentRouter":
+        # Validate path: must be within MODEL_DIR, no symlinks, must exist
+        path = path.resolve()
+        MODEL_DIR.mkdir(parents=True, exist_ok=True)
+        resolved_model_dir = MODEL_DIR.resolve()
+
+        if not path.exists():
+            raise FileNotFoundError(f"Model path does not exist: {path}")
+
+        # Prevent path traversal attacks
+        try:
+            path.relative_to(resolved_model_dir)
+        except ValueError:
+            raise ValueError(f"Model path must be within {resolved_model_dir}, got: {path}")
+
+        # Reject symlinks to prevent symlink attacks
+        if os.path.islink(path):
+            raise ValueError(f"Model path cannot be a symlink: {path}")
+
+        # Log model file hash for audit trail
+        try:
+            file_hash = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+            logger.info("Loading model from %s (sha256=%s...)", path, file_hash)
+        except Exception:
+            logger.info("Loading model from %s", path)
+
         model = joblib.load(path)
         return cls(model=model, threshold=threshold)
 
@@ -73,18 +100,20 @@ class IntentRouter:
             threshold=meta.get("threshold", ROUTER_CONFIDENCE_THRESHOLD),
         )
 
-    def _run_shadow_classification(self, query: str, eco_hint: bool, cv_hint: bool) -> ShadowDecision:
+    def _run_shadow_classification(
+        self, query: str, eco_hint: bool, cv_hint: bool, public_intent: str = "general"
+    ) -> ShadowDecision:
         """Run shadow classification with decision priority logic (internal-only)."""
         # Priority 1: conflicting hints
         if eco_hint and cv_hint:
             decision = ShadowDecision(intent="uncertain", confidence=0.0, reason="conflicting_hints")
-            self._track_shadow_decision(decision, public_intent="general")
+            self._track_shadow_decision(decision, public_intent=public_intent)
             return decision
 
         # Priority 2: no model loaded
         if self.model is None:
             decision = ShadowDecision(intent="general", confidence=0.0, reason="model_unavailable")
-            self._track_shadow_decision(decision, public_intent="general")
+            self._track_shadow_decision(decision, public_intent=public_intent)
             return decision
 
         self._shadow_stats["model_checks"] += 1
@@ -98,25 +127,25 @@ class IntentRouter:
             # Priority 4: low confidence
             if confidence < FALLBACK_THRESHOLD:
                 decision = ShadowDecision(intent="general", confidence=confidence, reason="low_confidence")
-                self._track_shadow_decision(decision, public_intent="general")
+                self._track_shadow_decision(decision, public_intent=public_intent)
                 return decision
 
             # Priority 5: mid confidence
             if confidence < MID_CONF_THRESHOLD:
                 decision = ShadowDecision(intent="uncertain", confidence=confidence, reason="mid_confidence_uncertain")
-                self._track_shadow_decision(decision, public_intent="general")
+                self._track_shadow_decision(decision, public_intent=public_intent)
                 return decision
 
             # Priority 6: high confidence
             decision = ShadowDecision(intent=prediction, confidence=confidence, reason="high_confidence_prediction")
-            self._track_shadow_decision(decision, public_intent="general")
+            self._track_shadow_decision(decision, public_intent=public_intent)
             return decision
 
         except Exception as exc:
             # Priority 3: model exception
             self._shadow_stats["prediction_errors"] += 1  # Backward compatibility
             decision = ShadowDecision(intent="general", confidence=0.0, reason="model_error")
-            self._track_shadow_decision(decision, public_intent="general")
+            self._track_shadow_decision(decision, public_intent=public_intent)
             logger.warning("Shadow ML model prediction failed: %s", exc)
             return decision
 
@@ -179,7 +208,8 @@ class IntentRouter:
             return Route(intent="cv", confidence=1.0, intent_method="rule")
 
         # Run shadow classification (internal tracking only, not exposed publicly)
-        self._run_shadow_classification(query, eco_hint=eco_hint, cv_hint=cv_hint)
+        # Public intent is "general" for all non-rule queries
+        self._run_shadow_classification(query, eco_hint=eco_hint, cv_hint=cv_hint, public_intent="general")
 
         # Non-rule queries always return general/0.5/rule publicly
         return Route(intent="general", confidence=0.5, intent_method="rule")
@@ -212,9 +242,9 @@ class IntentRouter:
             route = Route(intent="cv", confidence=1.0, intent_method="rule")
             return route, None
 
-        # Run shadow classification
-        shadow_decision = self._run_shadow_classification(query, eco_hint=eco_hint, cv_hint=cv_hint)
-
-        # Non-rule queries always return general/0.5/rule publicly
+        # Run shadow classification with actual public intent for accurate disagreement tracking
         route = Route(intent="general", confidence=0.5, intent_method="rule")
+        shadow_decision = self._run_shadow_classification(
+            query, eco_hint=eco_hint, cv_hint=cv_hint, public_intent=route.intent
+        )
         return route, shadow_decision

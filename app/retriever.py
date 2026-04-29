@@ -577,7 +577,7 @@ Return only the English translation:"""
 
         try:
             response = requests.post(
-                f"{OLLAMA_BASE_URL}/chat",
+                f"{OLLAMA_BASE_URL}/api/chat",
                 json={
                     "model": CHAT_MODEL,
                     "stream": False,

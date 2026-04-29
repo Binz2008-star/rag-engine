@@ -42,7 +42,7 @@ def diff_metrics(before_metrics: Dict[str, Any], after_metrics: Dict[str, Any]) 
         ("failed", "Failed"),
         ("pass_rate", "Pass rate", True),
         ("refusal_accuracy", "Refusal accuracy", True),
-        ("hallucination_rate", "Hallucination rate", True),
+        ("grounding_failure_rate", "Grounding failure rate", True),
         ("domain_accuracy", "Domain accuracy", True),
         ("avg_elapsed_s", "Avg latency (s)"),
     ]

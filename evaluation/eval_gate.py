@@ -2,12 +2,12 @@
 Canonical promotion gate.
 
 Policy:
-    pass_rate            >= 0.95   and in [0.0, 1.0]
-    hallucination_rate   == 0.0    and in [0.0, 1.0]
-    refusal_accuracy     == 1.0    and in [0.0, 1.0]
-    domain_accuracy      >= 0.95   and in [0.0, 1.0]
-    ocr_presence_check   is True   (strict identity, not truthy)
-    killer_queries       every result with `killer: true` must be `passed: true`
+    pass_rate                >= 0.95   and in [0.0, 1.0]
+    grounding_failure_rate   == 0.0    and in [0.0, 1.0]
+    refusal_accuracy         == 1.0    and in [0.0, 1.0]
+    domain_accuracy          >= 0.95   and in [0.0, 1.0]
+    ocr_presence_check       is True   (strict identity, not truthy)
+    killer_queries           every result with `killer: true` must be `passed: true`
 
 The gate is **fail-closed**: any missing, non-numeric, out-of-range,
 or wrongly-typed value counts as a rejection for that check.
@@ -20,10 +20,11 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 _RATE_CHECKS: tuple[tuple[str, float, str], ...] = (
-    ("pass_rate",          0.95, ">="),
-    ("hallucination_rate", 0.0,  "=="),
-    ("refusal_accuracy",   1.0,  "=="),
-    ("domain_accuracy",    0.95, ">="),
+    ("pass_rate",              0.95, ">="),
+    ("grounding_failure_rate",  0.0,  "=="),
+    ("reasoning_failure_rate",  0.0,  "=="),
+    ("refusal_accuracy",       1.0,  "=="),
+    ("domain_accuracy",        0.95, ">="),
 )
 
 _KILLER_FAILURE_CHECK = "killer_failure"
