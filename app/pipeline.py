@@ -144,10 +144,11 @@ class Pipeline:
         log.info("pipeline: retrieval_ms=%.0f hits=%d", retrieval_ms, len(hits))
 
         if not hits:
+            log.info("pipeline: EXIT gate=no_retrieval_hits (0 hits from retriever)")
             t_gap = time.perf_counter()
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
             gap_ms = (time.perf_counter() - t_gap) * 1000
-            log.info("pipeline: knowledge_gap_ms=%.0f (retrieval_miss path)", gap_ms)
+            log.info("pipeline: knowledge_gap_ms=%.0f", gap_ms)
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             return PipelineResult(
                 query_id=query_id,
@@ -167,15 +168,44 @@ class Pipeline:
             )
 
         if self.reranker:
+            pre_rerank_scores = {h.chunk_id: h.score for h in hits}
+            pre_rerank_top = hits[0].score if hits else 0.0
+            log.info(
+                "pipeline: pre_rerank hits=%d top_score=%.4f sources=%s",
+                len(hits), pre_rerank_top,
+                [h.source for h in hits[:5]],
+            )
             t_rerank = time.perf_counter()
             hits = self.reranker.rerank(hits, normalized_query, top_k=len(hits))
             rerank_ms = (time.perf_counter() - t_rerank) * 1000
+            for i, h in enumerate(hits[:5]):
+                log.info(
+                    "pipeline: post_rerank rank=%d score=%.4f src=%s id=%s",
+                    i, h.score, h.source, h.chunk_id,
+                )
             log.info(
                 "pipeline: rerank_ms=%.0f top_score=%.4f",
                 rerank_ms, hits[0].score if hits else 0.0,
             )
 
+            # If reranker killed all scores, fall back to pre-reranker
+            # FAISS-based scores which already passed threshold filtering.
+            if hits and hits[0].score < 0.20 and pre_rerank_top >= 0.20:
+                log.info(
+                    "pipeline: reranker_fallback — reranked top=%.4f < 0.20 "
+                    "but pre-rerank top=%.4f >= 0.20; restoring FAISS scores",
+                    hits[0].score, pre_rerank_top,
+                )
+                for h in hits:
+                    h.score = pre_rerank_scores.get(h.chunk_id, h.score)
+                hits.sort(key=lambda x: x.score, reverse=True)
+
         if hits and hits[0].score < 0.20:
+            log.info(
+                "pipeline: EXIT gate=post_reranker_threshold "
+                "(top_score=%.4f < 0.20, sources=%s)",
+                hits[0].score, [h.source for h in hits[:3]],
+            )
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             return PipelineResult(
@@ -224,6 +254,11 @@ class Pipeline:
 
         # Hard grounding gate: use English query for term overlap
         if not _has_sufficient_overlap(generation_query, hits):
+            log.info(
+                "pipeline: EXIT gate=overlap_check "
+                "(query=%r has no term overlap with chunks)",
+                generation_query[:60],
+            )
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             return PipelineResult(
                 query_id=query_id,
