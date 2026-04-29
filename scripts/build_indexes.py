@@ -1,17 +1,35 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-from app.config import BATCH_SIZE, CHUNK_OVERLAP, CHUNK_SIZE, DATA_DIR
-from app.models import Chunk
-from retrieval.embeddings import Embedder
-from retrieval.faiss_index import FaissIndex
+# Ensure repo root is on sys.path so "app", "retrieval", etc. resolve
+# without requiring the caller to set PYTHONPATH manually.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from app.config import BATCH_SIZE, CHUNK_OVERLAP, CHUNK_SIZE, DATA_DIR  # noqa: E402
+from app.models import Chunk  # noqa: E402
+from retrieval.embeddings import Embedder  # noqa: E402
+from retrieval.faiss_index import FaissIndex  # noqa: E402
 
 EXPECTED_DOC_MATCHERS = {
     "cv": ("cv", "deliveroo"),
-    "eco": ("eco_company_profile", "eco technology"),
+    "eco": ("eco_company_profile", "eco technology", "clients", "pricing", "services"),
 }
+
+# Stems (filename without extension) that map explicitly to 'eco' intent.
+# Business documents about ECO Technology's operations, pricing, clients,
+# and service offerings belong under the eco corpus even though the
+# filename itself does not contain "eco" or "company".
+_ECO_DOC_STEMS: frozenset[str] = frozenset({
+    "clients",
+    "pricing",
+    "services",
+    "grease_traps",
+    "maintenance",
+    "operations",
+})
 
 
 def sanitize_text(text: str) -> str:
@@ -58,10 +76,24 @@ def chunk_text(text: str, source: str, path: str, doc_type: str) -> list[Chunk]:
 
 
 def classify_doc(path: Path) -> str:
+    stem = path.stem.lower()
     name = path.name.lower()
+
+    # Explicit stem mapping for known eco business documents
+    if stem in _ECO_DOC_STEMS:
+        return "eco"
+
+    # Keyword matching
     if "cv" in name or "resume" in name or "deliveroo" in name:
         return "cv"
-    if "eco" in name or "company" in name:
+    if (
+        "eco" in name
+        or "company" in name
+        or "grease" in name
+        or "wastewater" in name
+        or "environmental" in name
+        or "sludge" in name
+    ):
         return "eco"
     return "general"
 
@@ -176,7 +208,7 @@ def main() -> None:
             continue
 
         for start in range(0, len(chunks), BATCH_SIZE):
-            batch = chunks[start : start + BATCH_SIZE]
+            batch = chunks[start:start + BATCH_SIZE]
             embeddings = embedder.embed_batch([chunk.text for chunk in batch])
             for chunk, emb in zip(batch, embeddings):
                 chunk.embedding = emb
