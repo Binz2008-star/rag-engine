@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 
 from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE
@@ -11,6 +12,8 @@ from router.features import normalize_query
 from generation.grounding import check_grounding
 from retrieval.reranker import Reranker
 from analysis.corpus_topic_map import CorpusTopicMap
+
+log = logging.getLogger(__name__)
 
 
 _SENSITIVE_PATTERNS = [
@@ -102,8 +105,18 @@ class Pipeline:
                 retriever_version=self.retriever_version,
             )
 
+        t_route = time.perf_counter()
         route = self.router.route(normalized_query)
+        route_ms = (time.perf_counter() - t_route) * 1000
+        log.info(
+            "pipeline: intent=%s confidence=%.2f method=%s route_ms=%.0f",
+            route.intent, route.confidence, route.intent_method, route_ms,
+        )
+
+        t_embed = time.perf_counter()
         vec = self.embedder.embed_batch([normalized_query])[0]
+        embed_ms = (time.perf_counter() - t_embed) * 1000
+        log.info("pipeline: embed_ms=%.0f", embed_ms)
 
         # Refuse sensitive queries after routing (for domain accuracy)
         if _is_sensitive_query(query):
@@ -125,10 +138,16 @@ class Pipeline:
                 retriever_version=self.retriever_version,
             )
 
+        t_retrieval = time.perf_counter()
         hits = self.retriever.retrieve(vec, route.intent, normalized_query)
+        retrieval_ms = (time.perf_counter() - t_retrieval) * 1000
+        log.info("pipeline: retrieval_ms=%.0f hits=%d", retrieval_ms, len(hits))
 
         if not hits:
+            t_gap = time.perf_counter()
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
+            gap_ms = (time.perf_counter() - t_gap) * 1000
+            log.info("pipeline: knowledge_gap_ms=%.0f (retrieval_miss path)", gap_ms)
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             return PipelineResult(
                 query_id=query_id,
@@ -148,7 +167,13 @@ class Pipeline:
             )
 
         if self.reranker:
+            t_rerank = time.perf_counter()
             hits = self.reranker.rerank(hits, normalized_query, top_k=len(hits))
+            rerank_ms = (time.perf_counter() - t_rerank) * 1000
+            log.info(
+                "pipeline: rerank_ms=%.0f top_score=%.4f",
+                rerank_ms, hits[0].score if hits else 0.0,
+            )
 
         if hits and hits[0].score < 0.20:
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)

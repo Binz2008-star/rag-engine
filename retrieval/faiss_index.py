@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 
 import faiss
@@ -39,15 +40,25 @@ class FaissIndex:
 
     def search(self, query_vec: np.ndarray, top_k: int) -> list[RetrievalHit]:
         if self.index is None or not self.chunks:
+            log.info("search: index=%s — empty (no index or no chunks)", self.name)
             return []
 
         query = query_vec.reshape(1, -1).astype(np.float32)
         k = min(top_k, len(self.chunks))
+
+        t0 = time.perf_counter()
         distances, indices = self.index.search(query, k)
+        search_ms = (time.perf_counter() - t0) * 1000
+
         hits: list[RetrievalHit] = []
         n_chunks = len(self.chunks)
 
-        for dist, idx in zip(distances[0], indices[0]):
+        log.info(
+            "search: index=%s k=%d n_chunks=%d faiss_ms=%.1f",
+            self.name, k, n_chunks, search_ms,
+        )
+
+        for rank, (dist, idx) in enumerate(zip(distances[0], indices[0])):
             if idx < 0:
                 continue
             int_idx = int(idx)
@@ -62,9 +73,9 @@ class FaissIndex:
             # similarity for L2-normalised vectors: sim = 1 - d²/2.
             sim = max(0.0, 1.0 - float(dist) / 2.0)
             chunk = self.chunks[int_idx]
-            log.debug(
-                "index=%s idx=%d dist=%.4f sim=%.4f src=%s",
-                self.name, int_idx, float(dist), sim, chunk.source,
+            log.info(
+                "  hit rank=%d idx=%d L2²=%.4f sim=%.4f src=%s",
+                rank, int_idx, float(dist), sim, chunk.source,
             )
             hits.append(
                 RetrievalHit(

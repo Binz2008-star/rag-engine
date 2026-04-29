@@ -33,17 +33,17 @@ class MultiRetriever:
 
         for hit in hits:
             if hit.score < threshold:
-                log.debug(
-                    "Dropped hit %s (score=%.4f < threshold=%.4f, intent=%s)",
-                    hit.chunk_id, hit.score, threshold, intent,
+                log.info(
+                    "  dropped %s score=%.4f < threshold=%.4f (intent=%s, src=%s)",
+                    hit.chunk_id, hit.score, threshold, intent, hit.source,
                 )
                 continue
             hit.score = max(0.0, min(1.0, (hit.score - threshold) / max(1e-8, 1.0 - threshold)))
             normalized.append(hit)
 
-        log.debug(
-            "normalize_and_filter: intent=%s threshold=%.2f in=%d out=%d",
-            intent, threshold, len(hits), len(normalized),
+        log.info(
+            "filter: intent=%s threshold=%.2f in=%d kept=%d dropped=%d",
+            intent, threshold, len(hits), len(normalized), len(hits) - len(normalized),
         )
         return normalized
 
@@ -59,7 +59,7 @@ class MultiRetriever:
             text_lower = hit.text.lower()
             if any(term in text_lower for term in ("price", "pricing", "aed", "cost")):
                 hit.score = min(1.0, hit.score + _PRICING_BOOST)
-                log.debug("Pricing boost applied to %s (new score=%.4f)", hit.chunk_id, hit.score)
+                log.info("  pricing_boost %s score=%.4f", hit.chunk_id, hit.score)
         return hits
 
     def _dedupe(self, hits: list[RetrievalHit]) -> list[RetrievalHit]:
@@ -82,7 +82,7 @@ class MultiRetriever:
         return hits
 
     def retrieve(self, query_vec, intent: str, query: str) -> list[RetrievalHit]:
-        log.debug("retrieve: intent=%s query=%r", intent, query[:80])
+        log.info("retrieve: intent=%s query=%r", intent, query[:80])
 
         if intent == "uncertain":
             eco_hint, cv_hint = extract_hints(query)
@@ -116,7 +116,7 @@ class MultiRetriever:
         hits = self._normalize_and_filter(idx.search(query_vec, TOP_K * 3), intent)
         hits = self._apply_pricing_boost(hits, query)
         hits.sort(key=lambda x: x.score, reverse=True)
-        log.debug(
+        log.info(
             "retrieve: intent=%s returning %d hits (top=%.4f)",
             intent, len(hits), hits[0].score if hits else 0.0,
         )
