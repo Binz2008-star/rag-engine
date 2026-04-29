@@ -175,6 +175,7 @@ background:var(--green);color:#fff;font-size:.85rem;cursor:pointer}
   <div class="tab" data-tab="queries" onclick="switchTab('queries')">Query History</div>
   <div class="tab" data-tab="monitoring" onclick="switchTab('monitoring')">Monitoring</div>
   <div class="tab" data-tab="testlab" onclick="switchTab('testlab')">AI Test Lab</div>
+  <div class="tab" data-tab="ragconfig" onclick="switchTab('ragconfig')">RAG Config</div>
   <div class="tab" data-tab="dispatch" onclick="switchTab('dispatch')">Dispatch Test</div>
 </div>
 
@@ -347,6 +348,62 @@ background:var(--green);color:#fff;font-size:.85rem;cursor:pointer}
 
 </div>
 
+<!-- ============= TAB: RAG Config ============= -->
+<div class="tab-content" id="tab-ragconfig">
+<div class="section">
+  <h2>RAG Runtime Configuration</h2>
+  <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem">Adjust retrieval and generation parameters. Changes are saved to <code>data/rag_runtime_config.json</code> but are not wired into the pipeline yet.</p>
+  <div class="toolbar">
+    <button onclick="loadRagConfig()">Refresh</button>
+    <span class="status" id="config-version"></span>
+  </div>
+  <div class="eval-form" id="rag-config-form">
+    <div>
+      <label>top_k <span style="color:var(--muted);font-weight:normal">(results to retrieve)</span></label>
+      <input id="cfg-top-k" type="number" min="1" max="100" step="1" />
+    </div>
+    <div>
+      <label>score_threshold <span style="color:var(--muted);font-weight:normal">(min similarity)</span></label>
+      <input id="cfg-score-threshold" type="number" min="0" max="1" step="0.01" />
+    </div>
+    <div>
+      <label>max_context_chars <span style="color:var(--muted);font-weight:normal">(context window)</span></label>
+      <input id="cfg-max-context" type="number" min="100" max="50000" step="100" />
+    </div>
+    <div>
+      <label>temperature <span style="color:var(--muted);font-weight:normal">(LLM creativity)</span></label>
+      <input id="cfg-temperature" type="number" min="0" max="2" step="0.05" />
+    </div>
+    <div>
+      <label>reranker_enabled</label>
+      <select id="cfg-reranker" style="width:100%;padding:.45rem .6rem;border-radius:.35rem;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.85rem">
+        <option value="true">Enabled</option>
+        <option value="false">Disabled</option>
+      </select>
+    </div>
+    <div>
+      <label>grounding_strictness <span style="color:var(--muted);font-weight:normal">(0–1)</span></label>
+      <input id="cfg-grounding" type="number" min="0" max="1" step="0.05" />
+    </div>
+    <textarea id="cfg-notes" placeholder="Notes (e.g. reason for change)"></textarea>
+  </div>
+  <div class="save-bar">
+    <button id="cfg-save-btn" onclick="saveRagConfig()">Save Config</button>
+    <span class="save-status" id="cfg-save-status"></span>
+  </div>
+</div>
+
+<!-- Config history card -->
+<div class="section">
+  <h2>Config Metadata</h2>
+  <div class="cards" id="cfg-meta-cards">
+    <div class="card"><div class="label">Version</div><div class="value" id="cfg-ver">&mdash;</div></div>
+    <div class="card"><div class="label">Updated At</div><div class="value" style="font-size:1rem" id="cfg-updated-at">&mdash;</div></div>
+    <div class="card"><div class="label">Updated By</div><div class="value" style="font-size:1rem" id="cfg-updated-by">&mdash;</div></div>
+  </div>
+</div>
+</div>
+
 <!-- ============= TAB: Dispatch Test ============= -->
 <div class="tab-content" id="tab-dispatch">
 <div class="section">
@@ -437,6 +494,7 @@ function switchTab(tab){
   if(tab==='queries') loadQueries();
   if(tab==='monitoring') loadMonitoring();
   if(tab==='testlab') loadEvalCases();
+  if(tab==='ragconfig') loadRagConfig();
 }
 
 /* ================================================================
@@ -856,6 +914,66 @@ function exportEvalCases(){
   const a = document.createElement('a');
   a.href=url; a.download='eval_cases.json'; a.click();
   URL.revokeObjectURL(url);
+}
+
+/* ================================================================
+   RAG Config
+   ================================================================ */
+async function loadRagConfig(){
+  try{
+    const r = await fetch(API+'/api/dashboard/rag-config',{headers:headers()});
+    if(r.status===401){doLogout();return}
+    const data = await r.json();
+    const c = data.config||{};
+    document.getElementById('cfg-top-k').value = c.top_k??15;
+    document.getElementById('cfg-score-threshold').value = c.score_threshold??0.38;
+    document.getElementById('cfg-max-context').value = c.max_context_chars??3000;
+    document.getElementById('cfg-temperature').value = c.temperature??0.2;
+    document.getElementById('cfg-reranker').value = c.reranker_enabled!==false?'true':'false';
+    document.getElementById('cfg-grounding').value = c.grounding_strictness??0.5;
+    document.getElementById('cfg-notes').value = c.notes||'';
+    document.getElementById('cfg-ver').textContent = 'v'+(c.version||1);
+    document.getElementById('cfg-updated-at').textContent = c.updated_at ? new Date(c.updated_at*1000).toLocaleString() : 'Never';
+    document.getElementById('cfg-updated-by').textContent = c.updated_by||'\u2014';
+    document.getElementById('config-version').textContent = 'Version '+(c.version||1);
+  }catch(e){console.error('loadRagConfig',e)}
+}
+
+async function saveRagConfig(){
+  const btn = document.getElementById('cfg-save-btn');
+  const statusEl = document.getElementById('cfg-save-status');
+  btn.disabled = true; statusEl.textContent = 'Saving...';
+  statusEl.style.color = 'var(--muted)';
+  const payload = {
+    top_k: parseInt(document.getElementById('cfg-top-k').value,10),
+    score_threshold: parseFloat(document.getElementById('cfg-score-threshold').value),
+    max_context_chars: parseInt(document.getElementById('cfg-max-context').value,10),
+    temperature: parseFloat(document.getElementById('cfg-temperature').value),
+    reranker_enabled: document.getElementById('cfg-reranker').value==='true',
+    grounding_strictness: parseFloat(document.getElementById('cfg-grounding').value),
+    notes: document.getElementById('cfg-notes').value.trim()||'',
+    updated_by: 'admin',
+  };
+  try{
+    const r = await fetch(API+'/api/dashboard/rag-config',{
+      method:'POST',headers:headers(),body:JSON.stringify(payload)
+    });
+    if(r.status===401){doLogout();return}
+    const data = await r.json();
+    if(data.status==='ok'){
+      statusEl.textContent = 'Saved! (v'+(data.config.version||'?')+')';
+      statusEl.style.color = 'var(--green)';
+      loadRagConfig();
+    }else{
+      statusEl.textContent = 'Failed: '+(data.detail||JSON.stringify(data));
+      statusEl.style.color = 'var(--red)';
+    }
+  }catch(e){
+    statusEl.textContent = 'Error: '+e.message;
+    statusEl.style.color = 'var(--red)';
+  }finally{
+    setTimeout(function(){btn.disabled=false},1000);
+  }
 }
 
 /* ================================================================

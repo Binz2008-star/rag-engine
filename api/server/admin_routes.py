@@ -14,14 +14,18 @@ Adds the following endpoints consumed by the admin dashboard:
 - POST /api/dispatch   -- forward a query through the RAG pipeline
 - POST /api/dashboard/eval-cases -- save an eval case (JSONL)
 - GET  /api/dashboard/eval-cases -- list recent eval cases
+- GET  /api/dashboard/rag-config  -- read RAG runtime config
+- POST /api/dashboard/rag-config  -- update RAG runtime config
 """
 
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
 import os
 import secrets
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List
@@ -325,6 +329,18 @@ def register_admin_routes(app: FastAPI) -> None:
         "good", "bad", "wrong_source", "too_slow", "false_refusal",
     }
 
+    def _locked_jsonl_append(path: Path, data: Dict[str, Any]) -> None:
+        """Append one JSON line with exclusive file locking."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        line = json.dumps(data, ensure_ascii=False) + "\n"
+        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            os.write(fd, line.encode("utf-8"))
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+
     @app.post(
         "/api/dashboard/eval-cases",
         dependencies=[Depends(verify_admin_token)],
@@ -362,9 +378,7 @@ def register_admin_routes(app: FastAPI) -> None:
             "created_at": time.time(),
         }
 
-        _EVAL_DIR.mkdir(parents=True, exist_ok=True)
-        with open(_EVAL_FILE, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(case, ensure_ascii=False) + "\n")
+        _locked_jsonl_append(_EVAL_FILE, case)
 
         logger.info("eval_case: saved query=%r label=%s", query[:60], feedback_label)
         return {"status": "ok", "saved": True}
@@ -389,3 +403,104 @@ def register_admin_routes(app: FastAPI) -> None:
 
         cases.reverse()
         return {"cases": cases, "total": len(cases)}
+
+    # ---- RAG runtime config (protected) --------------------------------
+
+    _CONFIG_FILE = _EVAL_DIR / "rag_runtime_config.json"
+
+    _DEFAULT_RAG_CONFIG: Dict[str, Any] = {
+        "top_k": 15,
+        "score_threshold": 0.38,
+        "max_context_chars": 3000,
+        "temperature": 0.2,
+        "reranker_enabled": True,
+        "grounding_strictness": 0.5,
+        "version": 1,
+        "updated_at": None,
+        "updated_by": None,
+        "notes": "",
+    }
+
+    def _load_rag_config() -> Dict[str, Any]:
+        """Load config from disk, returning defaults if missing."""
+        if not _CONFIG_FILE.exists():
+            return dict(_DEFAULT_RAG_CONFIG)
+        try:
+            data = json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
+            merged = dict(_DEFAULT_RAG_CONFIG)
+            merged.update(data)
+            return merged
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("rag_config: failed to load %s: %s", _CONFIG_FILE, exc)
+            return dict(_DEFAULT_RAG_CONFIG)
+
+    def _save_rag_config(config: Dict[str, Any]) -> None:
+        """Atomically write config to disk via tmp+rename."""
+        _EVAL_DIR.mkdir(parents=True, exist_ok=True)
+        tmp_fd, tmp_path = tempfile.mkstemp(
+            dir=str(_EVAL_DIR), suffix=".tmp", prefix="rag_config_"
+        )
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as fh:
+                json.dump(config, fh, indent=2, ensure_ascii=False)
+                fh.write("\n")
+            os.replace(tmp_path, str(_CONFIG_FILE))
+        except BaseException:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+
+    _RAG_CONFIG_KEYS = {
+        "top_k", "score_threshold", "max_context_chars",
+        "temperature", "reranker_enabled", "grounding_strictness",
+        "notes",
+    }
+
+    @app.get(
+        "/api/dashboard/rag-config",
+        dependencies=[Depends(verify_admin_token)],
+    )
+    async def get_rag_config() -> Dict[str, Any]:
+        config = _load_rag_config()
+        return {"config": config}
+
+    @app.post(
+        "/api/dashboard/rag-config",
+        dependencies=[Depends(verify_admin_token)],
+    )
+    async def update_rag_config(request: Request) -> Dict[str, Any]:
+        body = await request.json()
+
+        current = _load_rag_config()
+
+        for key in _RAG_CONFIG_KEYS:
+            if key in body:
+                current[key] = body[key]
+
+        if not isinstance(current["top_k"], int) or current["top_k"] < 1:
+            raise HTTPException(status_code=422, detail="top_k must be a positive integer")
+        if not isinstance(current["score_threshold"], (int, float)):
+            raise HTTPException(status_code=422, detail="score_threshold must be a number")
+        if not isinstance(current["max_context_chars"], int) or current["max_context_chars"] < 100:
+            raise HTTPException(status_code=422, detail="max_context_chars must be >= 100")
+        if not isinstance(current["temperature"], (int, float)):
+            raise HTTPException(status_code=422, detail="temperature must be a number")
+        if not isinstance(current["reranker_enabled"], bool):
+            raise HTTPException(status_code=422, detail="reranker_enabled must be a boolean")
+        if not isinstance(current["grounding_strictness"], (int, float)):
+            raise HTTPException(status_code=422, detail="grounding_strictness must be a number")
+
+        current["version"] = current.get("version", 0) + 1
+        current["updated_at"] = time.time()
+        current["updated_by"] = body.get("updated_by", "admin")
+
+        _save_rag_config(current)
+
+        logger.info(
+            "rag_config: updated v%d by %s",
+            current["version"],
+            current["updated_by"],
+        )
+        return {"status": "ok", "config": current}
