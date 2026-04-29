@@ -42,11 +42,12 @@ class FaissIndex:
             return []
 
         query = query_vec.reshape(1, -1).astype(np.float32)
-        scores, indices = self.index.search(query, min(top_k, len(self.chunks)))
+        k = min(top_k, len(self.chunks))
+        distances, indices = self.index.search(query, k)
         hits: list[RetrievalHit] = []
         n_chunks = len(self.chunks)
 
-        for score, idx in zip(scores[0], indices[0]):
+        for dist, idx in zip(distances[0], indices[0]):
             if idx < 0:
                 continue
             int_idx = int(idx)
@@ -57,13 +58,20 @@ class FaissIndex:
                     int_idx, n_chunks, self.name,
                 )
                 continue
+            # IndexHNSWFlat returns L2² distances; convert to cosine
+            # similarity for L2-normalised vectors: sim = 1 - d²/2.
+            sim = max(0.0, 1.0 - float(dist) / 2.0)
             chunk = self.chunks[int_idx]
+            log.debug(
+                "index=%s idx=%d dist=%.4f sim=%.4f src=%s",
+                self.name, int_idx, float(dist), sim, chunk.source,
+            )
             hits.append(
                 RetrievalHit(
                     chunk_id=chunk.chunk_id,
                     source=chunk.source,
                     text=chunk.text,
-                    score=float(score),
+                    score=sim,
                     path=chunk.path,
                     doc_type=chunk.doc_type,
                 )
