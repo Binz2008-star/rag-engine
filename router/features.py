@@ -40,7 +40,8 @@ def extract_hints(query: str) -> tuple[bool, bool]:
         "eco", "company", "environment", "environmental", "municipality",
         "waste", "wastewater", "grease", "compliance", "audit",
         "price", "pricing", "cost", "aed", "quote", "maintenance",
-        "grease trap",
+        "grease trap", "amc",
+        "size a", "size b", "size c", "size d",
     }
     cv_terms = {
         "cv", "resume", "tailored", "role", "experience",
