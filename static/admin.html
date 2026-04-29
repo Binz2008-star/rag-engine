@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admin Dashboard — RAG Intent System</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1117;--card:#1a1d27;--border:#2a2d3a;--text:#e0e0e6;--muted:#8b8fa3;
+--accent:#6c63ff;--green:#22c55e;--yellow:#eab308;--red:#ef4444;--blue:#3b82f6}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+background:var(--bg);color:var(--text);line-height:1.5}
+a{color:var(--accent);text-decoration:none}
+
+/* ---------- Login overlay ---------- */
+#login-overlay{position:fixed;inset:0;background:var(--bg);display:flex;
+align-items:center;justify-content:center;z-index:100}
+#login-box{background:var(--card);padding:2rem;border-radius:.75rem;
+border:1px solid var(--border);width:360px;text-align:center}
+#login-box h2{margin-bottom:1rem;font-size:1.25rem}
+#login-box input{width:100%;padding:.6rem .8rem;border-radius:.5rem;
+border:1px solid var(--border);background:var(--bg);color:var(--text);
+font-size:.95rem;margin-bottom:.75rem}
+#login-box button{width:100%;padding:.6rem;border:none;border-radius:.5rem;
+background:var(--accent);color:#fff;font-size:.95rem;cursor:pointer}
+#login-box button:hover{opacity:.9}
+#login-error{color:var(--red);font-size:.85rem;min-height:1.2em;margin-bottom:.5rem}
+
+/* ---------- Layout ---------- */
+header{padding:1rem 1.5rem;border-bottom:1px solid var(--border);
+display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:1.2rem;font-weight:600}
+header .logout{font-size:.85rem;cursor:pointer;color:var(--muted)}
+header .logout:hover{color:var(--text)}
+.container{max-width:1200px;margin:0 auto;padding:1.5rem}
+
+/* ---------- Cards grid ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem}
+.card{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1.25rem}
+.card .label{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.card .value{font-size:1.8rem;font-weight:700;margin-top:.25rem}
+.card .value.ok{color:var(--green)}.card .value.warn{color:var(--yellow)}.card .value.bad{color:var(--red)}
+.card .value.hot{color:var(--red)}.card .value.warm{color:var(--yellow)}.card .value.cold{color:var(--blue)}
+
+/* ---------- Sections ---------- */
+.section{background:var(--card);border:1px solid var(--border);border-radius:.75rem;
+padding:1.25rem;margin-bottom:1.5rem}
+.section h2{font-size:1rem;font-weight:600;margin-bottom:1rem}
+
+/* ---------- Table ---------- */
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{text-align:left;padding:.55rem .75rem;border-bottom:1px solid var(--border)}
+th{color:var(--muted);text-transform:uppercase;font-size:.75rem;letter-spacing:.04em}
+tr:last-child td{border-bottom:none}
+.temp-badge{display:inline-block;padding:.15rem .5rem;border-radius:.25rem;font-size:.75rem;font-weight:600}
+.temp-badge.hot{background:rgba(239,68,68,.15);color:var(--red)}
+.temp-badge.warm{background:rgba(234,179,8,.15);color:var(--yellow)}
+.temp-badge.cold{background:rgba(59,130,246,.15);color:var(--blue)}
+
+/* ---------- Dispatch box ---------- */
+.dispatch-form{display:flex;gap:.75rem;margin-bottom:1rem}
+.dispatch-form input{flex:1;padding:.6rem .8rem;border-radius:.5rem;
+border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.9rem}
+.dispatch-form button{padding:.6rem 1.25rem;border:none;border-radius:.5rem;
+background:var(--accent);color:#fff;font-size:.9rem;cursor:pointer;white-space:nowrap}
+.dispatch-form button:hover{opacity:.9}
+.dispatch-form button:disabled{opacity:.5;cursor:not-allowed}
+#dispatch-result{background:var(--bg);border:1px solid var(--border);border-radius:.5rem;
+padding:1rem;font-family:'Fira Code',monospace;font-size:.8rem;white-space:pre-wrap;
+max-height:300px;overflow-y:auto;display:none}
+
+/* ---------- Refresh ---------- */
+.toolbar{display:flex;align-items:center;gap:1rem;margin-bottom:1rem}
+.toolbar button{padding:.4rem 1rem;border:none;border-radius:.4rem;
+background:var(--accent);color:#fff;font-size:.85rem;cursor:pointer}
+.toolbar button:hover{opacity:.9}
+.toolbar .status{font-size:.8rem;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- ============= Login overlay ============= -->
+<div id="login-overlay">
+  <div id="login-box">
+    <h2>Admin Login</h2>
+    <p id="login-error"></p>
+    <input id="token-input" type="password" placeholder="Admin token" autofocus />
+    <button onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- ============= Dashboard ============= -->
+<div id="app" style="display:none">
+<header>
+  <h1>RAG Admin Dashboard</h1>
+  <span class="logout" onclick="doLogout()">Sign out</span>
+</header>
+
+<div class="container">
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button onclick="refresh()">Refresh</button>
+  <span class="status" id="last-refresh">—</span>
+</div>
+
+<!-- KPI cards -->
+<div class="cards">
+  <div class="card"><div class="label">System Status</div><div class="value" id="c-status">—</div></div>
+  <div class="card"><div class="label">RAG Ready</div><div class="value" id="c-rag">—</div></div>
+  <div class="card"><div class="label">Indexes</div><div class="value" id="c-indexes">—</div></div>
+  <div class="card"><div class="label">Total Leads</div><div class="value" id="c-total">—</div></div>
+  <div class="card"><div class="label">Hot</div><div class="value hot" id="c-hot">—</div></div>
+  <div class="card"><div class="label">Warm</div><div class="value warm" id="c-warm">—</div></div>
+  <div class="card"><div class="label">Cold</div><div class="value cold" id="c-cold">—</div></div>
+</div>
+
+<!-- Recent leads table -->
+<div class="section">
+  <h2>Recent Leads</h2>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Query</th><th>Intent</th><th>Temp</th><th>Source</th><th>Time</th>
+      </tr></thead>
+      <tbody id="leads-body"><tr><td colspan="6" style="color:var(--muted)">No leads yet</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Dispatch test box -->
+<div class="section">
+  <h2>Test Query — /api/dispatch</h2>
+  <div class="dispatch-form">
+    <input id="dispatch-input" type="text" placeholder="Enter a test query…" />
+    <button id="dispatch-btn" onclick="doDispatch()">Send</button>
+  </div>
+  <pre id="dispatch-result"></pre>
+</div>
+
+</div><!-- .container -->
+</div><!-- #app -->
+
+<script>
+/* ---------- State ---------- */
+let TOKEN = sessionStorage.getItem('admin_token') || '';
+const API = window.location.origin;
+
+/* ---------- Auth ---------- */
+function headers(){return {'X-Admin-Token':TOKEN,'Content-Type':'application/json'}}
+
+async function doLogin(){
+  const input = document.getElementById('token-input');
+  const err   = document.getElementById('login-error');
+  const t = input.value.trim();
+  if(!t){err.textContent='Token required';return}
+  try{
+    const r = await fetch(API+'/admin/stats',{headers:{'X-Admin-Token':t}});
+    if(!r.ok) throw new Error('Invalid token');
+    TOKEN = t;
+    sessionStorage.setItem('admin_token',t);
+    document.getElementById('login-overlay').style.display='none';
+    document.getElementById('app').style.display='block';
+    refresh();
+  }catch(e){err.textContent=e.message}
+}
+
+function doLogout(){
+  TOKEN='';sessionStorage.removeItem('admin_token');
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-overlay').style.display='flex';
+  document.getElementById('token-input').value='';
+}
+
+/* ---------- Auto-login if token saved ---------- */
+(async function(){
+  if(!TOKEN) return;
+  try{
+    const r = await fetch(API+'/admin/stats',{headers:{'X-Admin-Token':TOKEN}});
+    if(r.ok){
+      document.getElementById('login-overlay').style.display='none';
+      document.getElementById('app').style.display='block';
+      refresh();
+    }else{sessionStorage.removeItem('admin_token');TOKEN=''}
+  }catch(_){sessionStorage.removeItem('admin_token');TOKEN=''}
+})();
+
+/* ---------- Dashboard data ---------- */
+async function refresh(){
+  try{
+    const [statsR, leadsR] = await Promise.all([
+      fetch(API+'/admin/stats',{headers:headers()}),
+      fetch(API+'/leads',{headers:headers()})
+    ]);
+    if(statsR.status===401||leadsR.status===401){doLogout();return}
+    const stats = await statsR.json();
+    const leads = await leadsR.json();
+
+    // KPI cards
+    const sys = stats.system||{};
+    setText('c-status', sys.status||'—');
+    setClass('c-status', sys.status==='ok'?'ok':'bad');
+    setText('c-rag', sys.rag_ready?'Ready':'Not Ready');
+    setClass('c-rag', sys.rag_ready?'ok':'warn');
+    setText('c-indexes', sys.index_count??'—');
+    const ld = stats.leads||{};
+    setText('c-total', ld.total??0);
+    setText('c-hot', ld.hot??0);
+    setText('c-warm', ld.warm??0);
+    setText('c-cold', ld.cold??0);
+
+    // Leads table
+    const tbody = document.getElementById('leads-body');
+    const rows = (leads.leads||[]).slice(0,50);
+    if(!rows.length){
+      tbody.innerHTML='<tr><td colspan="6" style="color:var(--muted)">No leads yet</td></tr>';
+    }else{
+      tbody.innerHTML = rows.map((l,i)=>{
+        const d = new Date(l.created_at*1000);
+        const ts = d.toLocaleString();
+        return `<tr>
+          <td>${l.id??i+1}</td>
+          <td>${esc(trunc(l.query,80))}</td>
+          <td>${esc(l.intent)}</td>
+          <td><span class="temp-badge ${l.temperature}">${l.temperature}</span></td>
+          <td>${esc(l.source)}</td>
+          <td>${ts}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    document.getElementById('last-refresh').textContent='Updated '+new Date().toLocaleTimeString();
+  }catch(e){console.error('refresh failed',e)}
+}
+
+/* ---------- Dispatch ---------- */
+async function doDispatch(){
+  const input = document.getElementById('dispatch-input');
+  const btn   = document.getElementById('dispatch-btn');
+  const pre   = document.getElementById('dispatch-result');
+  const q = input.value.trim();
+  if(!q) return;
+  btn.disabled=true; btn.textContent='Sending…';
+  pre.style.display='block'; pre.textContent='Loading…';
+  try{
+    const r = await fetch(API+'/api/dispatch',{
+      method:'POST',headers:headers(),body:JSON.stringify({question:q})
+    });
+    if(r.status===401){doLogout();return}
+    const data = await r.json();
+    pre.textContent = JSON.stringify(data,null,2);
+    refresh();
+  }catch(e){pre.textContent='Error: '+e.message}
+  finally{btn.disabled=false;btn.textContent='Send'}
+}
+
+/* ---------- Helpers ---------- */
+function setText(id,v){document.getElementById(id).textContent=v}
+function setClass(id,cls){
+  const el=document.getElementById(id);
+  el.className='value';el.classList.add(cls);
+}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function trunc(s,n){return s&&s.length>n?s.slice(0,n)+'…':s||''}
+
+/* Enter key on token input */
+document.getElementById('token-input').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+/* Enter key on dispatch input */
+document.getElementById('dispatch-input').addEventListener('keydown',e=>{if(e.key==='Enter')doDispatch()});
+</script>
+</body>
+</html>
