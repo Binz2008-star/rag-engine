@@ -22,21 +22,27 @@ def _rrf_merge(
     """Reciprocal Rank Fusion of dense (FAISS) and sparse (BM25) results.
 
     Each result list contributes ``1 / (k + rank)`` for every chunk it
-    contains. The merged scores are used only for ordering; the final
-    ``RetrievalHit.score`` is set to the RRF score so downstream
-    threshold filtering still works on a comparable [0, 1] scale after
-    normalisation.
+    contains.  The final ``RetrievalHit.score`` is the normalised RRF
+    score.  Original dense and sparse scores are preserved on
+    ``dense_score`` / ``sparse_score`` so the downstream reranker can
+    use them independently.
     """
     scores: dict[str, float] = {}
     hit_by_id: dict[str, RetrievalHit] = {}
+    dense_scores: dict[str, float] = {}
+    sparse_scores: dict[str, float] = {}
 
     for rank, hit in enumerate(dense_hits):
         scores[hit.chunk_id] = scores.get(hit.chunk_id, 0.0) + 1.0 / (k + rank)
         hit_by_id[hit.chunk_id] = hit
+        # Convert raw FAISS L2 distance (lower=better) to similarity
+        # (higher=better) so downstream reranker sees consistent semantics.
+        dense_scores[hit.chunk_id] = 1.0 / (1.0 + hit.score)
 
-    for rank, (chunk, _bm25_score) in enumerate(sparse_results):
+    for rank, (chunk, bm25_score) in enumerate(sparse_results):
         cid = chunk.chunk_id
         scores[cid] = scores.get(cid, 0.0) + 1.0 / (k + rank)
+        sparse_scores[cid] = bm25_score
         if cid not in hit_by_id:
             hit_by_id[cid] = RetrievalHit(
                 chunk_id=chunk.chunk_id,
@@ -62,6 +68,8 @@ def _rrf_merge(
             hit.score = (rrf_score - min_score) / score_range
         else:
             hit.score = 1.0
+        hit.dense_score = dense_scores.get(cid, 0.0)
+        hit.sparse_score = sparse_scores.get(cid, 0.0)
         results.append(hit)
 
     return results
@@ -159,8 +167,11 @@ class MultiRetriever:
         if not sparse_results:
             # No BM25 results — normalise FAISS L2 distances to [0, 1]
             # similarity so downstream filters see the same semantics
-            # as the RRF path.  sparse_score stays at default 0.0.
-            return self._l2_to_similarity(dense_hits)
+            # as the RRF path.  Preserve dense_score; sparse_score stays 0.0.
+            self._l2_to_similarity(dense_hits)
+            for hit in dense_hits:
+                hit.dense_score = hit.score
+            return dense_hits
 
         return _rrf_merge(dense_hits, sparse_results)
 

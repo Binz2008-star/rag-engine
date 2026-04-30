@@ -9,7 +9,7 @@ from app.query_normalizer import is_arabic
 from app.utils import stable_hash
 from router.features import normalize_query
 from generation.grounding import check_grounding
-from retrieval.reranker import Reranker
+from app.reranker import LightweightReranker
 from analysis.corpus_topic_map import CorpusTopicMap
 
 
@@ -41,7 +41,7 @@ class Pipeline:
         embedder,
         retriever,
         llm,
-        reranker: Reranker | None = None,
+        reranker: LightweightReranker | None = None,
         knowledge_gap_analyzer=None,
     ):
         self.router = router
