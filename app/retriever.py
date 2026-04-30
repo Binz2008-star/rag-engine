@@ -14,7 +14,7 @@ from app.bm25_index import BM25Index
 from app.chunking import Chunk
 from app.decision_logger import DecisionLogger
 from app.embeddings import EmbeddingClient
-from app.models import RetrievedChunk
+from app.models import RetrievalHit, RetrievedChunk
 from app.query_normalizer import normalize_query
 from app.reranker import LightweightReranker
 from app.vector_store import VectorStore
@@ -521,7 +521,26 @@ class Retriever:
         # Pipeline: rerank → adjustments → score filter → diversify → top-k
         if RERANK_ENABLED:
             retrieved = sorted(retrieved, key=lambda rc: rc.score, reverse=True)[:20]
-            retrieved = self.reranker.rerank(query, retrieved)
+            rerank_hits = [
+                RetrievalHit(
+                    chunk_id=rc.chunk.chunk_id,
+                    source=rc.chunk.source,
+                    text=rc.chunk.text,
+                    score=rc.score,
+                    path=rc.chunk.path,
+                    doc_type=rc.chunk.doc_type,
+                    dense_score=rc.score,
+                    sparse_score=0.0,
+                )
+                for rc in retrieved
+            ]
+            reranked = self.reranker.rerank(rerank_hits, query, top_k=len(rerank_hits))
+            rc_by_id = {rc.chunk.chunk_id: rc for rc in retrieved}
+            retrieved = []
+            for hit in reranked:
+                rc = rc_by_id[hit.chunk_id]
+                rc.score = hit.score
+                retrieved.append(rc)
             retrieved = self._apply_scoring_adjustments(query, retrieved, phase="bias")
             retrieved = self._apply_scoring_adjustments(query, retrieved, phase="rescue")
             logger.info("Reranking applied: %d candidates", len(retrieved))

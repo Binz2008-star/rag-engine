@@ -39,8 +39,8 @@ python -m py_compile api/server/admin_routes.py
 # File should exist after first save
 cat data/eval_cases.jsonl
 
-# Validate latest line is valid JSON
-tail -1 data/eval_cases.jsonl | python -c "import sys,json; obj=json.loads(sys.stdin.read()); print('OK:', obj['query'], obj['feedback_label'], obj['must_include'])"
+# Validate latest line is valid JSON with config_version
+tail -1 data/eval_cases.jsonl | python3 -c "import sys,json; obj=json.loads(sys.stdin.read()); print('OK:', obj['query'], obj['feedback_label'], obj['must_include'], 'config_version='+str(obj.get('config_version')))"
 ```
 
 **Key normalization:** `must_include` accepts comma-separated string input (e.g. "AED, grease trap") and stores it as array (`["AED", "grease trap"]`).

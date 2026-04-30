@@ -87,8 +87,13 @@
     "query": "What is the contact information for ECO?",
     "expected_intent": "eco",
     "expected_method": "rule",
-    "expected_refusal": true,
-    "expected_failure_type": "retrieval_miss",
+    "expected_refusal": false,
+    "expected_source": "ECO Technology Environmental Protection Services L.L.C..md",
+    "expected_answer_contains": [
+      "971",
+      "ecotech"
+    ],
+    "must_be_grounded": true,
     "suite": "baseline_en"
   },
   {
