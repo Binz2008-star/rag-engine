@@ -1,4 +1,10 @@
-"""Lightweight reranker - second-pass scoring after FAISS retrieval."""
+"""Lightweight reranker — multi-signal second-pass scoring.
+
+Combines dense (semantic), sparse (BM25), and phrase-match signals
+that arrive on each ``RetrievalHit`` from the hybrid retriever.
+Scores are min-max normalised *per signal* before weighting so that
+the configured weights are meaningful regardless of raw score ranges.
+"""
 
 from __future__ import annotations
 
@@ -7,207 +13,127 @@ import re
 from dataclasses import dataclass
 from typing import List
 
-from app.config import (
-    RERANK_ENABLED,
-    RERANK_LEXICAL_WEIGHT,
-    RERANK_PHRASE_WEIGHT,
-    RERANK_SEMANTIC_WEIGHT,
-    RERANK_SOURCE_PRIOR_WEIGHT,
-)
-from app.models import RetrievedChunk
+from app.config import RERANK_ENABLED
+from app.models import RetrievalHit
 
 logger = logging.getLogger(__name__)
 
 
+def _min_max(values: list[float]) -> tuple[float, float, float]:
+    """Return (min, max, range) for a list of floats."""
+    if not values:
+        return 0.0, 1.0, 1.0
+    lo, hi = min(values), max(values)
+    return lo, hi, max(hi - lo, 1e-8)
+
+
 @dataclass(frozen=True)
 class RerankBreakdown:
-    """Breakdown of rerank score components."""
-    semantic: float
-    lexical: float
+    """Per-hit breakdown of rerank score components (all normalised)."""
+    dense: float
+    sparse: float
     phrase: float
     final: float
-    source_prior: float = 0.0  # Disabled - using semantic and lexical only
 
 
 class LightweightReranker:
-    """Lightweight reranker combining semantic, lexical, phrase, and source signals."""
+    """Pipeline-compatible reranker using retriever-provided signals.
+
+    The hybrid retriever stores ``dense_score`` (FAISS cosine) and
+    ``sparse_score`` (BM25) on every ``RetrievalHit``.  This reranker
+    normalises them independently and combines with a phrase-match
+    bonus.  No re-embedding or extra model calls are required.
+    """
 
     def __init__(
         self,
-        semantic_weight: float = RERANK_SEMANTIC_WEIGHT,
-        lexical_weight: float = RERANK_LEXICAL_WEIGHT,
-        phrase_weight: float = RERANK_PHRASE_WEIGHT,
-        bm25_weight: float = 0.3,  # BM25 weight for exact term matching
-        source_prior_weight: float = 0.0,  # Disabled - no source biasing
+        semantic_weight: float = 0.6,
+        bm25_weight: float = 0.3,
+        phrase_weight: float = 0.1,
     ) -> None:
         self.semantic_weight = semantic_weight
-        self.lexical_weight = lexical_weight
-        self.phrase_weight = phrase_weight
         self.bm25_weight = bm25_weight
-        self.source_prior_weight = source_prior_weight
+        self.phrase_weight = phrase_weight
 
-    def rerank(self, query: str, candidates: List[RetrievedChunk]) -> List[RetrievedChunk]:
-        """
-        Rerank candidates using multi-signal scoring.
-        Returns re-sorted list of candidates with updated scores.
-        """
-        if not RERANK_ENABLED:
-            return candidates
+    # ------------------------------------------------------------------
+    # Pipeline interface — matches Reranker.rerank(hits, query, top_k)
+    # ------------------------------------------------------------------
 
-        if not candidates:
-            return candidates
+    def rerank(
+        self,
+        hits: List[RetrievalHit],
+        query: str,
+        top_k: int,
+    ) -> List[RetrievalHit]:
+        """Rerank *hits* and return the best *top_k*."""
+        if not RERANK_ENABLED or not hits:
+            return hits[:top_k]
 
-        # Normalize query for token matching
         normalized_query = self._normalize_text(query)
-        query_tokens = self._tokenize(normalized_query)
 
-        # Compute rerank scores
-        reranked = []
-        for rc in candidates:
-            breakdown = self._compute_rerank_score(
-                query,
-                normalized_query,
-                query_tokens,
-                rc,
+        # Collect raw signals for batch normalisation.
+        raw_dense = [h.dense_score for h in hits]
+        raw_sparse = [h.sparse_score for h in hits]
+
+        d_lo, _, d_range = _min_max(raw_dense)
+        s_lo, _, s_range = _min_max(raw_sparse)
+
+        scored: list[tuple[RetrievalHit, RerankBreakdown]] = []
+        for hit in hits:
+            norm_dense = (hit.dense_score - d_lo) / d_range
+            norm_sparse = (hit.sparse_score - s_lo) / s_range
+
+            norm_chunk = self._normalize_text(hit.text)
+            phrase = self._phrase_bonus(normalized_query, norm_chunk)
+
+            final = (
+                self.semantic_weight * norm_dense
+                + self.bm25_weight * norm_sparse
+                + self.phrase_weight * phrase
             )
-            updated_rc = RetrievedChunk(chunk=rc.chunk, score=breakdown.final)
-            reranked.append((updated_rc, breakdown))
 
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(
-                    "Rerank: %s | semantic=%.3f lexical=%.3f phrase=%.3f source=%.3f final=%.3f",
-                    rc.chunk.source[:30],
-                    breakdown.semantic,
-                    breakdown.lexical,
-                    breakdown.phrase,
-                    breakdown.source_prior,
-                    breakdown.final,
+            scored.append((hit, RerankBreakdown(
+                dense=norm_dense,
+                sparse=norm_sparse,
+                phrase=phrase,
+                final=final,
+            )))
+
+        scored.sort(key=lambda x: x[1].final, reverse=True)
+
+        # Debug logging — top results with score breakdowns.
+        if scored:
+            logger.info("RERANK TOP RESULTS:")
+            for i, (h, bd) in enumerate(scored[:5]):
+                logger.info(
+                    "  %d. score=%.4f (dense=%.3f sparse=%.3f phrase=%.3f) | %s",
+                    i + 1, bd.final, bd.dense, bd.sparse, bd.phrase,
+                    h.source,
                 )
 
-        # Sort by final rerank score
-        reranked.sort(key=lambda x: x[1].final, reverse=True)
+        results = scored[:top_k]
+        for hit, bd in results:
+            hit.score = bd.final
 
-        # Return updated candidates
-        return [rc for rc, _ in reranked]
+        return [h for h, _ in results]
 
-    def _compute_rerank_score(
-        self,
-        query: str,
-        normalized_query: str,
-        query_tokens: set[str],
-        rc: RetrievedChunk,
-    ) -> RerankBreakdown:
-        """Compute rerank score breakdown for a single candidate."""
-        # Semantic score (existing FAISS score)
-        semantic_score = rc.score
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
 
-        # BM25 lexical score for exact term matching
-        bm25_score = self._compute_bm25_score(query, rc.chunk.text)
-
-        # Simple lexical overlap score
-        normalized_chunk = self._normalize_text(rc.chunk.text)
-        chunk_tokens = self._tokenize(normalized_chunk)
-        lexical_score = self._compute_lexical_overlap(query_tokens, chunk_tokens)
-
-        # Phrase match bonus
-        phrase_score = self._compute_phrase_bonus(normalized_query, normalized_chunk)
-
-        # Source prior disabled - using semantic and lexical only
-        source_prior = 0.0
-
-        # Final weighted score with BM25 boost
-        final_score = (
-            self.semantic_weight * semantic_score
-            + self.bm25_weight * bm25_score
-            + self.lexical_weight * lexical_score
-            + self.phrase_weight * phrase_score
-        )
-
-        # Apply 1.5x multiplier to reduce reranking aggression
-        final_score *= 1.5
-
-        return RerankBreakdown(
-            semantic=semantic_score,
-            lexical=lexical_score,
-            phrase=phrase_score,
-            source_prior=source_prior,
-            final=final_score,
-        )
-
-    def _normalize_text(self, text: str) -> str:
-        """Normalize text for lexical comparison."""
-        # Simple Arabic normalization (without external dependencies)
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        """Lowercase + collapse whitespace + basic Arabic normalisation."""
         text = re.sub(r"[إأآ]", "ا", text)
-        text = text.replace("ى", "ي")
-        text = text.replace("ؤ", "و")
-        text = text.replace("ئ", "ي")
-        # Remove diacritics
+        text = text.replace("ى", "ي").replace("ؤ", "و").replace("ئ", "ي")
         text = re.sub(r"[\u064B-\u065F\u0670]", "", text)
-        # Lowercase
         text = text.lower()
-        # Remove punctuation
         text = re.sub(r"[^\w\s]", " ", text)
-        # Collapse whitespace
-        text = re.sub(r"\s+", " ", text)
-        return text.strip()
+        return re.sub(r"\s+", " ", text).strip()
 
-    def _tokenize(self, text: str) -> set[str]:
-        """Tokenize text into set of meaningful tokens."""
-        tokens = text.split()
-        # Ignore very short tokens
-        return {t for t in tokens if len(t) >= 3}
-
-    def _compute_lexical_overlap(self, query_tokens: set[str], chunk_tokens: set[str]) -> float:
-        """Compute normalized token overlap between query and chunk."""
-        if not query_tokens:
-            return 0.0
-
-        overlap = len(query_tokens & chunk_tokens)
-        return overlap / len(query_tokens)
-
-    def _compute_phrase_bonus(self, normalized_query: str, normalized_chunk: str) -> float:
-        """Compute phrase match bonus for strong exact normalized phrase matches."""
+    @staticmethod
+    def _phrase_bonus(normalized_query: str, normalized_chunk: str) -> float:
+        """1.0 if the full normalised query appears as a substring."""
         if len(normalized_query.split()) < 2:
             return 0.0
-
-        # Check if full normalized query appears in chunk
-        if normalized_query in normalized_chunk:
-            return 1.0
-
-        return 0.0
-
-    def _compute_bm25_score(self, query: str, document: str) -> float:
-        """Compute BM25 score for exact term matching."""
-        # Simple BM25 implementation
-        k1 = 1.2  # Controls term frequency scaling
-        b = 0.75  # Controls document length normalization
-
-        # Tokenize query and document
-        query_terms = query.lower().split()
-        doc_terms = document.lower().split()
-        doc_len = len(doc_terms)
-        avg_doc_len = 100  # Approximate average document length
-
-        # Calculate term frequencies
-        term_freqs = {}
-        for term in query_terms:
-            term_freqs[term] = doc_terms.count(term)
-
-        # Compute BM25 score
-        score = 0.0
-        for term, tf in term_freqs.items():
-            if tf > 0:
-                # IDF component (simplified)
-                idf = 1.0  # Simplified IDF for speed
-
-                # BM25 formula
-                tf_component = (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * doc_len / avg_doc_len))
-                score += idf * tf_component
-
-        # Boost for exact entity matches
-        entity_terms = ['eco', 'cv', 'deliveroo', 'robin', 'edwan']
-        for term in entity_terms:
-            if term in query.lower() and term in document.lower():
-                score += 0.5  # Additional boost for entity matches
-
-        return min(score, 2.0)  # Cap the score
+        return 1.0 if normalized_query in normalized_chunk else 0.0
