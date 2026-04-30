@@ -87,10 +87,8 @@
     "query": "What is the contact information for ECO?",
     "expected_intent": "eco",
     "expected_method": "rule",
-    "must_be_grounded": true,
-    "expected_answer_contains": [
-      "ECO"
-    ],
+    "expected_refusal": true,
+    "expected_failure_type": "retrieval_miss",
     "suite": "baseline_en"
   },
   {

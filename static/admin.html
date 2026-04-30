@@ -432,7 +432,10 @@ background:var(--green);color:#fff;font-size:.85rem;cursor:pointer}
 /* ================================================================
    State
    ================================================================ */
-let TOKEN = sessionStorage.getItem('admin_token') || '';
+/* Support ?token= URL param for /admin GET convenience */
+const _urlToken = new URLSearchParams(window.location.search).get('token') || '';
+let TOKEN = _urlToken || sessionStorage.getItem('admin_token') || '';
+if(_urlToken) sessionStorage.setItem('admin_token', _urlToken);
 const API = window.location.origin;
 let allLeads = [];
 let currentFilter = 'all';
@@ -507,6 +510,7 @@ async function refresh(){
       fetch(API+'/leads',{headers:headers()})
     ]);
     if(statsR.status===401||leadsR.status===401){doLogout();return}
+    if(!statsR.ok||!leadsR.ok){console.error('refresh: bad status',statsR.status,leadsR.status);return}
     const stats = await statsR.json();
     const leads = await leadsR.json();
 
@@ -578,6 +582,7 @@ async function loadQueries(){
   try{
     const r = await fetch(url,{headers:headers()});
     if(r.status===401){doLogout();return}
+    if(!r.ok){console.error('loadQueries: bad status',r.status);return}
     const data = await r.json();
     let rows = data.leads||[];
     if(currentFilter==='whatsapp') rows = rows.filter(l=>(l.channel||'api')==='whatsapp');
@@ -629,6 +634,7 @@ async function loadMonitoring(){
   try{
     const r = await fetch(API+'/admin/monitoring',{headers:headers()});
     if(r.status===401){doLogout();return}
+    if(!r.ok){console.error('loadMonitoring: bad status',r.status);return}
     const m = await r.json();
     setText('m-total', m.total_queries||0);
     setText('m-failures', m.failures||0);
@@ -847,6 +853,12 @@ async function labSaveEval(){
       method:'POST',headers:headers(),body:JSON.stringify(evalCase)
     });
     if(r.status===401){doLogout();return}
+    if(!r.ok){
+      const err = await r.json().catch(function(){return {}});
+      statusEl.textContent = 'Save failed: '+(err.detail||r.status);
+      statusEl.style.color = 'var(--red)';
+      return;
+    }
     const data = await r.json();
     if(data.saved){
       statusEl.textContent = 'Saved!';
@@ -871,6 +883,7 @@ async function loadEvalCases(){
   try{
     const r = await fetch(API+'/api/dashboard/eval-cases',{headers:headers()});
     if(r.status===401){doLogout();return}
+    if(!r.ok){console.error('loadEvalCases: bad status',r.status);return}
     const data = await r.json();
     evalCasesCache = data.cases || [];
     document.getElementById('eval-count').textContent = data.total+' cases';
@@ -923,6 +936,7 @@ async function loadRagConfig(){
   try{
     const r = await fetch(API+'/api/dashboard/rag-config',{headers:headers()});
     if(r.status===401){doLogout();return}
+    if(!r.ok){console.error('loadRagConfig: bad status',r.status);return}
     const data = await r.json();
     const c = data.config||{};
     document.getElementById('cfg-top-k').value = c.top_k??15;
@@ -959,6 +973,12 @@ async function saveRagConfig(){
       method:'POST',headers:headers(),body:JSON.stringify(payload)
     });
     if(r.status===401){doLogout();return}
+    if(!r.ok){
+      const err = await r.json().catch(function(){return {}});
+      statusEl.textContent = 'Failed: '+(err.detail||r.status);
+      statusEl.style.color = 'var(--red)';
+      return;
+    }
     const data = await r.json();
     if(data.status==='ok'){
       statusEl.textContent = 'Saved! (v'+(data.config.version||'?')+')';

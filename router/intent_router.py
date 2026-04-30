@@ -166,30 +166,22 @@ class IntentRouter:
 
     def route(self, query: str) -> Route:
         eco_hint, cv_hint = extract_hints(query)
-        logger.info(
-            "route: query=%r eco_hint=%s cv_hint=%s",
-            query[:80], eco_hint, cv_hint,
-        )
 
         # Hard-rule routes bypass model execution entirely
         q = query.lower()
         if "roben" in q or "roben's" in q:
-            logger.info("route: matched roben rule → cv")
             return Route(intent="cv", confidence=1.0, intent_method="rule")
 
         if eco_hint and not cv_hint:
-            logger.info("route: eco_hint=True → eco")
             return Route(intent="eco", confidence=1.0, intent_method="rule")
 
         if cv_hint and not eco_hint:
-            logger.info("route: cv_hint=True → cv")
             return Route(intent="cv", confidence=1.0, intent_method="rule")
 
         # Run shadow classification (internal tracking only, not exposed publicly)
         self._run_shadow_classification(query, eco_hint=eco_hint, cv_hint=cv_hint)
 
         # Non-rule queries always return general/0.5/rule publicly
-        logger.info("route: no hint match → general")
         return Route(intent="general", confidence=0.5, intent_method="rule")
 
     def _route_with_shadow(self, query: str) -> tuple[Route, ShadowDecision | None]:

@@ -357,6 +357,11 @@ def register_admin_routes(app: FastAPI) -> None:
             raise HTTPException(
                 status_code=422, detail="feedback_label is required"
             )
+        if feedback_label not in _VALID_FEEDBACK_LABELS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"feedback_label must be one of: {', '.join(sorted(_VALID_FEEDBACK_LABELS))}",
+            )
 
         must_include = body.get("must_include", [])
         if isinstance(must_include, str):
