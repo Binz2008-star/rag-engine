@@ -61,7 +61,8 @@ THRESHOLDS_BY_INTENT = {
     "uncertain": 0.30,
 }
 
-TOP_K = 5
+TOP_K = get_int_env("TOP_K", 12)
+GENERATION_TOP_K = get_int_env("GENERATION_TOP_K", 7)
 CHUNK_SIZE = 700
 CHUNK_OVERLAP = 120
 BATCH_SIZE = 32

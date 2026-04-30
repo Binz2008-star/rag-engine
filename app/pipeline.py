@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import time
 
-from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE
+from app.config import ACTIVE_MODEL_PATH, GENERATION_TOP_K, REFUSAL_MESSAGE
 from app.models import KnowledgeGap, PipelineResult
 from app.query_normalizer import is_arabic
 from app.utils import stable_hash
@@ -148,7 +148,7 @@ class Pipeline:
             )
 
         if self.reranker:
-            hits = self.reranker.rerank(hits, normalized_query, top_k=len(hits))
+            hits = self.reranker.rerank(hits, normalized_query, top_k=GENERATION_TOP_K)
 
         if hits and hits[0].score < 0.20:
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
