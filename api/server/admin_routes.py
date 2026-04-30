@@ -20,7 +20,6 @@ Adds the following endpoints consumed by the admin dashboard:
 
 from __future__ import annotations
 
-import fcntl
 import json
 import logging
 import os
@@ -29,6 +28,19 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List
+
+# Platform-specific file locking
+try:
+    import fcntl
+    HAS_FCNTL = True
+except ImportError:
+    # Windows doesn't have fcntl, use msvcrt or skip locking
+    try:
+        import msvcrt
+        HAS_MSVCRT = True
+    except ImportError:
+        HAS_MSVCRT = False
+    HAS_FCNTL = False
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
@@ -335,10 +347,18 @@ def register_admin_routes(app: FastAPI) -> None:
         line = json.dumps(data, ensure_ascii=False) + "\n"
         fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            if HAS_FCNTL:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+            elif HAS_MSVCRT:
+                # Windows locking with msvcrt
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, os.path.getsize(str(path)))
+            # If no locking available, proceed without it (acceptable for dev/single-instance)
             os.write(fd, line.encode("utf-8"))
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            if HAS_FCNTL:
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            elif HAS_MSVCRT:
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, os.path.getsize(str(path)))
             os.close(fd)
 
     @app.post(
