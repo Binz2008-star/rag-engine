@@ -114,8 +114,37 @@ class MultiRetriever:
             hit.score = hit.score * weight
         return hits
 
+    @staticmethod
+    def _l2_to_similarity(hits: list[RetrievalHit]) -> list[RetrievalHit]:
+        """Convert raw FAISS L2 distances to [0, 1] similarity scores.
+
+        FAISS ``IndexHNSWFlat`` returns squared-L2 distances where
+        **lower = more similar**.  Downstream code assumes **higher =
+        more relevant**, so we apply: ``sim = 1 / (1 + l2_dist)``.
+        The result is then min-max normalised so the best hit is 1.0.
+        """
+        if not hits:
+            return hits
+
+        # Convert L2 distance → similarity (higher = better).
+        for hit in hits:
+            hit.score = 1.0 / (1.0 + hit.score)
+
+        # Min-max normalise to [0, 1].
+        lo = min(h.score for h in hits)
+        hi = max(h.score for h in hits)
+        rng = hi - lo
+        for hit in hits:
+            hit.score = (hit.score - lo) / rng if rng > 0 else 1.0
+
+        return hits
+
     def _hybrid_search(self, query_vec, query: str, intent: str, fetch_k: int) -> list[RetrievalHit]:
-        """Run dense (FAISS) + sparse (BM25) search and merge with RRF."""
+        """Run dense (FAISS) + sparse (BM25) search and merge with RRF.
+
+        Both return paths guarantee the same score semantics:
+        ``score ∈ [0, 1]`` where **higher = more relevant**.
+        """
         idx = self.indexes.get(intent)
         if idx is None:
             return []
@@ -128,7 +157,10 @@ class MultiRetriever:
         sparse_results = bm25.search(query, fetch_k) if bm25 else []
 
         if not sparse_results:
-            return dense_hits
+            # No BM25 results — normalise FAISS L2 distances to [0, 1]
+            # similarity so downstream filters see the same semantics
+            # as the RRF path.  sparse_score stays at default 0.0.
+            return self._l2_to_similarity(dense_hits)
 
         return _rrf_merge(dense_hits, sparse_results)
 
