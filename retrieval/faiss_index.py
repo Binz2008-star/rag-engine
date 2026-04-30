@@ -1,20 +1,12 @@
 from __future__ import annotations
 
 import json
-import logging
-import time
 from pathlib import Path
 
 import faiss
 import numpy as np
 
 from app.models import Chunk, RetrievalHit
-
-log = logging.getLogger(__name__)
-
-
-class IndexMismatchError(RuntimeError):
-    """FAISS vector count does not match chunk metadata length."""
 
 
 class FaissIndex:
@@ -40,49 +32,22 @@ class FaissIndex:
 
     def search(self, query_vec: np.ndarray, top_k: int) -> list[RetrievalHit]:
         if self.index is None or not self.chunks:
-            log.info("search: index=%s — empty (no index or no chunks)", self.name)
             return []
 
         query = query_vec.reshape(1, -1).astype(np.float32)
-        k = min(top_k, len(self.chunks))
-
-        t0 = time.perf_counter()
-        distances, indices = self.index.search(query, k)
-        search_ms = (time.perf_counter() - t0) * 1000
-
+        scores, indices = self.index.search(query, min(top_k, len(self.chunks)))
         hits: list[RetrievalHit] = []
-        n_chunks = len(self.chunks)
 
-        log.info(
-            "search: index=%s k=%d n_chunks=%d faiss_ms=%.1f",
-            self.name, k, n_chunks, search_ms,
-        )
-
-        for rank, (dist, idx) in enumerate(zip(distances[0], indices[0])):
+        for score, idx in zip(scores[0], indices[0]):
             if idx < 0:
                 continue
-            int_idx = int(idx)
-            if int_idx >= n_chunks:
-                log.warning(
-                    "FAISS returned index %d but only %d chunks in '%s' "
-                    "— skipping (index/metadata mismatch?)",
-                    int_idx, n_chunks, self.name,
-                )
-                continue
-            # IndexHNSWFlat returns L2² distances; convert to cosine
-            # similarity for L2-normalised vectors: sim = 1 - d²/2.
-            sim = max(0.0, 1.0 - float(dist) / 2.0)
-            chunk = self.chunks[int_idx]
-            log.info(
-                "  hit rank=%d idx=%d L2²=%.4f sim=%.4f src=%s",
-                rank, int_idx, float(dist), sim, chunk.source,
-            )
+            chunk = self.chunks[int(idx)]
             hits.append(
                 RetrievalHit(
                     chunk_id=chunk.chunk_id,
                     source=chunk.source,
                     text=chunk.text,
-                    score=sim,
+                    score=float(score),
                     path=chunk.path,
                     doc_type=chunk.doc_type,
                 )
@@ -109,13 +74,4 @@ class FaissIndex:
         meta = json.loads((out_dir / f"{name}.json").read_text(encoding="utf-8"))
         instance.chunks = [Chunk(**row) for row in meta]
         instance.dim = instance.index.d
-
-        n_vectors = instance.index.ntotal
-        n_chunks = len(instance.chunks)
-        if n_vectors != n_chunks:
-            raise IndexMismatchError(
-                f"Index '{name}': FAISS has {n_vectors} vectors but "
-                f"metadata has {n_chunks} chunks — rebuild with "
-                f"scripts/build_indexes.py"
-            )
         return instance

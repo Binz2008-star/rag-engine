@@ -1,25 +1,9 @@
 from __future__ import annotations
 
-import logging
-
 from app.config import THRESHOLDS_BY_INTENT, TOP_K
 from app.models import RetrievalHit
 from retrieval.faiss_index import FaissIndex
 from router.features import extract_hints
-
-log = logging.getLogger(__name__)
-
-# Terms whose presence in a query triggers a small score boost for
-# chunks that also contain them.  Improves recall for pricing /
-# commercial queries without altering grounding logic.
-_PRICING_QUERY_TERMS: frozenset[str] = frozenset({
-    "price", "pricing", "cost", "costs", "quote",
-    "aed", "grease trap", "grease traps",
-    "size a", "size b", "size c", "size d",
-    "rate", "rates", "fee", "fees",
-})
-
-_PRICING_BOOST = 0.10
 
 
 class MultiRetriever:
@@ -33,34 +17,11 @@ class MultiRetriever:
 
         for hit in hits:
             if hit.score < threshold:
-                log.info(
-                    "  dropped %s score=%.4f < threshold=%.4f (intent=%s, src=%s)",
-                    hit.chunk_id, hit.score, threshold, intent, hit.source,
-                )
                 continue
             hit.score = max(0.0, min(1.0, (hit.score - threshold) / max(1e-8, 1.0 - threshold)))
             normalized.append(hit)
 
-        log.info(
-            "filter: intent=%s threshold=%.2f in=%d kept=%d dropped=%d",
-            intent, threshold, len(hits), len(normalized), len(hits) - len(normalized),
-        )
         return normalized
-
-    @staticmethod
-    def _apply_pricing_boost(
-        hits: list[RetrievalHit], query: str,
-    ) -> list[RetrievalHit]:
-        """Boost chunks containing pricing terms when the query is pricing-related."""
-        q = query.lower()
-        if not any(term in q for term in _PRICING_QUERY_TERMS):
-            return hits
-        for hit in hits:
-            text_lower = hit.text.lower()
-            if any(term in text_lower for term in ("price", "pricing", "aed", "cost")):
-                hit.score = min(1.0, hit.score + _PRICING_BOOST)
-                log.info("  pricing_boost %s score=%.4f", hit.chunk_id, hit.score)
-        return hits
 
     def _dedupe(self, hits: list[RetrievalHit]) -> list[RetrievalHit]:
         seen: set[str] = set()
@@ -82,8 +43,6 @@ class MultiRetriever:
         return hits
 
     def retrieve(self, query_vec, intent: str, query: str) -> list[RetrievalHit]:
-        log.info("retrieve: intent=%s query=%r", intent, query[:80])
-
         if intent == "uncertain":
             eco_hint, cv_hint = extract_hints(query)
 
@@ -104,20 +63,13 @@ class MultiRetriever:
                 blended.extend(normalized)
 
             blended = self._apply_weighted_blending(blended, weights)
-            blended = self._apply_pricing_boost(blended, query)
             blended.sort(key=lambda x: x.score, reverse=True)
             return self._dedupe(blended)[:TOP_K]
 
         idx = self.indexes.get(intent)
         if idx is None:
-            log.warning("No index for intent=%s", intent)
             return []
 
         hits = self._normalize_and_filter(idx.search(query_vec, TOP_K * 3), intent)
-        hits = self._apply_pricing_boost(hits, query)
         hits.sort(key=lambda x: x.score, reverse=True)
-        log.info(
-            "retrieve: intent=%s returning %d hits (top=%.4f)",
-            intent, len(hits), hits[0].score if hits else 0.0,
-        )
         return self._dedupe(hits)[:TOP_K]
