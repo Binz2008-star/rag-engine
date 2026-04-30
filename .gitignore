@@ -177,3 +177,6 @@ test_*.json
 models/faiss.index
 models/data_hash.txt
 *.index
+
+# Nested git repository
+rag-engine/
