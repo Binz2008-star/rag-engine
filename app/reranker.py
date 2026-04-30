@@ -68,6 +68,8 @@ class LightweightReranker:
         """Rerank *hits* and return the best *top_k*."""
         if not RERANK_ENABLED or not hits:
             return hits[:top_k]
+        if len(hits) <= 1:
+            return hits[:top_k]
 
         normalized_query = self._normalize_text(query)
 

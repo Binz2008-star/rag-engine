@@ -35,7 +35,9 @@ def _rrf_merge(
     for rank, hit in enumerate(dense_hits):
         scores[hit.chunk_id] = scores.get(hit.chunk_id, 0.0) + 1.0 / (k + rank)
         hit_by_id[hit.chunk_id] = hit
-        dense_scores[hit.chunk_id] = hit.score
+        # Convert raw FAISS L2 distance (lower=better) to similarity
+        # (higher=better) so downstream reranker sees consistent semantics.
+        dense_scores[hit.chunk_id] = 1.0 / (1.0 + hit.score)
 
     for rank, (chunk, bm25_score) in enumerate(sparse_results):
         cid = chunk.chunk_id
