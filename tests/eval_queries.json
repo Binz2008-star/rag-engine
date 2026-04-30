@@ -87,11 +87,22 @@
     "query": "What is the contact information for ECO?",
     "expected_intent": "eco",
     "expected_method": "rule",
+<<<<<<< HEAD
     "suite": "baseline_en",
     "expected_contains": [
       "+971 52 223 3989",
       "robinedwan@gmail.com"
     ]
+=======
+    "expected_refusal": false,
+    "expected_source": "ECO Technology Environmental Protection Services L.L.C..md",
+    "expected_answer_contains": [
+      "971",
+      "ecotech"
+    ],
+    "must_be_grounded": true,
+    "suite": "baseline_en"
+>>>>>>> bf11e432f353b5c499b55ef976481f330dd1800b
   },
   {
     "query": "What is NAFFCO?",

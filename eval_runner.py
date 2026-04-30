@@ -30,7 +30,7 @@ from router.intent_router import IntentRouter
 from retrieval.embeddings import Embedder
 from retrieval.faiss_index import FaissIndex
 from retrieval.multi_retriever import MultiRetriever
-from retrieval.reranker import Reranker
+from app.reranker import LightweightReranker
 from generation.llm import LLMClient
 
 EVAL_QUERIES_PATH = Path(__file__).parent / "tests" / "eval_queries.json"
@@ -442,6 +442,7 @@ def main(query_fn=None) -> int:
             print("ERROR: No FAISS indexes found. Run scripts/build_indexes.py first.")
             return 2
 
+<<<<<<< HEAD
         # Build BM25 index for hybrid retrieval
         from app.bm25_index import BM25Index
         bm25_index = BM25Index()
@@ -453,6 +454,12 @@ def main(query_fn=None) -> int:
 
         retriever = MultiRetriever(indexes=indexes, bm25_index=bm25_index)
         reranker = Reranker(embed_fn=embedder.embed_batch)
+=======
+        retriever = MultiRetriever(indexes=indexes)
+        reranker = LightweightReranker(
+            semantic_weight=0.6, bm25_weight=0.3, phrase_weight=0.1,
+        )
+>>>>>>> bf11e432f353b5c499b55ef976481f330dd1800b
         llm = LLMClient()
         # Configure pipeline for fast modes
         pipeline_kwargs = {
