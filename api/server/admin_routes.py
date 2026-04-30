@@ -30,6 +30,18 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List
 
+# Platform-specific file locking
+try:
+    import fcntl
+    HAS_FCNTL = True
+except ImportError:
+    # Windows doesn't have fcntl, use msvcrt or skip locking
+    try:
+        import msvcrt
+        HAS_MSVCRT = True
+    except ImportError:
+        HAS_MSVCRT = False
+    HAS_FCNTL = False
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 
@@ -794,3 +806,4 @@ def register_admin_routes(app: FastAPI) -> None:
             "last_eval_pass_rate": eval_info.get("last_eval_pass_rate"),
             "last_eval_time": eval_info.get("last_eval_time"),
         }
+>>>>>>> origin/main
