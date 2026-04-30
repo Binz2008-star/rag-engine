@@ -149,6 +149,8 @@ class Pipeline:
 
         if self.reranker:
             hits = self.reranker.rerank(hits, normalized_query, top_k=GENERATION_TOP_K)
+        else:
+            hits = hits[:GENERATION_TOP_K]
 
         if hits and hits[0].score < 0.20:
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
