@@ -34,6 +34,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 
 from .services.leads_store import get_leads_store
+from .services.rag_config import get_config_version
 
 logger = logging.getLogger(__name__)
 
@@ -317,6 +318,7 @@ def register_admin_routes(app: FastAPI) -> None:
             "kind": intent,
             "status": "ok",
             "request_id": result.get("request_id", ""),
+            "config_version": get_config_version(),
             "payload": result,
         }
 
@@ -380,6 +382,7 @@ def register_admin_routes(app: FastAPI) -> None:
             "actual_sources": body.get("actual_sources"),
             "latency_ms": body.get("latency_ms"),
             "request_id": body.get("request_id"),
+            "config_version": get_config_version(),
             "created_at": time.time(),
         }
 
