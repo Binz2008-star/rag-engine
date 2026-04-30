@@ -420,10 +420,17 @@ async function loadFiles(){
 
     list.innerHTML = d.files.map(f=>{
       const ext = f.name.split('.').pop();
-      return `<div class="file-item" data-file="${esc(f.name)}" onclick="openFile('${esc(f.name)}')">
+      return `<div class="file-item" data-file="${esc(f.name)}">
         ${esc(f.name)}<span class="ext">.${esc(ext)}</span>
       </div>`;
     }).join('');
+
+    // Add click handlers via event delegation
+    list.querySelectorAll('.file-item').forEach(el=>{
+      el.addEventListener('click', function(){
+        openFile(this.dataset.file);
+      });
+    });
   }catch(e){console.error('loadFiles',e)}
 }
 
@@ -561,12 +568,9 @@ async function doEval(){
       output.textContent = 'Evaluation not configured.\n\nCreate scripts/run_eval.py to enable.';
       status.textContent = 'Not configured';
     }else if(d.status==='ok'){
-      output.textContent = `Passed: ${d.pass||0}
-Failed: ${d.fail||0}
-Wrong source: ${d.wrong_source||0}
-False refusal: ${d.false_refusal||0}`;
-      status.textContent = `Pass rate: ${Math.round((d.pass||0)/((d.pass||0)+(d.fail||0)||1)*100)}%`;
-      status.style.color = d.fail ? 'var(--yellow)' : 'var(--green)';
+      output.textContent = d.output || 'Evaluation passed';
+      status.textContent = d.passed ? 'Passed' : 'Failed';
+      status.style.color = d.passed ? 'var(--green)' : 'var(--red)';
     }else{
       output.textContent = d.output || d.error || 'Failed';
       status.textContent = 'Failed';

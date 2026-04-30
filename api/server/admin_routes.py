@@ -571,16 +571,21 @@ def register_admin_routes(app: FastAPI) -> None:
     @app.get("/admin/knowledge/{filename:path}", dependencies=[Depends(verify_admin_token)])
     async def get_knowledge_file(filename: str) -> Dict[str, Any]:
         """Read a knowledge file."""
-        # Prevent path traversal
+        # Prevent path traversal and symlink escape
         safe_name = filename.replace("..", "").replace("//", "/").lstrip("/")
         if not safe_name:
             raise HTTPException(status_code=400, detail="Invalid filename")
 
-        file_path = _RAW_DIR / safe_name
+        file_path = (_RAW_DIR / safe_name).resolve()
+        raw_dir_resolved = _RAW_DIR.resolve()
         try:
-            file_path.relative_to(_RAW_DIR)
+            file_path.relative_to(raw_dir_resolved)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid path")
+
+        # Reject symlinks to prevent escape
+        if file_path.is_symlink():
+            raise HTTPException(status_code=400, detail="Symlinks not allowed")
 
         if not file_path.exists() or not file_path.is_file():
             raise HTTPException(status_code=404, detail="File not found")
@@ -603,16 +608,21 @@ def register_admin_routes(app: FastAPI) -> None:
         body = await request.json()
         content = body.get("content", "")
 
-        # Prevent path traversal
+        # Prevent path traversal and symlink escape
         safe_name = filename.replace("..", "").replace("//", "/").lstrip("/")
         if not safe_name:
             raise HTTPException(status_code=400, detail="Invalid filename")
 
-        file_path = _RAW_DIR / safe_name
+        file_path = (_RAW_DIR / safe_name).resolve()
+        raw_dir_resolved = _RAW_DIR.resolve()
         try:
-            file_path.relative_to(_RAW_DIR)
+            file_path.relative_to(raw_dir_resolved)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid path")
+
+        # Reject symlinks to prevent escape
+        if file_path.is_symlink():
+            raise HTTPException(status_code=400, detail="Symlinks not allowed")
 
         suffix = file_path.suffix.lower()
         if suffix not in {".txt", ".md"}:
@@ -632,21 +642,32 @@ def register_admin_routes(app: FastAPI) -> None:
     @app.post("/admin/rebuild", dependencies=[Depends(verify_admin_token)])
     async def rebuild_indexes(request: Request) -> Dict[str, Any]:
         """Trigger knowledge base rebuild."""
-        import subprocess
+        import asyncio
         import sys
 
         try:
-            # Run build_indexes.py script
-            result = subprocess.run(
-                [sys.executable, "scripts/build_indexes.py"],
-                cwd=Path(__file__).resolve().parent.parent.parent,
-                capture_output=True,
-                text=True,
-                timeout=300,  # 5 minute timeout
+            # Run build_indexes.py script in subprocess (non-blocking)
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                "scripts/build_indexes.py",
+                cwd=str(Path(__file__).resolve().parent.parent.parent),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
 
-            success = result.returncode == 0
-            output = result.stdout if success else result.stderr
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                return {
+                    "status": "error",
+                    "success": False,
+                    "error": "Rebuild timed out after 5 minutes",
+                }
+
+            success = proc.returncode == 0
+            output = stdout.decode("utf-8", errors="ignore") if success else stderr.decode("utf-8", errors="ignore")
 
             # Get index counts
             rag_service = getattr(request.app.state, "rag_service", None)
@@ -657,15 +678,9 @@ def register_admin_routes(app: FastAPI) -> None:
             return {
                 "status": "ok" if success else "error",
                 "success": success,
-                "returncode": result.returncode,
+                "returncode": proc.returncode,
                 "output": output[-2000:] if output else "",  # Last 2000 chars
                 "index_count": index_count,
-            }
-        except subprocess.TimeoutExpired:
-            return {
-                "status": "error",
-                "success": False,
-                "error": "Rebuild timed out after 5 minutes",
             }
         except Exception as e:
             return {
@@ -677,7 +692,7 @@ def register_admin_routes(app: FastAPI) -> None:
     @app.post("/admin/eval", dependencies=[Depends(verify_admin_token)])
     async def run_eval() -> Dict[str, Any]:
         """Run evaluation tests."""
-        import subprocess
+        import asyncio
         import sys
 
         eval_script = Path(__file__).resolve().parent.parent.parent / "scripts" / "run_eval.py"
@@ -690,31 +705,37 @@ def register_admin_routes(app: FastAPI) -> None:
             }
 
         try:
-            result = subprocess.run(
-                [sys.executable, str(eval_script)],
-                cwd=Path(__file__).resolve().parent.parent.parent,
-                capture_output=True,
-                text=True,
-                timeout=120,
+            # Run eval script in subprocess (non-blocking)
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                str(eval_script),
+                cwd=str(Path(__file__).resolve().parent.parent.parent),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
 
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                return {
+                    "status": "timeout",
+                    "configured": True,
+                    "passed": False,
+                    "error": "Eval timed out",
+                }
+
             # Try to parse pass/fail from output
-            output = result.stdout + result.stderr
-            passed = result.returncode == 0
+            output = stdout.decode("utf-8", errors="ignore") + stderr.decode("utf-8", errors="ignore")
+            passed = proc.returncode == 0
 
             return {
                 "status": "ok" if passed else "failed",
                 "configured": True,
                 "passed": passed,
-                "returncode": result.returncode,
+                "returncode": proc.returncode,
                 "output": output[-2000:] if output else "",
-            }
-        except subprocess.TimeoutExpired:
-            return {
-                "status": "timeout",
-                "configured": True,
-                "passed": False,
-                "error": "Eval timed out",
             }
         except Exception as e:
             return {
