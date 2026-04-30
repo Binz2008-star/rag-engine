@@ -164,7 +164,10 @@ background:var(--green);color:#fff;font-size:.85rem;cursor:pointer}
 <div id="app" style="display:none">
 <header>
   <h1>RAG Control Center</h1>
-  <span class="logout" onclick="doLogout()">Sign out</span>
+  <div style="display:flex;gap:1rem;align-items:center">
+    <a href="/admin/operator" style="font-size:.85rem">← Operator Console</a>
+    <span class="logout" onclick="doLogout()">Sign out</span>
+  </div>
 </header>
 
 <div class="container">
