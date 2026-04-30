@@ -134,6 +134,8 @@ class MultiRetriever:
         sparse_results = bm25.search(query, fetch_k) if bm25 else []
 
         if not sparse_results:
+            for hit in dense_hits:
+                hit.dense_score = hit.score
             return dense_hits
 
         return _rrf_merge(dense_hits, sparse_results)
