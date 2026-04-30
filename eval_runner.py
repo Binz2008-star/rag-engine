@@ -30,7 +30,7 @@ from router.intent_router import IntentRouter
 from retrieval.embeddings import Embedder
 from retrieval.faiss_index import FaissIndex
 from retrieval.multi_retriever import MultiRetriever
-from retrieval.reranker import Reranker
+from app.reranker import LightweightReranker
 from generation.llm import LLMClient
 
 EVAL_QUERIES_PATH = Path(__file__).parent / "tests" / "eval_queries.json"
@@ -379,7 +379,9 @@ def main(query_fn=None) -> int:
             return 2
 
         retriever = MultiRetriever(indexes=indexes)
-        reranker = Reranker(embed_fn=embedder.embed_batch)
+        reranker = LightweightReranker(
+            semantic_weight=0.6, bm25_weight=0.3, phrase_weight=0.1,
+        )
         llm = LLMClient()
         pipeline = Pipeline(router=router, embedder=embedder, retriever=retriever, llm=llm, reranker=reranker)
         service = InferenceService(pipeline=pipeline)

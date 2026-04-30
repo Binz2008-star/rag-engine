@@ -20,6 +20,7 @@ Adds the following endpoints consumed by the admin dashboard:
 
 from __future__ import annotations
 
+from filelock import FileLock
 import json
 import logging
 import os
@@ -41,11 +42,11 @@ except ImportError:
     except ImportError:
         HAS_MSVCRT = False
     HAS_FCNTL = False
-
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 
 from .services.leads_store import get_leads_store
+from .services.rag_config import get_config_version
 
 logger = logging.getLogger(__name__)
 
@@ -329,6 +330,7 @@ def register_admin_routes(app: FastAPI) -> None:
             "kind": intent,
             "status": "ok",
             "request_id": result.get("request_id", ""),
+            "config_version": get_config_version(),
             "payload": result,
         }
 
@@ -342,24 +344,14 @@ def register_admin_routes(app: FastAPI) -> None:
     }
 
     def _locked_jsonl_append(path: Path, data: Dict[str, Any]) -> None:
-        """Append one JSON line with exclusive file locking."""
+        """Append one JSON line with cross-platform file locking."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        line = json.dumps(data, ensure_ascii=False) + "\n"
-        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
-        try:
-            if HAS_FCNTL:
-                fcntl.flock(fd, fcntl.LOCK_EX)
-            elif HAS_MSVCRT:
-                # Windows locking with msvcrt
-                msvcrt.locking(fd, msvcrt.LK_NBLCK, os.path.getsize(str(path)))
-            # If no locking available, proceed without it (acceptable for dev/single-instance)
-            os.write(fd, line.encode("utf-8"))
-        finally:
-            if HAS_FCNTL:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-            elif HAS_MSVCRT:
-                msvcrt.locking(fd, msvcrt.LK_UNLCK, os.path.getsize(str(path)))
-            os.close(fd)
+        lock_path = str(path) + ".lock"
+        lock = FileLock(lock_path)
+        with lock:
+            with open(path, "a", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+                f.write("\n")
 
     @app.post(
         "/api/dashboard/eval-cases",
@@ -400,6 +392,7 @@ def register_admin_routes(app: FastAPI) -> None:
             "actual_sources": body.get("actual_sources"),
             "latency_ms": body.get("latency_ms"),
             "request_id": body.get("request_id"),
+            "config_version": get_config_version(),
             "created_at": time.time(),
         }
 
@@ -529,3 +522,288 @@ def register_admin_routes(app: FastAPI) -> None:
             current["updated_by"],
         )
         return {"status": "ok", "config": current}
+
+    # ---- Operator Console (Issue #34) ------------------------------------
+
+    _RAW_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "raw"
+    _MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "models"
+
+    @app.get("/admin/operator", include_in_schema=False)
+    async def operator_page() -> HTMLResponse:
+        """Operator Console HTML page."""
+        html_path = _STATIC_DIR / "operator.html"
+        if not html_path.exists():
+            raise HTTPException(status_code=404, detail="Operator Console not found")
+        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+
+    @app.post("/admin/ask", dependencies=[Depends(verify_admin_token)])
+    async def operator_ask(request: Request) -> Dict[str, Any]:
+        """Ask the RAG system a question (Operator Console)."""
+        body = await request.json()
+        question = (body.get("question") or body.get("query") or "").strip()
+        if not question:
+            raise HTTPException(status_code=422, detail="question is required")
+
+        rag_service = getattr(request.app.state, "rag_service", None)
+        if rag_service is None or not rag_service.ready:
+            raise HTTPException(status_code=503, detail="RAG pipeline not ready")
+
+        t0 = time.perf_counter()
+        result = await rag_service.query(question)
+        wall_ms = int((time.perf_counter() - t0) * 1000)
+
+        return {
+            "status": "ok",
+            "query": question,
+            "answer": result.get("answer", ""),
+            "sources": result.get("sources", []),
+            "intent": result.get("intent", "general"),
+            "intent_confidence": result.get("intent_confidence", 0.0),
+            "grounded": result.get("grounded", False),
+            "failure_type": result.get("failure_type"),
+            "latency_ms": wall_ms,
+            "request_id": result.get("request_id", ""),
+        }
+
+    @app.get("/admin/knowledge", dependencies=[Depends(verify_admin_token)])
+    async def list_knowledge_files() -> Dict[str, Any]:
+        """List all knowledge files in data/raw."""
+        _RAW_DIR.mkdir(parents=True, exist_ok=True)
+        files = []
+        for path in sorted(_RAW_DIR.rglob("*")):
+            if path.is_file() and path.suffix.lower() in {".txt", ".md"}:
+                rel_path = path.relative_to(_RAW_DIR)
+                files.append({
+                    "name": str(rel_path).replace("\\", "/"),
+                    "size": path.stat().st_size,
+                    "modified": path.stat().st_mtime,
+                })
+        return {"files": files, "total": len(files)}
+
+    @app.get("/admin/knowledge/{filename:path}", dependencies=[Depends(verify_admin_token)])
+    async def get_knowledge_file(filename: str) -> Dict[str, Any]:
+        """Read a knowledge file."""
+        # Prevent path traversal and symlink escape
+        safe_name = filename.replace("..", "").replace("//", "/").lstrip("/")
+        if not safe_name:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+        file_path = (_RAW_DIR / safe_name).resolve()
+        raw_dir_resolved = _RAW_DIR.resolve()
+        try:
+            file_path.relative_to(raw_dir_resolved)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid path")
+
+        # Reject symlinks to prevent escape
+        if file_path.is_symlink():
+            raise HTTPException(status_code=400, detail="Symlinks not allowed")
+
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(status_code=404, detail="File not found")
+
+        suffix = file_path.suffix.lower()
+        if suffix not in {".txt", ".md"}:
+            raise HTTPException(status_code=400, detail="Only .txt and .md files allowed")
+
+        content = file_path.read_text(encoding="utf-8", errors="ignore")
+        return {
+            "filename": safe_name,
+            "content": content,
+            "size": len(content),
+            "modified": file_path.stat().st_mtime,
+        }
+
+    @app.post("/admin/knowledge/{filename:path}", dependencies=[Depends(verify_admin_token)])
+    async def save_knowledge_file(filename: str, request: Request) -> Dict[str, Any]:
+        """Save a knowledge file."""
+        body = await request.json()
+        content = body.get("content", "")
+
+        # Prevent path traversal and symlink escape
+        safe_name = filename.replace("..", "").replace("//", "/").lstrip("/")
+        if not safe_name:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+
+        file_path = (_RAW_DIR / safe_name).resolve()
+        raw_dir_resolved = _RAW_DIR.resolve()
+        try:
+            file_path.relative_to(raw_dir_resolved)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid path")
+
+        # Reject symlinks to prevent escape
+        if file_path.is_symlink():
+            raise HTTPException(status_code=400, detail="Symlinks not allowed")
+
+        suffix = file_path.suffix.lower()
+        if suffix not in {".txt", ".md"}:
+            raise HTTPException(status_code=400, detail="Only .txt and .md files allowed")
+
+        # Ensure parent directory exists
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        file_path.write_text(content, encoding="utf-8")
+        return {
+            "status": "ok",
+            "filename": safe_name,
+            "size": len(content),
+            "saved_at": time.time(),
+        }
+
+    @app.post("/admin/rebuild", dependencies=[Depends(verify_admin_token)])
+    async def rebuild_indexes(request: Request) -> Dict[str, Any]:
+        """Trigger knowledge base rebuild."""
+        import asyncio
+        import sys
+
+        try:
+            # Run build_indexes.py script in subprocess (non-blocking)
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                "scripts/build_indexes.py",
+                cwd=str(Path(__file__).resolve().parent.parent.parent),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                return {
+                    "status": "error",
+                    "success": False,
+                    "error": "Rebuild timed out after 5 minutes",
+                }
+
+            success = proc.returncode == 0
+            output = stdout.decode("utf-8", errors="ignore") if success else stderr.decode("utf-8", errors="ignore")
+
+            # Get index counts
+            rag_service = getattr(request.app.state, "rag_service", None)
+            index_count = 0
+            if rag_service and rag_service.ready:
+                index_count = rag_service.index_count
+
+            return {
+                "status": "ok" if success else "error",
+                "success": success,
+                "returncode": proc.returncode,
+                "output": output[-2000:] if output else "",  # Last 2000 chars
+                "index_count": index_count,
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "success": False,
+                "error": str(e),
+            }
+
+    @app.post("/admin/eval", dependencies=[Depends(verify_admin_token)])
+    async def run_eval() -> Dict[str, Any]:
+        """Run evaluation tests."""
+        import asyncio
+        import sys
+
+        eval_script = Path(__file__).resolve().parent.parent.parent / "scripts" / "run_eval.py"
+
+        if not eval_script.exists():
+            return {
+                "status": "not_configured",
+                "configured": False,
+                "message": "Eval runner not found at scripts/run_eval.py",
+            }
+
+        try:
+            # Run eval script in subprocess (non-blocking)
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable,
+                str(eval_script),
+                cwd=str(Path(__file__).resolve().parent.parent.parent),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                return {
+                    "status": "timeout",
+                    "configured": True,
+                    "passed": False,
+                    "error": "Eval timed out",
+                }
+
+            # Try to parse pass/fail from output
+            output = stdout.decode("utf-8", errors="ignore") + stderr.decode("utf-8", errors="ignore")
+            passed = proc.returncode == 0
+
+            return {
+                "status": "ok" if passed else "failed",
+                "configured": True,
+                "passed": passed,
+                "returncode": proc.returncode,
+                "output": output[-2000:] if output else "",
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "configured": True,
+                "passed": False,
+                "error": str(e),
+            }
+
+    @app.get("/admin/status", dependencies=[Depends(verify_admin_token)])
+    async def get_publish_status(request: Request) -> Dict[str, Any]:
+        """Get publish/readiness status."""
+        rag_service = getattr(request.app.state, "rag_service", None)
+
+        rag_ready = False
+        index_count = 0
+        if rag_service:
+            rag_ready = rag_service.ready
+            index_count = rag_service.index_count
+
+        # Check for indexes
+        models_exist = _MODELS_DIR.exists() and any(_MODELS_DIR.iterdir())
+
+        # Load last build info if available
+        build_info = {"last_build": None, "last_error": None}
+        build_status_file = _EVAL_DIR / "last_build.json"
+        if build_status_file.exists():
+            try:
+                build_info = json.loads(build_status_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        # Load last eval info if available
+        eval_info = {"last_eval_pass_rate": None, "last_eval_time": None}
+        eval_status_file = _EVAL_DIR / "last_eval.json"
+        if eval_status_file.exists():
+            try:
+                eval_info = json.loads(eval_status_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        config = _load_rag_config()
+
+        # Determine readiness
+        ready = rag_ready and models_exist and index_count > 0
+
+        return {
+            "status": "ready" if ready else "not_ready",
+            "ready": ready,
+            "config_version": config.get("version", 1),
+            "index_count": index_count,
+            "models_exist": models_exist,
+            "rag_ready": rag_ready,
+            "last_build": build_info.get("last_build"),
+            "last_build_error": build_info.get("last_error"),
+            "last_eval_pass_rate": eval_info.get("last_eval_pass_rate"),
+            "last_eval_time": eval_info.get("last_eval_time"),
+        }
+>>>>>>> origin/main
