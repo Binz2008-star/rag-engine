@@ -310,7 +310,16 @@ def create_app() -> FastAPI:
         # 1. AuthN first — reject unauthenticated callers BEFORE we do any
         #    body parsing, size checks, or JSON deserialization. This prevents
         #    unauth'd requests from triggering parser work or 413 responses.
-        if settings.jotform_webhook_secret:
+        if settings.jotform_webhook_enabled:
+            if not settings.jotform_webhook_secret:
+                logger.warning(
+                    "Jotform webhook enabled but secret not configured (request_id=%s)",
+                    request_id,
+                )
+                return JSONResponse(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    content={"error": "Jotform webhook enabled but secret not configured"},
+                )
             provided_secret = request.headers.get("X-Jotform-Secret")
             if provided_secret != settings.jotform_webhook_secret:
                 logger.warning(
@@ -321,9 +330,7 @@ def create_app() -> FastAPI:
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     content={"error": "Invalid webhook secret"},
                 )
-
-        # 2. Feature flag — also before parsing.
-        if not settings.jotform_webhook_enabled:
+        else:
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 content={"error": "Jotform webhook is disabled"},

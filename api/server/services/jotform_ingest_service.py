@@ -269,12 +269,13 @@ def save_jotform_lead(lead: JotformLead) -> None:
             # Insert into form_submissions table for raw payload
             cur.execute(
                 """
-                INSERT INTO form_submissions (lead_id, idempotency_key, raw_data)
-                VALUES (%s, %s, %s)
+                INSERT INTO form_submissions (lead_id, provider, external_submission_id, raw_payload)
+                VALUES (%s, %s, %s, %s)
                 """,
                 (
                     lead_db_id,
-                    lead.lead_id,  # Use lead_id as idempotency key
+                    "jotform",
+                    lead.lead_id,  # Use lead_id as external_submission_id
                     Json(lead.raw_payload) if lead.raw_payload else Json({}),
                 ),
             )
