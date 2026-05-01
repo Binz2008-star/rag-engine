@@ -1,30 +1,11 @@
 services:
   - type: web
-    name: eco-pipeline-webhook
+    name: rag-engine-api
     runtime: python
-    plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn webhook_server:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn api.server.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: PORT
+        value: 8000
       - key: PYTHON_VERSION
-        value: "3.11"
-      - key: DATABASE_URL
-        sync: false
-      - key: API_KEY
-        sync: false
-      - key: GMAIL_USER
-        sync: false
-      - key: GMAIL_APP_PASSWORD
-        sync: false
-      - key: JOTFORM_API_KEY
-        sync: false
-      - key: OLLAMA_BASE_URL
-        value: http://localhost:11434/api
-      - key: ENV
-        value: production
-      - key: COMPANY_NAME
-        value: ECO Technology Environmental Protection Services LLC
-      - key: COMPANY_PHONE
-        value: +971 52 223 3989
-      - key: WEBSITE
-        value: https://binz2008-star.github.io/eco-environmental-uae
+        value: 3.11

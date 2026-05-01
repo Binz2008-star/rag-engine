@@ -1,0 +1,19 @@
+{
+  "idempotency_key": "jotform:test:20250430-001",
+  "raw_payload": {
+    "submission_id": "123456789",
+    "form_id": "form_abc123",
+    "submitted_at": "2025-04-30T14:30:00Z",
+    "answers": {
+      "full_name": "Test Customer",
+      "email": "test@example.com",
+      "phone": "+971501234567",
+      "company_name": "Test Company LLC",
+      "emirate": "Dubai",
+      "services_required": ["GREASE_TRAP", "DESLUDGING"],
+      "urgency": "high",
+      "property_type": "Restaurant",
+      "notes": "This is a test submission from n8n mock data"
+    }
+  }
+}
