@@ -1,0 +1,11 @@
+[Jotform Lead]
+Name: Test Client
+Email: client@example.com
+Phone: +971500000000
+Company: 
+Service: wastewater maintenance
+Location: Dubai
+Urgency: 
+Intent: eco
+Message: Need grease trap cleaning quote
+Raw summary: name: Test Client | email: client@example.com | phone: +971500000000 | service: wastewater maintenance | message: Need grease trap cleaning quote

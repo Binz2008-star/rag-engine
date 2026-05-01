@@ -1,17 +1,25 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import time
 
-from app.config import ACTIVE_MODEL_PATH, GENERATION_TOP_K, REFUSAL_MESSAGE
-from app.models import KnowledgeGap, PipelineResult
+import numpy as np
+
+from app.config import ACTIVE_MODEL_PATH, REFUSAL_MESSAGE
+from app.models import FailureType, KnowledgeGap, PipelineResult
 from app.query_normalizer import is_arabic
 from app.utils import stable_hash
 from router.features import normalize_query
 from generation.grounding import check_grounding
-from app.reranker import LightweightReranker
+from generation.reasoning import ReasoningVerifier
+from generation.self_correcting import SelfCorrectingGenerator
+from retrieval.reranker import Reranker
 from analysis.corpus_topic_map import CorpusTopicMap
 
+
+logger = logging.getLogger(__name__)
 
 _SENSITIVE_PATTERNS = [
     "uranium", "enrichment", "nuclear plant", "nuclear power station",
@@ -24,14 +32,28 @@ def _is_sensitive_query(query: str) -> bool:
     return any(p in q for p in _SENSITIVE_PATTERNS)
 
 
-def _has_sufficient_overlap(query: str, chunks: list) -> bool:
-    """Check if query has sufficient term overlap with retrieved chunks."""
-    q_terms = set(query.lower().split())
-    if not q_terms:
+def _has_sufficient_overlap(query: str, chunks: list, embedder) -> bool:
+    """Check if query has sufficient semantic similarity with retrieved chunks."""
+    if not chunks:
         return False
-    ctx_text = " ".join(c.text.lower() for c in chunks)
-    hits = sum(1 for t in q_terms if t in ctx_text)
-    return hits >= 1
+
+    # Use semantic similarity instead of primitive term overlap
+    query_embedding = embedder.embed_batch([query])[0]
+    chunk_texts = [c.text for c in chunks]
+    chunk_embeddings = embedder.embed_batch(chunk_texts)
+
+    # Calculate max similarity between query and any chunk
+    max_similarity = 0.0
+    for chunk_emb in chunk_embeddings:
+        # Cosine similarity
+        similarity = float(
+            (query_embedding @ chunk_emb) /
+            (np.linalg.norm(query_embedding) * np.linalg.norm(chunk_emb) + 1e-8)
+        )
+        max_similarity = max(max_similarity, similarity)
+
+    # Threshold: need at least 0.30 similarity to proceed
+    return max_similarity >= 0.30
 
 
 class Pipeline:
@@ -41,8 +63,10 @@ class Pipeline:
         embedder,
         retriever,
         llm,
-        reranker: LightweightReranker | None = None,
+        reranker: Reranker | None = None,
         knowledge_gap_analyzer=None,
+        reasoning_verifier: ReasoningVerifier | None = None,
+        self_correcting: SelfCorrectingGenerator | None = None,
     ):
         self.router = router
         self.embedder = embedder
@@ -58,6 +82,14 @@ class Pipeline:
             knowledge_gap_analyzer = KnowledgeGapAnalyzer(llm)
         self.knowledge_gap_analyzer = knowledge_gap_analyzer
         self.corpus_topic_map = CorpusTopicMap(retriever.indexes)
+        self.reasoning_verifier = reasoning_verifier or ReasoningVerifier()
+
+        # Check for evaluation fast mode: disable self-correction
+        _enable_self_correction = os.environ.get("EVAL_SELF_CORRECTION", "1") not in ("0", "false", "False")
+        if _enable_self_correction:
+            self.self_correcting = self_correcting or SelfCorrectingGenerator(max_retries=2)
+        else:
+            self.self_correcting = None  # Disabled for fast eval
 
         if ACTIVE_MODEL_PATH.exists():
             meta = json.loads(ACTIVE_MODEL_PATH.read_text(encoding="utf-8"))
@@ -69,6 +101,74 @@ class Pipeline:
         for idx in retriever.indexes.values():
             sample_ids.extend(c.chunk_id for c in idx.chunks[:100])
         self.retriever_version = f"{getattr(retriever, 'version', 'unknown')}_{stable_hash(sample_ids)[:8]}"
+
+    def _build_cited_context(self, hits: list, max_chars: int = 4200) -> str:
+        """
+        Build cited context with RAGFlow-style [S1], [S2] formatting.
+
+        Each chunk includes source metadata and score for transparency.
+        """
+        parts = []
+        total = 0
+
+        for idx, hit in enumerate(hits, start=1):
+            # Build citation header with metadata
+            location = f", page={hit.page}" if hasattr(hit, 'page') and hit.page else ""
+            section = f", section={hit.section}" if hasattr(hit, 'section') and hit.section else ""
+            header = f"[S{idx}: source={hit.source}, chunk={hit.chunk_id}{location}{section}, score={hit.score:.3f}]"
+
+            part = f"{header}\n{hit.text.strip()}"
+
+            if total + len(part) > max_chars:
+                break
+
+            parts.append(part)
+            total += len(part)
+
+        return "\n\n".join(parts)
+
+    def _shape_context(self, hits: list, intent: str) -> list:
+        """
+        Shape and optimize context before generation.
+
+        Strategies:
+        1. Diversify sources (avoid clustering on same document)
+        2. Boost CV-specific chunks for cv intent
+        3. Reorder by relevance score
+        4. Truncate to max context size
+        """
+        if not hits:
+            return hits
+
+        # Group by source to diversify
+        source_seen = set()
+        diversified = []
+        others = []
+
+        for hit in hits:
+            if hit.source not in source_seen:
+                diversified.append(hit)
+                source_seen.add(hit.source)
+            else:
+                others.append(hit)
+
+        # Append remaining hits
+        shaped = diversified + others
+
+        # Intent-specific boosting
+        if intent == "cv":
+            # Boost CV-specific sources
+            shaped.sort(key=lambda h: (
+                0 if "cv" in h.doc_type.lower() or "roben" in h.source.lower() else 1,
+                -h.score
+            ))
+        else:
+            # Sort by score
+            shaped.sort(key=lambda h: -h.score)
+
+        # Limit to top-k for context window
+        max_context_hits = 5
+        return shaped[:max_context_hits]
 
     def _analyze_gap(self, query: str, intent: str, normalized_query: str) -> KnowledgeGap:
         """Run LLM gap analysis and enrich with deterministic corpus coverage."""
@@ -95,7 +195,7 @@ class Pipeline:
                 retrieval=[],
                 answer=REFUSAL_MESSAGE,
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.ROUTING_MISS,
                 knowledge_gap=None,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
@@ -118,7 +218,7 @@ class Pipeline:
                 retrieval=[],
                 answer=REFUSAL_MESSAGE,
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.SENSITIVE_REJECT,
                 knowledge_gap=None,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
@@ -140,17 +240,21 @@ class Pipeline:
                 retrieval=[],
                 answer="Insufficient data.",
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.RETRIEVAL_EMPTY,
                 knowledge_gap=knowledge_gap,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
                 retriever_version=self.retriever_version,
             )
 
-        if self.reranker:
-            hits = self.reranker.rerank(hits, normalized_query, top_k=GENERATION_TOP_K)
-        else:
-            hits = hits[:GENERATION_TOP_K]
+        # Check for evaluation fast mode: optionally skip reranking.
+        # NOTE: top_k=len(hits) is intentional — we let the reranker reorder
+        # the full candidate set. _shape_context() below truncates to 5 before
+        # generation, so the rerank cost is bounded by retriever TOP_K, not
+        # the final context size.
+        _enable_rerank = os.environ.get("EVAL_RERANK", "1") not in ("0", "false", "False")
+        if self.reranker and _enable_rerank:
+            hits = self.reranker.rerank(hits, normalized_query, top_k=len(hits))
 
         if hits and hits[0].score < 0.20:
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
@@ -165,7 +269,7 @@ class Pipeline:
                 retrieval=hits,
                 answer="Insufficient data.",
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.RETRIEVAL_LOW_SCORE,
                 knowledge_gap=knowledge_gap,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
@@ -190,7 +294,7 @@ class Pipeline:
                     retrieval=hits,
                     answer=REFUSAL_MESSAGE,
                     grounded=True,
-                    failure_type="translation_failure",
+                    failure_type=FailureType.TRANSLATION_FAILURE,
                     knowledge_gap=None,
                     latency_ms=elapsed_ms,
                     model_version=self.model_version,
@@ -199,8 +303,8 @@ class Pipeline:
         else:
             generation_query = normalized_query
 
-        # Hard grounding gate: use English query for term overlap
-        if not _has_sufficient_overlap(generation_query, hits):
+        # Hard grounding gate: use semantic similarity instead of term overlap
+        if not _has_sufficient_overlap(generation_query, hits, self.embedder):
             elapsed_ms = int((time.perf_counter() - t0) * 1000)
             return PipelineResult(
                 query_id=query_id,
@@ -212,15 +316,53 @@ class Pipeline:
                 retrieval=hits,
                 answer="Insufficient data.",
                 grounded=True,
-                failure_type="retrieval_miss",
+                failure_type=FailureType.TERM_OVERLAP_MISS,
                 knowledge_gap=None,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,
                 retriever_version=self.retriever_version,
             )
 
-        answer = self.llm.generate(generation_query, hits)
-        normalized_answer = answer.strip().lower()
+        # Context shaping: optimize retrieval hits before generation
+        shaped_hits = self._shape_context(hits, route.intent)
+
+        # Self-correcting generation with retry strategies
+        def generate_with_prompt(query: str, prompt: str) -> str:
+            """Generate answer using LLM with custom prompt."""
+            # Build cited context from shaped hits
+            context = self._build_cited_context(shaped_hits)
+            full_prompt = f"""Answer the following question using ONLY the provided context.
+Use citations like [S1], [S2] to reference sources.
+
+Context:
+{context}
+
+Question: {query}
+
+{prompt}
+"""
+            return self.llm._generate_with_prompt(full_prompt)
+
+        def check_grounding_wrapper(answer: str, hits_list: list) -> bool:
+            """Wrapper for grounding check."""
+            return check_grounding(answer, hits_list, self.embedder.embed_batch)
+
+        def check_reasoning_wrapper(answer: str, hits_list: list) -> tuple[bool, object]:
+            """Wrapper for reasoning check."""
+            return self.reasoning_verifier.verify(answer, hits_list, self.embedder.embed_batch)
+
+        # Initial generation
+        # IMPORTANT: generation, grounding, and reasoning all operate on the
+        # SAME shaped_hits set so the gates evaluate against the exact context
+        # the LLM saw. Using full `hits` here would let the model be judged
+        # against chunks it could not cite.
+        initial_answer = self.llm.generate(generation_query, shaped_hits)
+        normalized_answer = initial_answer.strip().lower()
+
+        # Initial validation - DO NOT replace with refusal yet
+        initial_grounded = True
+        initial_reasoning_valid = True
+        initial_failure_type = None
 
         speculative_prefixes = (
             "based on the context",
@@ -228,36 +370,96 @@ class Pipeline:
             "it can be inferred",
             "this suggests",
             "likely",
-            "used cooking oil",
-            "uco",
         )
 
         if normalized_answer.startswith(speculative_prefixes):
-            answer = "Insufficient data."
-            grounded = True
-            failure_type = "retrieval_miss"
-            knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
+            # Speculative wording must trigger correction / refusal.
+            initial_grounded = False
+            initial_reasoning_valid = False
+            initial_failure_type = FailureType.SPECULATIVE_REJECT
         elif normalized_answer.startswith("insufficient data"):
+            # LLM self-refusal — pass through; not a grounding-gate rejection.
+            initial_grounded = True
+            initial_reasoning_valid = True
+            initial_failure_type = None
+        else:
+            # Authoritative grounding check
+            initial_grounded = check_grounding(initial_answer, shaped_hits, self.embedder.embed_batch)
+            if not initial_grounded:
+                initial_failure_type = FailureType.GROUNDING_REJECT
+            else:
+                # Reasoning verifier check
+                initial_reasoning_valid, reasoning_breakdown = self.reasoning_verifier.verify(
+                    initial_answer, shaped_hits, self.embedder.embed_batch
+                )
+                if not initial_reasoning_valid:
+                    initial_failure_type = FailureType.REASONING_REJECT
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            "Reasoning check failed: premise=%s flow=%s no_spec=%s conclusion=%s score=%.2f",
+                            reasoning_breakdown.has_premise_support,
+                            reasoning_breakdown.has_logical_flow,
+                            reasoning_breakdown.avoids_speculation,
+                            reasoning_breakdown.has_conclusion_link,
+                            reasoning_breakdown.final_score,
+                        )
+
+        # Apply self-correction for grounding or reasoning failures
+        # Grounding gate is fail-closed: if correction also fails, refuse
+        correction_result = None
+        if (not initial_grounded or not initial_reasoning_valid) and self.self_correcting is not None:
+            correction_result = self.self_correcting.correct(
+                query=generation_query,
+                initial_answer=initial_answer,
+                hits=shaped_hits,
+                initial_failure_type=initial_failure_type,
+                initial_grounded=initial_grounded,
+                initial_reasoning_valid=initial_reasoning_valid,
+                generate_fn=generate_with_prompt,
+                check_grounding_fn=check_grounding_wrapper,
+                check_reasoning_fn=check_reasoning_wrapper,
+            )
+
+            answer = correction_result.final_answer
+            grounded = correction_result.final_grounded
+            reasoning_valid = correction_result.final_reasoning_valid
+            failure_type = correction_result.final_failure_type
+
+            if correction_result.corrected:
+                logger.info(
+                    f"Self-correction succeeded after {correction_result.total_attempts} attempts"
+                )
+            else:
+                logger.warning(
+                    f"Self-correction failed after {correction_result.total_attempts} attempts"
+                )
+
+            knowledge_gap = self._analyze_gap(query, route.intent, normalized_query) if failure_type else None
+        else:
+            # Initial attempt passed, use as-is
+            answer = initial_answer
+            grounded = initial_grounded
+            failure_type = initial_failure_type
+            knowledge_gap = None
+
+        # Final hard gate: if correction failed (grounding or reasoning), refuse
+        if correction_result is not None and (
+            not correction_result.final_grounded or not correction_result.final_reasoning_valid
+        ):
             answer = "Insufficient data."
             grounded = True
-            failure_type = "retrieval_miss"
+            failure_type = correction_result.final_failure_type or FailureType.GROUNDING_REJECT
             knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
-        else:
-            # Authoritative grounding: same logic as evaluator (sentence-level
-            # semantic cosine at 0.60). If the evaluator would reject this
-            # answer as ungrounded, the product must also reject it.
-            # Unifying the two removes split-brain between runtime and eval.
-            grounded = check_grounding(answer, hits, self.embedder.embed_batch)
-            if not grounded:
-                answer = "Insufficient data."
-                grounded = True
-                failure_type = "retrieval_miss"
-                knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
-            else:
-                failure_type = None
-                knowledge_gap = None
 
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
+
+        # Extract retry metrics if self-correction was used
+        retry_attempts = 0
+        corrected = False
+        if correction_result is not None:
+            retry_attempts = correction_result.total_attempts - 1  # Subtract initial attempt
+            corrected = correction_result.corrected
+
         return PipelineResult(
             query_id=query_id,
             query=query,
@@ -273,6 +475,8 @@ class Pipeline:
             latency_ms=elapsed_ms,
             model_version=self.model_version,
             retriever_version=self.retriever_version,
+            retry_attempts=retry_attempts,
+            corrected=corrected,
         )
 
     def close(self) -> None:

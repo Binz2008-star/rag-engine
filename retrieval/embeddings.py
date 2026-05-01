@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import time
 
 import numpy as np
 import requests
 
 from app.config import EMBED_MODEL, MAX_RETRIES, OLLAMA_BASE_URL, TIMEOUT
+
+logger = logging.getLogger(__name__)
 
 
 class Embedder:
@@ -37,11 +40,24 @@ class Embedder:
                 norms = np.linalg.norm(arr, axis=1, keepdims=True)
                 norms = np.where(norms == 0, 1.0, norms)
                 return arr / norms
-            except Exception as exc:
+            except (
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.HTTPError,
+                ValueError,
+                KeyError,
+            ) as exc:
                 last_exc = exc
+                logger.warning(
+                    "Embedding attempt %d/%d failed: %s: %s",
+                    attempt + 1,
+                    MAX_RETRIES,
+                    type(exc).__name__,
+                    str(exc)[:100],
+                )
                 time.sleep(2**attempt)
 
-        raise RuntimeError(f"Embedding failed after retries: {last_exc}")
+        raise RuntimeError(f"Embedding failed after {MAX_RETRIES} retries: {type(last_exc).__name__}: {last_exc}")
 
     def embed(self, text: str) -> np.ndarray:
         return self.embed_batch([text])[0]

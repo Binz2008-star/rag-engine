@@ -50,7 +50,7 @@ def normalize_arabic(text: str) -> str:
     return text
 
 
-def normalize_query(query: str) -> tuple[str, bool]:
+def normalize_query_with_flag(query: str) -> tuple[str, bool]:
     """
     Normalize a query for retrieval.
     Returns (normalized_query, was_normalized).
@@ -62,3 +62,12 @@ def normalize_query(query: str) -> tuple[str, bool]:
     if normalized != query:
         logger.debug("Query normalized: %r → %r", query, normalized)
     return normalized, normalized != query
+
+
+def normalize_query(query: str) -> str:
+    """
+    Normalize a query for retrieval.
+    Returns normalized_query string only (for backward compatibility with router.features).
+    """
+    normalized, _ = normalize_query_with_flag(query)
+    return normalized

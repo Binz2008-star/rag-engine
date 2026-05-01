@@ -98,6 +98,15 @@ class Settings:
             "TRADING_SANDBOX", "true"
         ).lower() in ("true", "1", "yes")
 
+        # Jotform webhook configuration
+        self.jotform_webhook_enabled: bool = os.getenv(
+            "JOTFORM_WEBHOOK_ENABLED", "true"
+        ).lower() in ("true", "1", "yes")
+        self.jotform_memory_dir: Path = Path(
+            os.getenv("JOTFORM_MEMORY_DIR", str(_ROOT_DIR / "data" / "jotform_memory"))
+        )
+        self.jotform_webhook_secret: str | None = os.getenv("JOTFORM_WEBHOOK_SECRET")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
