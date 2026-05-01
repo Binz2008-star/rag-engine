@@ -222,24 +222,96 @@ def save_jotform_lead(lead: JotformLead) -> None:
 
     with psycopg2.connect(database_url) as conn:
         with conn.cursor() as cur:
-            # Insert into leads table
+            # 1. Upsert company
             cur.execute(
                 """
-                INSERT INTO leads (full_name, company_name, email, phone, services_required, source, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO companies (name, emirate, industry, address)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (name) DO UPDATE SET
+                    emirate = EXCLUDED.emirate,
+                    industry = EXCLUDED.industry,
+                    address = EXCLUDED.address,
+                    updated_at = now()
                 RETURNING id
                 """,
                 (
-                    lead.name or "Unknown",
                     lead.company or "Unknown",
+                    None,  # emirate not provided by Jotform
+                    None,  # industry not provided by Jotform
+                    None,  # address not provided by Jotform
+                ),
+            )
+            company_id = cur.fetchone()[0]
+
+            # 2. Upsert contact
+            cur.execute(
+                """
+                INSERT INTO contacts (company_id, full_name, email, phone, is_primary)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (email) DO UPDATE SET
+                    company_id = EXCLUDED.company_id,
+                    full_name = EXCLUDED.full_name,
+                    phone = EXCLUDED.phone,
+                    is_primary = EXCLUDED.is_primary,
+                    updated_at = now()
+                RETURNING id
+                """,
+                (
+                    company_id,
+                    lead.name or "Unknown",
                     lead.email or None,
                     lead.phone or None,
-                    [lead.service] if lead.service else [],
+                    True,  # Mark as primary contact
+                ),
+            )
+            contact_id = cur.fetchone()[0]
+
+            # 3. Insert lead using proper schema
+            cur.execute(
+                """
+                INSERT INTO leads (company_id, primary_contact_id, source, stage, status, urgency, emirate, units_count, estimated_value_aed)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    company_id,
+                    contact_id,
                     lead.source,
-                    "new",
+                    "New Lead",
+                    "open",
+                    "low",
+                    None,  # emirate not provided
+                    1 if lead.service else 0,  # units_count
+                    None,  # estimated_value_aed not provided
                 ),
             )
             lead_db_id = cur.fetchone()[0]
+
+            # 4. Insert lead_services if service specified
+            if lead.service:
+                # First ensure the service exists
+                cur.execute(
+                    """
+                    INSERT INTO services (service_code, service_name)
+                    VALUES (%s, %s)
+                    ON CONFLICT (service_code) DO UPDATE SET
+                        service_name = EXCLUDED.service_name
+                    RETURNING id
+                    """,
+                    (lead.service, lead.service),
+                )
+                service_id = cur.fetchone()[0]
+
+                # Link lead to service
+                cur.execute(
+                    """
+                    INSERT INTO lead_services (lead_id, service_id, quantity_units)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (lead_id, service_id) DO UPDATE SET
+                        quantity_units = EXCLUDED.quantity_units
+                    """,
+                    (lead_db_id, service_id, 1),
+                )
 
             # Insert into agent_conversations table
             cur.execute(
