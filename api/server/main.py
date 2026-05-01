@@ -199,7 +199,7 @@ def create_app() -> FastAPI:
             status="ok",
             pipeline_ready=rag_service.ready if rag_service else False,
             version=settings.version,
-            chat_model="llama3.2",
+            chat_model=settings.chat_model,
             index_count=rag_service.index_count if rag_service else None,
         )
 

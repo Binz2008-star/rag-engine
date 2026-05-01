@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 
@@ -17,6 +18,8 @@ from generation.self_correcting import SelfCorrectingGenerator
 from retrieval.reranker import Reranker
 from analysis.corpus_topic_map import CorpusTopicMap
 
+
+logger = logging.getLogger(__name__)
 
 _SENSITIVE_PATTERNS = [
     "uranium", "enrichment", "nuclear plant", "nuclear power station",
@@ -393,13 +396,41 @@ Question: {query}
                             reasoning_breakdown.final_score,
                         )
 
-        # Apply self-correction if initial attempt failed (and enabled)
-        # Pass the FAILED DRAFT, not a refusal
+        # Grounding gate is AUTHORITATIVE (fail-closed per v1.0 contract)
+        # If grounding fails, refuse immediately - no self-correction allowed
+        if not initial_grounded:
+            answer = "Insufficient data."
+            grounded = True
+            failure_type = FailureType.GROUNDING_REJECT
+            knowledge_gap = self._analyze_gap(query, route.intent, normalized_query)
+            retry_attempts = 0
+            corrected = False
+            elapsed_ms = int((time.perf_counter() - t0) * 1000)
+            return PipelineResult(
+                query_id=query_id,
+                query=query,
+                normalized_query=normalized_query,
+                intent=route.intent,
+                confidence=route.confidence,
+                intent_method=route.intent_method,
+                retrieval=hits,
+                answer=answer,
+                grounded=grounded,
+                failure_type=failure_type,
+                knowledge_gap=knowledge_gap,
+                latency_ms=elapsed_ms,
+                model_version=self.model_version,
+                retriever_version=self.retriever_version,
+                retry_attempts=retry_attempts,
+                corrected=corrected,
+            )
+
+        # Apply self-correction only for reasoning failures (not grounding)
         correction_result = None
-        if (not initial_grounded or not initial_reasoning_valid) and self.self_correcting is not None:
+        if not initial_reasoning_valid and self.self_correcting is not None:
             correction_result = self.self_correcting.correct(
                 query=generation_query,
-                initial_answer=initial_answer,  # Pass failed draft, not "Insufficient data."
+                initial_answer=initial_answer,
                 hits=hits,
                 initial_failure_type=initial_failure_type,
                 initial_grounded=initial_grounded,
@@ -431,11 +462,8 @@ Question: {query}
             failure_type = initial_failure_type
             knowledge_gap = None
 
-        # Final hard gate: if correction still failed, refuse
-        if correction_result is not None and (
-            not correction_result.final_grounded
-            or not correction_result.final_reasoning_valid
-        ):
+        # Final hard gate: if reasoning correction still failed, refuse
+        if correction_result is not None and not correction_result.final_reasoning_valid:
             answer = "Insufficient data."
             grounded = True
             failure_type = correction_result.final_failure_type or FailureType.REASONING_REJECT

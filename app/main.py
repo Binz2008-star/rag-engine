@@ -51,7 +51,6 @@ def create_app() -> FastAPI:
     if not indexes:
         raise RuntimeError("No FAISS indexes found. Run scripts/build_indexes.py first.")
 
-<<<<<<< HEAD
     # Build BM25 index for hybrid retrieval
     from app.bm25_index import BM25Index
     from app.chunking import load_chunks
@@ -64,12 +63,6 @@ def create_app() -> FastAPI:
 
     retriever = MultiRetriever(indexes=indexes, bm25_index=bm25_index)
     reranker = Reranker(embed_fn=embedder.embed_batch)
-=======
-    retriever = MultiRetriever(indexes=indexes)
-    reranker = LightweightReranker(
-        semantic_weight=0.6, bm25_weight=0.3, phrase_weight=0.1,
-    )
->>>>>>> bf11e432f353b5c499b55ef976481f330dd1800b
     llm = LLMClient()
     pipeline = Pipeline(router=router, embedder=embedder, retriever=retriever, llm=llm, reranker=reranker)
     service = InferenceService(pipeline=pipeline)

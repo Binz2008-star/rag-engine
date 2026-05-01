@@ -87,6 +87,8 @@ class RetrievalHit:
     doc_type: str
     page: int | None = None
     section: str | None = None
+    dense_score: float = 0.0
+    sparse_score: float = 0.0
 
 
 @dataclass
