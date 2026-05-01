@@ -187,3 +187,28 @@ class TradingRuntimeResponse(BaseModel):
     execution_summary: dict[str, Any] | None = None
     normalized_symbol: str | None = None
     warnings: list[str] = Field(default_factory=list)
+
+
+class JotformLeadResponse(BaseModel):
+    lead_id: str
+    form_id: str
+    submission_id: str
+    source: str = "jotform"
+    name: str
+    email: str
+    phone: str
+    company: str
+    service: str
+    location: str
+    urgency: str
+    message: str
+    intent: str
+
+
+class JotformWebhookResponse(BaseModel):
+    status: str
+    source: str
+    lead_id: str
+    intent: str
+    indexed: bool
+    request_id: str

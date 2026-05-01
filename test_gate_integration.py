@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from app.models import PipelineResult, RetrievalHit
+from app.models import FailureType, PipelineResult, RetrievalHit
 from evaluation.eval_main import run_eval
 
 REPO_ROOT = Path(__file__).parent
@@ -77,7 +77,7 @@ def _refusal_result(query: str, intent: str) -> PipelineResult:
         retrieval=[],
         answer="Insufficient data.",
         grounded=True,
-        failure_type="retrieval_miss",
+        failure_type=FailureType.RETRIEVAL_EMPTY,
     )
 
 
@@ -101,7 +101,7 @@ def _hallucinated_result(query: str, intent: str) -> PipelineResult:
         ],
         answer="A confidently wrong answer.",
         grounded=False,
-        failure_type="hallucination",
+        failure_type=FailureType.GROUNDING_REJECT,
     )
 
 
@@ -121,7 +121,7 @@ def test_run_eval_promotes_clean_run(tmp_path):
          "expected_answer_contains": ["answer"]},
         {"query": "general q", "expected_intent": "general",
          "expected_refusal": True, "expected_answer_exact": "Insufficient data.",
-         "expected_failure_type": "retrieval_miss"},
+         "expected_failure_type": "retrieval_empty"},
     ]
     pipeline = _FakePipeline(scripted={
         "eco q":     _ok_result("eco q", "eco"),
@@ -133,7 +133,7 @@ def test_run_eval_promotes_clean_run(tmp_path):
 
     assert report["decision"] == "PROMOTE"
     assert report["failed_checks"] == []
-    assert report["metrics"]["hallucination_rate"] == 0.0
+    assert report["metrics"]["grounding_failure_rate"] == 0.0
     assert report["metrics"]["refusal_accuracy"] == 1.0
     assert report["metrics"]["domain_accuracy"] == 1.0
 
@@ -150,7 +150,7 @@ def test_run_eval_rejects_on_hallucination(tmp_path):
     report = run_eval(pipeline, _write_queries(tmp_path, queries), data_dir=None, strict=False)
 
     assert report["decision"] == "REJECT"
-    assert "hallucination_rate" in report["failed_checks"]
+    assert "grounding_failure_rate" in report["failed_checks"]
 
 
 def test_run_eval_rejects_on_refusal_failure(tmp_path):
@@ -158,7 +158,7 @@ def test_run_eval_rejects_on_refusal_failure(tmp_path):
     queries = [
         {"query": "general q", "expected_intent": "general",
          "expected_refusal": True, "expected_answer_exact": "Insufficient data.",
-         "expected_failure_type": "retrieval_miss"},
+         "expected_failure_type": "retrieval_empty"},
     ]
     pipeline = _FakePipeline(scripted={
         "general q": _ok_result("general q", "general"),  # wrong: answers instead of refusing
@@ -194,7 +194,7 @@ def test_run_eval_rejects_when_killer_query_fails(tmp_path):
         {"query": "killer q", "expected_intent": "general",
          "expected_refusal": True,
          "expected_answer_exact": "Insufficient data.",
-         "expected_failure_type": "retrieval_miss",
+         "expected_failure_type": "retrieval_empty",
          "killer": True},
     ]
     pipeline = _FakePipeline(scripted={
@@ -217,7 +217,7 @@ def test_run_eval_promotes_when_killer_query_refuses_correctly(tmp_path):
         {"query": "killer q", "expected_intent": "general",
          "expected_refusal": True,
          "expected_answer_exact": "Insufficient data.",
-         "expected_failure_type": "retrieval_miss",
+         "expected_failure_type": "retrieval_empty",
          "killer": True},
     ]
     pipeline = _FakePipeline(scripted={
@@ -260,7 +260,7 @@ def test_check_strict_pass_exits_zero_on_promote(_isolated_report):
         "failed_checks": [],
         "metrics": {
             "pass_rate": 1.0,
-            "hallucination_rate": 0.0,
+            "grounding_failure_rate": 0.0,
             "refusal_accuracy": 1.0,
             "domain_accuracy": 1.0,
             "ocr_presence_check": True,
@@ -276,10 +276,10 @@ def test_check_strict_pass_exits_zero_on_promote(_isolated_report):
 def test_check_strict_pass_exits_nonzero_on_reject(_isolated_report):
     _isolated_report.write_text(json.dumps({
         "decision": "REJECT",
-        "failed_checks": ["hallucination_rate"],
+        "failed_checks": ["grounding_failure_rate"],
         "metrics": {
             "pass_rate": 0.9,
-            "hallucination_rate": 0.1,
+            "grounding_failure_rate": 0.1,
             "refusal_accuracy": 1.0,
             "domain_accuracy": 1.0,
             "ocr_presence_check": True,
@@ -290,7 +290,7 @@ def test_check_strict_pass_exits_nonzero_on_reject(_isolated_report):
 
     assert result.returncode == 1
     assert "FAIL" in result.stdout
-    assert "hallucination_rate" in result.stdout
+    assert "grounding_failure_rate" in result.stdout
 
 
 def test_check_strict_pass_fails_if_decision_missing(_isolated_report):

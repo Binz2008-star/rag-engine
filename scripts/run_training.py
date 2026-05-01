@@ -36,7 +36,7 @@ def main() -> None:
     register_model(
         version="intent_bootstrap",
         path=str(model_path),
-        metrics={"pass_rate": 1.0, "hallucination_rate": 0.0},
+        metrics={"pass_rate": 1.0, "grounding_failure_rate": 0.0},
         dataset_hash=dataset_hash,
         status="active",
     )

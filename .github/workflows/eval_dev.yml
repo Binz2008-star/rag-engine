@@ -69,7 +69,7 @@ jobs:
         run: |
           python -m py_compile eval_runner.py       && echo 'eval_runner.py OK'
           python -m py_compile app/config.py        && echo 'app/config.py OK'
-          python -m py_compile app/pipeline.py      && echo 'app/pipeline.py OK'
+          python -m py_compile app/main.py          && echo 'app/main.py OK'
           python -m py_compile generation/llm.py    && echo 'generation/llm.py OK'
           python -m py_compile evaluation/eval_main.py && echo 'evaluation/eval_main.py OK'
 
