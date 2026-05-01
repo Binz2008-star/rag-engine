@@ -6,7 +6,7 @@ exits non-zero if the canonical gate rejects the run.
 
 Canonical policy (from evaluation/eval_gate.py):
   - pass_rate >= 0.95
-  - hallucination_rate == 0.0
+  - grounding_failure_rate == 0.0
   - refusal_accuracy == 1.0
   - domain_accuracy >= 0.95
   - ocr_presence_check == True
@@ -73,7 +73,7 @@ def main() -> int:
 
     print(f"Decision:            {decision}")
     print(f"Pass rate:           {metrics.get('pass_rate', 0) * 100:.1f}%")
-    print(f"Hallucination rate:  {metrics.get('hallucination_rate', 0) * 100:.1f}%")
+    print(f"Grounding failure rate:  {metrics.get('grounding_failure_rate', 0) * 100:.1f}%")
     print(f"Refusal accuracy:    {metrics.get('refusal_accuracy', 0) * 100:.1f}%")
     print(f"Domain accuracy:     {metrics.get('domain_accuracy', 0) * 100:.1f}%")
     print(f"OCR presence check:  {metrics.get('ocr_presence_check', False)}")

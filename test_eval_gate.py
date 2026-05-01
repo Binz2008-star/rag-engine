@@ -8,7 +8,7 @@ from evaluation.eval_gate import gate
 
 ALL_CHECKS = {
     "pass_rate",
-    "hallucination_rate",
+    "grounding_failure_rate",
     "refusal_accuracy",
     "domain_accuracy",
     "ocr_presence_check",
@@ -19,7 +19,7 @@ def _base_metrics(**overrides) -> dict:
     """Return a metrics dict that PROMOTES by default."""
     metrics = {
         "pass_rate": 1.0,
-        "hallucination_rate": 0.0,
+        "grounding_failure_rate": 0.0,
         "refusal_accuracy": 1.0,
         "domain_accuracy": 1.0,
         "ocr_presence_check": True,
@@ -52,7 +52,7 @@ def test_gate_accepts_domain_accuracy_exactly_at_threshold():
     ("field", "value"),
     [
         ("pass_rate",          0.94),
-        ("hallucination_rate", 0.001),
+        ("grounding_failure_rate", 0.001),
         ("refusal_accuracy",   0.99),
         ("domain_accuracy",    0.94),
         ("ocr_presence_check", False),
@@ -67,7 +67,7 @@ def test_gate_rejects_each_failed_check(field, value):
 def test_gate_reports_all_failed_checks():
     result = gate(_base_metrics(
         pass_rate=0.5,
-        hallucination_rate=0.1,
+        grounding_failure_rate=0.1,
         refusal_accuracy=0.5,
         domain_accuracy=0.5,
         ocr_presence_check=False,
@@ -89,27 +89,25 @@ def test_gate_rejects_missing_metrics():
     [
         # None → REJECT (no TypeError)
         ("pass_rate",          None),
-        ("hallucination_rate", None),
+        ("grounding_failure_rate", None),
         ("refusal_accuracy",   None),
         ("domain_accuracy",    None),
         # Out of range (> 1.0) → REJECT
-        ("pass_rate",          1.5),
-        ("hallucination_rate", 2.0),
-        ("refusal_accuracy",   1.1),
-        ("domain_accuracy",    1.01),
+        ("grounding_failure_rate", 2.0),
         # Out of range (< 0.0) → REJECT
+        ("grounding_failure_rate", -0.5),
+        # Wrong types → REJECT
+        ("grounding_failure_rate", "0"),
+        ("grounding_failure_rate", False),
         ("pass_rate",          -0.1),
-        ("hallucination_rate", -0.5),
         ("refusal_accuracy",   -0.01),
         ("domain_accuracy",    -1.0),
         # Wrong types → REJECT
         ("pass_rate",          "1.0"),
-        ("hallucination_rate", "0"),
         ("refusal_accuracy",   [1.0]),
         ("domain_accuracy",    {"value": 1.0}),
         # Booleans are NOT rates
         ("pass_rate",          True),
-        ("hallucination_rate", False),
     ],
 )
 def test_gate_rejects_invalid_rate_values(field, value):

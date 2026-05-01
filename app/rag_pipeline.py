@@ -91,7 +91,7 @@ def _normalize_query_language(query: str) -> str:
 
     try:
         response = requests.post(
-            f"{OLLAMA_BASE_URL}/chat",
+            f"{OLLAMA_BASE_URL}/api/chat",
             json={
                 "model": CHAT_MODEL,
                 "stream": False,
@@ -534,7 +534,7 @@ class RagPipeline:
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 response = self.session.post(
-                    f"{OLLAMA_BASE_URL}/chat",
+                    f"{OLLAMA_BASE_URL}/api/chat",
                     json={
                         "model": CHAT_MODEL,
                         "stream": False,

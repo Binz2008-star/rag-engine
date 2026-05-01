@@ -1,2 +1,2 @@
-{"version": "intent_bootstrap", "path": "D:\\AI\\assistant\\models\\intent_bootstrap.joblib", "status": "active", "dataset_hash": "d38792ffb86d4d22882b7976ffb1c21d", "metrics": {"pass_rate": 1.0, "hallucination_rate": 0.0}, "threshold": 0.6}
-{"version": "intent_bootstrap", "path": "D:\\AI\\assistant\\models\\intent_bootstrap.joblib", "status": "active", "dataset_hash": "56d8119a62c8c92a05e245527af4d704", "metrics": {"pass_rate": 1.0, "hallucination_rate": 0.0}, "threshold": 0.6}
+{"version": "intent_bootstrap", "path": "D:\\AI\\assistant\\models\\intent_bootstrap.joblib", "status": "active", "dataset_hash": "d38792ffb86d4d22882b7976ffb1c21d", "metrics": {"pass_rate": 1.0, "grounding_failure_rate": 0.0}, "threshold": 0.6}
+{"version": "intent_bootstrap", "path": "D:\\AI\\assistant\\models\\intent_bootstrap.joblib", "status": "active", "dataset_hash": "56d8119a62c8c92a05e245527af4d704", "metrics": {"pass_rate": 1.0, "grounding_failure_rate": 0.0}, "threshold": 0.6}

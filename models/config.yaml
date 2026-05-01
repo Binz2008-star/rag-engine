@@ -1,0 +1,213 @@
+# Ellora Local Model Configuration
+# Schema: v3
+# Purpose: Centralized model registry with role-based routing, fallback chains, and inference parameters
+
+name: ellora-local
+version: 1.0.0
+schema: v3
+
+# Global defaults applied when model-specific config is absent
+defaults:
+  chat_model: qwen-agent
+  embed_model: nomic-embed
+  rerank_model: bge-reranker
+  
+  # Inference parameters
+  temperature: 0.1
+  top_p: 0.9
+  top_k: 40
+  num_predict: 256
+  repeat_penalty: 1.1
+  
+  # Runtime behavior
+  timeout: 300
+  max_retries: 3
+  retry_backoff: 2  # exponential backoff base (2^attempt)
+  stream: false
+  
+  # Resource limits
+  max_context_length: 8192
+  batch_size: 8
+
+# Provider configuration
+providers:
+  ollama:
+    base_url: ${OLLAMA_BASE_URL:-http://localhost:11434/api}
+    health_check:
+      enabled: true
+      endpoint: /api/tags
+      interval: 30  # seconds
+      timeout: 5
+    required_models:
+      - qwen2.5:7b-instruct-q4_K_M
+      - nomic-embed-text:latest
+      - dengcao/bge-reranker-v2-m3
+
+# Model registry with role-based routing
+models:
+  # ── PRIMARY AGENT (Chat & Reasoning) ─────────────────────────────
+  - id: qwen-agent
+    provider: ollama
+    model: qwen2.5:7b-instruct-q4_K_M
+    roles: [agent, chat]
+    priority: 1
+    enabled: true
+    
+    # Inference parameters (override defaults)
+    params:
+      temperature: 0.1
+      top_p: 0.9
+      num_predict: 512
+      repeat_penalty: 1.1
+    
+    # Capabilities
+    capabilities:
+      max_context: 32768
+      supports_streaming: true
+      supports_function_calling: false
+      supports_vision: false
+    
+    # Fallback chain (tried in order if primary fails)
+    fallback: [llama-fast]
+    
+    # Health check
+    health:
+      required: true
+      warmup: true  # load into memory on startup
+
+  # ── FALLBACK CHAT (Backup for primary) ──────────────────────────
+  - id: llama-fast
+    provider: ollama
+    model: llama3.1:8b
+    roles: [chat]
+    priority: 2
+    enabled: true
+    
+    params:
+      temperature: 0.2
+      top_p: 0.9
+      num_predict: 384
+    
+    capabilities:
+      max_context: 128000
+      supports_streaming: true
+      supports_function_calling: true
+      supports_vision: false
+    
+    fallback: []
+
+  # ── CODE EDITING & APPLY ────────────────────────────────────────
+  - id: qwen-coder
+    provider: ollama
+    model: qwen2.5-coder:7b
+    roles: [edit, apply]
+    priority: 1
+    enabled: true
+    
+    params:
+      temperature: 0.0  # deterministic for code
+      top_p: 0.95
+      num_predict: 1024
+    
+    capabilities:
+      max_context: 32768
+      supports_streaming: true
+      supports_function_calling: false
+      supports_vision: false
+    
+    fallback: []
+
+  # ── EMBEDDINGS (Vector generation) ───────────────────────────────
+  - id: nomic-embed
+    provider: ollama
+    model: nomic-embed-text:latest
+    roles: [embed]
+    priority: 1
+    enabled: true
+    
+    params:
+      # Embeddings typically use fixed parameters
+      num_predict: 768  # embedding dimension
+    
+    capabilities:
+      embedding_dim: 768
+      max_sequence: 8192
+      normalized: true  # L2-normalized embeddings
+    
+    fallback: []
+
+  # ── RERANKING (Cross-encoder for result refinement) ───────────────
+  - id: bge-reranker
+    provider: ollama
+    model: dengcao/bge-reranker-v2-m3
+    roles: [rerank]
+    priority: 1
+    enabled: true
+    
+    params:
+      num_predict: 1024
+    
+    capabilities:
+      max_sequence: 512
+      output_type: score  # returns relevance scores
+    
+    fallback: []
+
+  # ── AUTODETECT (Dynamic model selection) ─────────────────────────
+  - id: autodetect
+    provider: ollama
+    model: AUTODETECT
+    roles: [chat, embed, rerank]
+    priority: 99  # lowest priority, used only as last resort
+    enabled: false  # disabled by default, requires explicit enable
+    
+    params:
+      temperature: 0.1
+    
+    capabilities:
+      max_context: 0  # dynamic
+      supports_streaming: true
+    
+    fallback: []
+
+# Role to model mapping (resolves model ID for a given role)
+role_mapping:
+  agent: qwen-agent
+  chat: qwen-agent
+  edit: qwen-coder
+  apply: qwen-coder
+  embed: nomic-embed
+  rerank: bge-reranker
+
+# Feature flags
+features:
+  # Enable model cascading (try fallback on failure)
+  cascading_enabled: true
+  
+  # Enable model warmup on startup
+  warmup_enabled: true
+  
+  # Enable telemetry/logging of model usage
+  telemetry_enabled: true
+  
+  # Enable request batching for embeddings
+  batch_embeddings: true
+  
+  # Enable caching of embedding results
+  cache_embeddings: true
+  cache_ttl: 3600  # seconds
+
+# Monitoring & observability
+monitoring:
+  # Log model selection decisions
+  log_selection: true
+  
+  # Track latency per model
+  track_latency: true
+  
+  # Track error rates per model
+  track_errors: true
+  
+  # Alert on error rate threshold
+  error_threshold: 0.1  # 10% error rate triggers alert
+  alert_cooldown: 300  # seconds between alerts

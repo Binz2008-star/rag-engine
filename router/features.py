@@ -27,9 +27,8 @@ def normalize_query(text: str) -> str:
         text = normalize_arabic(text)
     text = text.lower()
     text = re.sub(r"\s+", " ", text)
-    # Unify ECO variants
+    # Unify ECO variant (already lowercased and normalized)
     text = text.replace("ايكو", "eco")
-    text = text.replace("إيكو", "eco")
     return text.strip()
 
 
@@ -43,17 +42,20 @@ def extract_hints(query: str) -> tuple[bool, bool]:
     cv_terms = {
         "cv", "resume", "tailored", "role", "experience",
         "skills", "certificates", "deliveroo", "job", "roben", "roben's",
-        # Arabic CV terms
+        "employment", "employment history", "work history", "worked for",
+        "companies worked", "companies has", "companies has robin worked",
+        "previous roles", "career history", "applying for",
+        "position does", "position does robin want", "job is the cv for",
         "خبرة", "روبن", "خبر", "سيرة", "ذاتية",
     }
     general_terms = {
         "mars", "planet", "galaxy", "jupiter", "gdp", "economy",
     }
 
-    # General terms override eco/cv hints
     if any(term in q for term in general_terms):
         return False, False
 
-    eco_hint = any(term in q for term in eco_terms)
-    cv_hint = any(term in q for term in cv_terms)
-    return eco_hint, cv_hint
+    return (
+        any(term in q for term in eco_terms),
+        any(term in q for term in cv_terms),
+    )

@@ -52,7 +52,7 @@ class EmbeddingClient:
 
             try:
                 response = self.session.post(
-                    f"{self.base_url}/embed",
+                    f"{self.base_url}/api/embed",
                     json={"model": EMBED_MODEL, "input": texts},
                     timeout=self.timeout,
                 )

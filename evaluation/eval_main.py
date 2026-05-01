@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from app.config import REFUSAL_MESSAGE
+from app.models import normalize_legacy_failure_type
 from evaluation.eval_gate import gate
 from evaluation.metrics import compute_metrics
 from evaluation.ocr_check import check_ocr_presence
@@ -11,7 +12,8 @@ from evaluation.ocr_check import check_ocr_presence
 
 def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bool = False) -> dict:
     data = json.loads(eval_path.read_text(encoding="utf-8"))
-    tests = data.get("queries", [])
+    # Handle both object-shaped {queries: [...]} and top-level list formats
+    tests = data if isinstance(data, list) else data.get("queries", [])
     results: list[dict] = []
 
     if strict and data_dir is None:
@@ -27,6 +29,15 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
         actual_answer = getattr(result, "answer", "")
         actual_grounded = getattr(result, "grounded", True)
         actual_failure_type = getattr(result, "failure_type", None)
+        # Normalize to string: handle both enum and legacy string values
+        if actual_failure_type is None:
+            actual_failure_type_str = None
+        elif hasattr(actual_failure_type, "value"):
+            actual_failure_type_str = actual_failure_type.value
+        else:
+            actual_failure_type_str = str(actual_failure_type)
+        # Apply legacy normalization for historical compatibility
+        actual_failure_type_str = normalize_legacy_failure_type(actual_failure_type_str)
         actual_latency_ms = getattr(result, "latency_ms", 0)
         actual_knowledge_gap = getattr(result, "knowledge_gap", None)
 
@@ -80,14 +91,14 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
 
         if "expected_failure_type" in item:
             expected = item["expected_failure_type"]
-            if expected is not None and actual_failure_type != expected:
+            if expected is not None and actual_failure_type_str != expected:
                 passed = False
                 failure_reasons.append(
-                    f"failure_type mismatch: expected {expected}, got {actual_failure_type}"
+                    f"failure_type mismatch: expected {expected}, got {actual_failure_type_str}"
                 )
-            elif expected is None and actual_failure_type is not None:
+            elif expected is None and actual_failure_type_str is not None:
                 passed = False
-                failure_reasons.append(f"unexpected failure_type: {actual_failure_type}")
+                failure_reasons.append(f"unexpected failure_type: {actual_failure_type_str}")
 
         if "expected_knowledge_gap" in item:
             if item["expected_knowledge_gap"] and actual_knowledge_gap is None:
@@ -109,7 +120,7 @@ def run_eval(pipeline, eval_path: Path, data_dir: Path | None = None, strict: bo
                 "intent": actual_intent,
                 "intent_method": actual_method,
                 "grounded": actual_grounded,
-                "failure_type": actual_failure_type,
+                "failure_type": actual_failure_type_str,
                 "knowledge_gap": {
                     "gap_type": actual_knowledge_gap.gap_type if actual_knowledge_gap else None,
                     "confidence_if_adversarial": actual_knowledge_gap.confidence_if_adversarial if actual_knowledge_gap else None,

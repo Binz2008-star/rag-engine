@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 import sys
+import uuid
 from contextlib import asynccontextmanager
+from json import JSONDecodeError
 from pathlib import Path
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -22,8 +26,17 @@ from .jotform_routes import register_jotform_routes  # noqa: E402
 from .core.config import get_settings  # noqa: E402
 from .core.logging import configure_logging  # noqa: E402
 from .infra.ollama_health import OllamaUnavailableError, check_ollama  # noqa: E402
+from .schemas import (
+    DispatchRequest,
+    DispatchResponse,
+    HealthResponse,
+    JotformWebhookResponse,
+    QueryRequest,
+    QueryResponse,
+)  # noqa: E402
 from .services.agent_executor import AgentExecutor  # noqa: E402
 from .services.execution_guard import ExecutionGuard  # noqa: E402
+from .services.jotform_ingest_service import ingest_jotform_payload  # noqa: E402
 from .services.rag_service import RagService  # noqa: E402
 from .services.scheduler_service import SchedulerService  # noqa: E402
 from .services.scheduler_worker import SchedulerWorker  # noqa: E402
@@ -44,6 +57,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings.host,
         settings.port,
     )
+
+    # Warn if Jotform webhook is enabled but secret is not configured
+    if settings.jotform_webhook_enabled and not settings.jotform_webhook_secret:
+        logger.warning(
+            "Jotform webhook is enabled but JOTFORM_WEBHOOK_SECRET is not configured. "
+            "Webhook requests will return 503 Service Unavailable."
+        )
 
     # Initialize infrastructure services
     app.state.task_store = TaskStore()
@@ -170,6 +190,214 @@ def create_app() -> FastAPI:
             "name": settings.app_name,
             "version": settings.version,
         }
+
+    @app.get("/health")
+    async def health() -> dict[str, str]:
+        return {"status": "ok", "version": "3.0"}
+
+    @app.get("/leads/hot")
+    async def get_hot_leads() -> dict[str, Any]:
+        """Return hot leads for sales follow-up."""
+        return {"leads": [], "count": 0}
+
+    @app.get("/api/health")
+    async def api_health() -> HealthResponse:
+        rag_service: RagService | None = getattr(app.state, "rag_service", None)
+        return HealthResponse(
+            status="ok",
+            pipeline_ready=rag_service.ready if rag_service else False,
+            version=settings.version,
+            chat_model=settings.chat_model,
+            index_count=rag_service.index_count if rag_service else None,
+        )
+
+    @app.post("/api/query", response_model=QueryResponse)
+    async def query(request: QueryRequest) -> QueryResponse | JSONResponse:
+        """Execute a RAG query against the knowledge base."""
+        rag_service: RagService | None = getattr(app.state, "rag_service", None)
+        if rag_service is None or not rag_service.ready:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"error": "RAG service not ready", "detail": "Pipeline is initializing or unavailable"},
+            )
+        try:
+            result = await rag_service.query(request.question)
+            return QueryResponse(**result)
+        except Exception as e:
+            logger.exception("Query failed")
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"error": "Query failed", "detail": str(e)},
+            )
+
+    @app.post("/api/leads/score")
+    async def score_lead(request: Request) -> JSONResponse:
+        """Score a lead using LeadScorer (same as backfill and webhook)."""
+        from lead_scorer import get_scorer
+
+        try:
+            data = await request.json()
+        except JSONDecodeError:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Invalid JSON"},
+            )
+
+        # Map API fields to LeadScorer expected format
+        lead_data = {
+            "services_required": data.get("services", []),
+            "company_name": data.get("company_name", data.get("company", "")),
+            "location": data.get("location", data.get("emirate", "")),
+            "source": data.get("source", "api"),
+            "message": data.get("message", ""),
+            "notes": data.get("notes", ""),
+            "email": data.get("email", ""),
+            "phone": data.get("phone", ""),
+            "full_name": data.get("full_name", data.get("name", "")),
+        }
+
+        # Build RAG result from intent/urgency if provided
+        rag_result = None
+        if data.get("intent"):
+            rag_result = {
+                "intent": data.get("intent"),
+                "confidence": 0.9 if data.get("intent") in ["eco", "quote", "consultation"] else 0.7,
+                "method": "api_direct",
+            }
+
+        # Score using same LeadScorer as backfill and webhook
+        scorer = get_scorer()
+        result = scorer.score(lead_data, rag_result)
+
+        return JSONResponse(
+            content={
+                "score": result["lead_score"],
+                "band": result["score_band"],
+                "recommended_action": result["recommended_action"],
+                "breakdown": result.get("scores", {}),
+                "weighted": result.get("weighted_scores", {}),
+                "version": "2.0-leadscorer",
+            }
+        )
+
+    @app.post("/api/dispatch", response_model=DispatchResponse)
+    async def dispatch(request: DispatchRequest) -> DispatchResponse:
+        """Route a question to the appropriate capability."""
+        from router.intent_router import IntentRouter
+
+        router = IntentRouter.from_active_model()
+        route_result = router.route(request.question)
+
+        # Map intent to capability
+        capability_map = {
+            "cv": "cv",
+            "eco": "eco",
+            "general": "chat",
+        }
+        capability = capability_map.get(route_result.intent, "chat")
+
+        return DispatchResponse(
+            capability=capability,
+            kind=route_result.intent,
+            status="ok",
+            request_id=str(uuid.uuid4()),
+            payload={
+                "intent": route_result.intent,
+                "confidence": route_result.confidence,
+                "method": route_result.intent_method,
+                "question": request.question,
+            },
+        )
+
+    @app.post("/api/webhooks/jotform-agent")
+    async def jotform_webhook(request: Request) -> JSONResponse:
+        """Ingest Jotform AI Agent webhook payload as structured lead + RAG memory."""
+        request_id = str(uuid.uuid4())
+
+        # 1. AuthN first — reject unauthenticated callers BEFORE we do any
+        #    body parsing, size checks, or JSON deserialization. This prevents
+        #    unauth'd requests from triggering parser work or 413 responses.
+        if settings.jotform_webhook_enabled:
+            if not settings.jotform_webhook_secret:
+                logger.warning(
+                    "Jotform webhook enabled but secret not configured (request_id=%s)",
+                    request_id,
+                )
+                return JSONResponse(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    content={"error": "Jotform webhook enabled but secret not configured"},
+                )
+            provided_secret = request.headers.get("X-Jotform-Secret")
+            if provided_secret != settings.jotform_webhook_secret:
+                logger.warning(
+                    "Jotform webhook secret validation failed (request_id=%s)",
+                    request_id,
+                )
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"error": "Invalid webhook secret"},
+                )
+        else:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"error": "Jotform webhook is disabled"},
+            )
+
+        # 3. Parse JSON only after auth + enabled checks pass.
+        try:
+            payload = await request.json()
+        except JSONDecodeError:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Invalid JSON payload"},
+            )
+
+        if not payload or not isinstance(payload, dict):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Payload must be a non-empty object"},
+            )
+
+        # Payload size guard (100KB limit)
+        import json
+        try:
+            payload_size = len(json.dumps(payload))
+            if payload_size > 100_000:
+                return JSONResponse(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    content={"error": "Payload too large (max 100KB)"},
+                )
+        except (TypeError, ValueError):
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": "Invalid payload structure"},
+            )
+
+        # Ingest payload in thread pool to avoid blocking
+        try:
+            lead = await asyncio.to_thread(ingest_jotform_payload, payload)
+            logger.info("Jotform lead ingested successfully (request_id=%s, lead_id=%s, intent=%s)", request_id, lead.lead_id, lead.intent)
+            response = JotformWebhookResponse(
+                status="ok",
+                source="jotform",
+                lead_id=lead.lead_id,
+                intent=lead.intent,
+                indexed=False,  # File-based storage, requires index rebuild
+                request_id=request_id,
+            )
+            return JSONResponse(content=response.model_dump(), status_code=status.HTTP_200_OK)
+        except ValueError as e:
+            logger.error("Jotform webhook validation error (request_id=%s): %s", request_id, e)
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"error": str(e)},
+            )
+        except Exception as e:
+            logger.exception("Jotform webhook ingestion failed (request_id=%s): %s", request_id, e)
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"error": "Ingestion failed"},
+            )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(

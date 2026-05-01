@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
-from app.query_normalizer import normalize_query
+from app.query_normalizer import normalize_query_with_flag
 from app.retriever import Retriever
 from app.embeddings import EmbeddingClient
 
@@ -37,7 +37,7 @@ def extract_queries_with_labels(eval_data: List[Dict]) -> List[Tuple[str, str]]:
 
         # If Arabic, also add normalized version
         if retriever._contains_arabic(query):
-            normalized, _ = normalize_query(query)
+            normalized, _ = normalize_query_with_flag(query)
             if normalized != query:
                 norm_intent = retriever._detect_query_type(normalized)
                 dataset.append((normalized, norm_intent))
