@@ -45,6 +45,8 @@ def _rate_passes(value: Any, threshold: float, op: str) -> bool:
     numeric = float(value)
     if op == ">=":
         return numeric >= threshold
+    if op == "<=":
+        return numeric <= threshold
     if op == "==":
         return numeric == threshold
     return False

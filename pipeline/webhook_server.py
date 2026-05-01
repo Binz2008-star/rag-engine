@@ -193,7 +193,7 @@ async def startup_event():
     if RAG_ENABLED and RAG_AVAILABLE:
         try:
             rag_client = get_rag_client()
-            is_healthy = await rag_client.health_check()
+            is_healthy = rag_client.health_check()
             RAG_HEALTHY = is_healthy
             if is_healthy:
                 log.info(f"RAG service healthy at {RAG_SERVICE_URL}")
@@ -740,7 +740,7 @@ async def rag_health():
         return {"rag_healthy": False, "reason": "RAG disabled or client unavailable"}
     try:
         rag_client = get_rag_client()
-        is_healthy = await rag_client.health_check()
+        is_healthy = rag_client.health_check()
         RAG_HEALTHY = is_healthy
         if is_healthy:
             log.info(f"RAG health check passed - routing enabled")
