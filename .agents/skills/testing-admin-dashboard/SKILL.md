@@ -1,7 +1,7 @@
 # Testing: RAG Admin Dashboard & AI Test Lab
 
 ## Overview
-The admin dashboard at `/admin` is a single-page HTML app (`static/admin.html`) with 6 tabs: Overview, Query History, Monitoring, AI Test Lab, RAG Config, Dispatch Test. All endpoints are protected by `ADMIN_TOKEN` via `X-Admin-Token` header or `?token=` query param.
+The admin dashboard at `/admin` is a single-page HTML app (`static/admin.html`) with 6 tabs: Overview, Query History, Monitoring, AI Test Lab, RAG Config, Dispatch Test. All endpoints are protected by `ADMIN_TOKEN` via `X-Admin-Token` header or `?token=` query param (GET only).
 
 ## Devin Secrets Needed
 - `ADMIN_TOKEN` — admin dashboard auth token (use `test-secret-token-123` for local dev)
@@ -18,7 +18,7 @@ python -m uvicorn server.main:app --reload --host 0.0.0.0 --port 8000 --app-dir 
 ## Compile Gate (always run first)
 ```bash
 python -m py_compile api/server/main.py
-python -m py_compile api/server/services/rag_config.py
+python -m py_compile api/server/admin_routes.py
 ```
 
 ## Testing the AI Test Lab
@@ -45,58 +45,87 @@ tail -1 data/eval_cases.jsonl | python3 -c "import sys,json; obj=json.loads(sys.
 
 **Key normalization:** `must_include` accepts comma-separated string input (e.g. "AED, grease trap") and stores it as array (`["AED", "grease trap"]`).
 
-## Testing RAG Config Tab (config_version Traceability)
+### Feedback Label Validation
+Valid labels: `good`, `bad`, `wrong_source`, `too_slow`, `false_refusal`. Any other value returns 422.
+```bash
+curl -s -X POST http://localhost:8000/api/dashboard/eval-cases \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Token: test-secret-token-123" \
+  -d '{"query":"x","feedback_label":"invalid"}'
+# Expected: 422 with list of valid labels
+```
 
-The RAG Config tab allows viewing/editing runtime config parameters. Config is stored in `data/rag_runtime_config.json`. The `config_version` field is automatically included in eval case saves and dispatch responses.
+## Testing RAG Config Tab
 
 ### Browser Flow
 1. Click "RAG Config" tab
 2. Verify defaults load: top_k=15, score_threshold=0.38, max_context_chars=3000, temperature=0.2, reranker_enabled=Enabled, grounding_strictness=0.5
-3. Verify Config Metadata shows: Version v1, Updated At "Never", Updated By "—"
-4. Change top_k to 20 → click "Save Config"
-5. Verify: "Saved! (v2)" appears, Version card shows v2, Updated At shows timestamp, Updated By shows "admin"
-
-### config_version Progression Test
-This is the key Phase 10 traceability test:
-1. **Clean data first:** `rm -f data/eval_cases.jsonl data/rag_runtime_config.json`
-2. Save eval case in AI Test Lab (default config) → verify JSONL has `config_version: 1`
-3. Go to RAG Config → change a value → Save (bumps to v2)
-4. Save another eval case in AI Test Lab → verify JSONL has `config_version: 2`
-5. Shell verification:
-```bash
-cat data/eval_cases.jsonl | python3 -c "
-import sys, json
-lines = [l for l in sys.stdin.read().strip().split('\n') if l.strip()]
-for i, line in enumerate(lines):
-    d = json.loads(line)
-    print(f'Line {i+1}: config_version={d.get(\"config_version\")}')
-"
-```
+3. Verify Config Metadata shows: VERSION v1, UPDATED AT "Never"
+4. Change top_k to 20, click "Save Config"
+5. Verify: "Saved! (v2)" green text, Version shows v2, Updated At has timestamp, Updated By shows "admin"
 
 ### Config File Verification
 ```bash
-# After saving config from RAG Config tab
-cat data/rag_runtime_config.json | python3 -m json.tool
-# Should show version, updated_at, updated_by, and config values
+cat data/rag_runtime_config.json | python -m json.tool
+# Should show top_k=20, version=2, updated_by="admin"
 ```
 
-## Auth Enforcement (curl)
+### Config API
 ```bash
-# Should return 401
-curl -s -X POST http://localhost:8000/api/dashboard/eval-cases \
+# GET config
+curl -s http://localhost:8000/api/dashboard/rag-config \
+  -H "X-Admin-Token: test-secret-token-123" | python -m json.tool
+
+# POST config update
+curl -s -X POST http://localhost:8000/api/dashboard/rag-config \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Token: test-secret-token-123" \
+  -d '{"top_k":25,"notes":"testing"}'
+```
+
+## Auth Enforcement
+
+**Important:** POST endpoints require `X-Admin-Token` header. The `?token=` query param is accepted for `/admin` GET (browser access) but **NOT** for POST write endpoints.
+
+```bash
+# Should return 401 — no token
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8000/api/dashboard/eval-cases \
   -H "Content-Type: application/json" \
   -d '{"query":"x","feedback_label":"bad"}'
 
-# Should return {"status":"ok","saved":true}
+# Should return 401 — ?token= only (no header)
+curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:8000/api/dashboard/eval-cases?token=test-secret-token-123" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"x","feedback_label":"bad"}'
+
+# Should return 200 — X-Admin-Token header
 curl -s -X POST http://localhost:8000/api/dashboard/eval-cases \
   -H "Content-Type: application/json" \
   -H "X-Admin-Token: test-secret-token-123" \
   -d '{"query":"x","feedback_label":"bad","must_include":"AED"}'
 ```
 
-### Validation (422 errors)
-- Missing `query` → 422
-- Missing `feedback_label` → 422
+## Diff Scope Verification
+
+When working on dashboard-only PRs, always verify no RAG/retrieval/router files leaked into the diff:
+```bash
+git diff --name-only main...HEAD
+```
+
+**Allowed files** (dashboard/eval-case scope):
+- `api/server/admin_routes.py`
+- `api/server/main.py`
+- `api/server/services/leads_store.py`
+- `api/server/whatsapp_routes.py`
+- `requirements.txt`
+- `static/admin.html`
+
+**Disallowed files** (RAG/retrieval scope):
+- `retrieval/*`
+- `router/*`
+- `generation/*`
+- `app/pipeline.py`
+- `api/server/services/rag_service.py`
 
 ## Common Pitfalls
 - **No Ollama:** Dispatch returns 503 — this is expected in degraded mode. UI/auth/persistence still testable.
@@ -104,12 +133,12 @@ curl -s -X POST http://localhost:8000/api/dashboard/eval-cases \
 - **Double-click save:** The Save button disables for 1 second after save to prevent rapid duplicates.
 - **Meta cards missing:** In degraded mode (503 response), meta cards (intent, failure_type, latency, sources) may not render since there's no full payload. This is normal.
 - **JSONL file location:** `data/eval_cases.jsonl` — the `data/` directory is auto-created on first save.
-- **Config file location:** `data/rag_runtime_config.json` — auto-created on first config save from dashboard.
-- **config_version in 503 mode:** In degraded mode, dispatch returns 503 error JSON without `config_version`. The `config_version` field only appears in successful dispatch responses. Eval case saves always include `config_version` regardless of dispatch mode.
-- **Clean data for testing:** Remove both `data/eval_cases.jsonl` and `data/rag_runtime_config.json` before testing config_version progression to start from known defaults (v1).
+- **Config file location:** `data/rag_runtime_config.json` — auto-created with defaults on first GET.
+- **Server restart needed:** If you edit backend Python files, you may need to restart the uvicorn server (or use `--reload`) for changes to take effect. Old code running on a stale server is a common source of test failures.
+- **?token for POST:** Do NOT use `?token=` for POST endpoints — only `X-Admin-Token` header is accepted for writes.
 
 ## Regression Checks
 - After changes to `admin.html`, verify all 6 tabs still render (Overview, Query History, Monitoring, AI Test Lab, RAG Config, Dispatch Test)
 - Overview should show KPI cards (System Status, RAG Ready, Indexes, Total Leads, etc.)
 - Switching tabs should hide/show correct content
-- RAG Config defaults should load even without `data/rag_runtime_config.json`
+- Eval case save should still work after RAG Config changes and vice versa
