@@ -83,6 +83,10 @@ class _FakeLLM:
     def generate(self, query: str, hits) -> str:
         return self._answer
 
+    def _generate_with_prompt(self, prompt: str) -> str:
+        """Fake implementation for self-correction path."""
+        return self._answer
+
 
 def _hit(text: str, score: float = 0.9) -> RetrievalHit:
     return RetrievalHit(
