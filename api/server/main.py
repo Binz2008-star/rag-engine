@@ -58,6 +58,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings.port,
     )
 
+    # Warn if Jotform webhook is enabled but secret is not configured
+    if settings.jotform_webhook_enabled and not settings.jotform_webhook_secret:
+        logger.warning(
+            "Jotform webhook is enabled but JOTFORM_WEBHOOK_SECRET is not configured. "
+            "Webhook requests will return 503 Service Unavailable."
+        )
+
     # Initialize infrastructure services
     app.state.task_store = TaskStore()
     app.state.execution_guard = ExecutionGuard(app.state.task_store)

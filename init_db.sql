@@ -1,3 +1,7 @@
+-- DEPRECATED: see 001_init.sql
+-- This file is kept for backward compatibility but is no longer used.
+-- Use 001_init.sql for new installations.
+
 -- Create database tables for Robin AI Pipeline
 
 -- Leads table
