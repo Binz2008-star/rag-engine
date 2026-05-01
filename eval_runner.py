@@ -516,7 +516,7 @@ def main(query_fn=None) -> int:
             answer="", sources=[],
             passed=False, reasons=[], buckets=[], elapsed=0.0,
             expected_source=test.get("expected_source", ""),
-            expected_exact=test.get("expected_answer_exact") or test.get("expected_exact", ""),
+            expected_exact=test["expected_answer_exact"] if "expected_answer_exact" in test else test.get("expected_exact", ""),
             expected_intent=test.get("expected_intent", ""),
             has_expected_source="expected_source" in test,
             has_expected_exact="expected_answer_exact" in test or "expected_exact" in test,

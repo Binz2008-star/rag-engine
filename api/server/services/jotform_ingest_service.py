@@ -207,7 +207,7 @@ def save_jotform_lead(lead: JotformLead) -> None:
     """Save Jotform lead to PostgreSQL database.
 
     Inserts into agent_conversations table with link to leads table.
-    Uses existing schema from init_db.sql.
+    Uses existing schema from 001_init.sql.
 
     Args:
         lead: Normalized JotformLead to save.

@@ -317,7 +317,7 @@ def create_app() -> FastAPI:
                     request_id,
                 )
                 return JSONResponse(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     content={"error": "Jotform webhook enabled but secret not configured"},
                 )
             provided_secret = request.headers.get("X-Jotform-Secret")

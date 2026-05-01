@@ -12,11 +12,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
 def init_database() -> None:
-    """Create database tables from init_db.sql."""
+    """Create database tables from 001_init.sql."""
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL environment variable is required")
 
-    sql_path = Path(__file__).with_name("init_db.sql")
+    sql_path = Path(__file__).with_name("001_init.sql")
     if not sql_path.exists():
         raise FileNotFoundError(f"SQL file not found: {sql_path}")
 
