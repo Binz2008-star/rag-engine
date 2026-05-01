@@ -119,7 +119,7 @@ class RAGClient:
                 "error": str(e)
             }
 
-    async def health_check(self) -> bool:
+    def health_check(self) -> bool:
         """Check if RAG service is healthy."""
         try:
             response = self.client.get(f"{self.base_url}/health", timeout=5.0)

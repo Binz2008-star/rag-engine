@@ -141,12 +141,12 @@ def test_eval_rows_distinguish_failure_types():
     # different expected_failure_type values for different query types
     from pathlib import Path
     eval_queries = json.loads(Path("tests/eval_queries.json").read_text(encoding="utf-8"))
-    
+
     failure_types = set()
     for q in eval_queries:
         if "expected_failure_type" in q:
             failure_types.add(q["expected_failure_type"])
-    
+
     # Should have at least the types we set in the migration
     assert "retrieval_empty" in failure_types
     assert "routing_miss" in failure_types
@@ -158,7 +158,7 @@ def test_all_failure_types_covered():
     """All FailureType enum values are valid and distinct."""
     values = [ft.value for ft in FailureType]
     assert len(values) == len(set(values)), "FailureType values must be unique"
-    
+
     # Verify all expected types are present
     expected = {
         "routing_miss",
@@ -166,6 +166,7 @@ def test_all_failure_types_covered():
         "retrieval_low_score",
         "term_overlap_miss",
         "grounding_reject",
+        "reasoning_reject",
         "speculative_reject",
         "injection_reject",
         "sensitive_reject",

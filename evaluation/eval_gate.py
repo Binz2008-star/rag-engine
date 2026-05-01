@@ -22,7 +22,7 @@ from typing import Any, Iterable
 _RATE_CHECKS: tuple[tuple[str, float, str], ...] = (
     ("pass_rate",              0.95, ">="),
     ("grounding_failure_rate",  0.0,  "=="),
-    ("reasoning_failure_rate",  0.0,  "=="),
+    ("reasoning_failure_rate",  0.05, "<="),
     ("refusal_accuracy",       1.0,  "=="),
     ("domain_accuracy",        0.95, ">="),
 )

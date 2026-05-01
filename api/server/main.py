@@ -306,7 +306,29 @@ def create_app() -> FastAPI:
         """Ingest Jotform AI Agent webhook payload as structured lead + RAG memory."""
         request_id = str(uuid.uuid4())
 
-        # Parse JSON with narrow exception handling
+        # 1. AuthN first — reject unauthenticated callers BEFORE we do any
+        #    body parsing, size checks, or JSON deserialization. This prevents
+        #    unauth'd requests from triggering parser work or 413 responses.
+        if settings.jotform_webhook_secret:
+            provided_secret = request.headers.get("X-Jotform-Secret")
+            if provided_secret != settings.jotform_webhook_secret:
+                logger.warning(
+                    "Jotform webhook secret validation failed (request_id=%s)",
+                    request_id,
+                )
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"error": "Invalid webhook secret"},
+                )
+
+        # 2. Feature flag — also before parsing.
+        if not settings.jotform_webhook_enabled:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"error": "Jotform webhook is disabled"},
+            )
+
+        # 3. Parse JSON only after auth + enabled checks pass.
         try:
             payload = await request.json()
         except JSONDecodeError:
@@ -334,23 +356,6 @@ def create_app() -> FastAPI:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"error": "Invalid payload structure"},
-            )
-
-        # Optional secret validation via settings
-        if settings.jotform_webhook_secret:
-            provided_secret = request.headers.get("X-Jotform-Secret")
-            if provided_secret != settings.jotform_webhook_secret:
-                logger.warning("Jotform webhook secret validation failed (request_id=%s)", request_id)
-                return JSONResponse(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    content={"error": "Invalid webhook secret"},
-                )
-
-        # Check if webhook is enabled via settings
-        if not settings.jotform_webhook_enabled:
-            return JSONResponse(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                content={"error": "Jotform webhook is disabled"},
             )
 
         # Ingest payload in thread pool to avoid blocking

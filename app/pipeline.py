@@ -247,7 +247,11 @@ class Pipeline:
                 retriever_version=self.retriever_version,
             )
 
-        # Check for evaluation fast mode: optionally skip reranking
+        # Check for evaluation fast mode: optionally skip reranking.
+        # NOTE: top_k=len(hits) is intentional — we let the reranker reorder
+        # the full candidate set. _shape_context() below truncates to 5 before
+        # generation, so the rerank cost is bounded by retriever TOP_K, not
+        # the final context size.
         _enable_rerank = os.environ.get("EVAL_RERANK", "1") not in ("0", "false", "False")
         if self.reranker and _enable_rerank:
             hits = self.reranker.rerank(hits, normalized_query, top_k=len(hits))
@@ -348,6 +352,10 @@ Question: {query}
             return self.reasoning_verifier.verify(answer, hits_list, self.embedder.embed_batch)
 
         # Initial generation
+        # IMPORTANT: generation, grounding, and reasoning all operate on the
+        # SAME shaped_hits set so the gates evaluate against the exact context
+        # the LLM saw. Using full `hits` here would let the model be judged
+        # against chunks it could not cite.
         initial_answer = self.llm.generate(generation_query, shaped_hits)
         normalized_answer = initial_answer.strip().lower()
 
@@ -362,27 +370,27 @@ Question: {query}
             "it can be inferred",
             "this suggests",
             "likely",
-            "used cooking oil",
-            "uco",
         )
 
         if normalized_answer.startswith(speculative_prefixes):
-            initial_grounded = True
-            initial_reasoning_valid = True
+            # Speculative wording must trigger correction / refusal.
+            initial_grounded = False
+            initial_reasoning_valid = False
             initial_failure_type = FailureType.SPECULATIVE_REJECT
         elif normalized_answer.startswith("insufficient data"):
+            # LLM self-refusal — pass through; not a grounding-gate rejection.
             initial_grounded = True
             initial_reasoning_valid = True
-            initial_failure_type = FailureType.GROUNDING_REJECT
+            initial_failure_type = None
         else:
             # Authoritative grounding check
-            initial_grounded = check_grounding(initial_answer, hits, self.embedder.embed_batch)
+            initial_grounded = check_grounding(initial_answer, shaped_hits, self.embedder.embed_batch)
             if not initial_grounded:
                 initial_failure_type = FailureType.GROUNDING_REJECT
             else:
                 # Reasoning verifier check
                 initial_reasoning_valid, reasoning_breakdown = self.reasoning_verifier.verify(
-                    initial_answer, hits, self.embedder.embed_batch
+                    initial_answer, shaped_hits, self.embedder.embed_batch
                 )
                 if not initial_reasoning_valid:
                     initial_failure_type = FailureType.REASONING_REJECT
@@ -403,7 +411,7 @@ Question: {query}
             correction_result = self.self_correcting.correct(
                 query=generation_query,
                 initial_answer=initial_answer,
-                hits=hits,
+                hits=shaped_hits,
                 initial_failure_type=initial_failure_type,
                 initial_grounded=initial_grounded,
                 initial_reasoning_valid=initial_reasoning_valid,

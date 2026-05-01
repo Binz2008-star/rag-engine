@@ -66,7 +66,16 @@ class MultiRetriever:
         dense: list[RetrievalHit],
         sparse: list[tuple[Chunk, float]],
     ) -> list[RetrievalHit]:
-        """Reciprocal Rank Fusion of dense (FAISS) and sparse (BM25) rankings."""
+        """
+        Reciprocal Rank Fusion of dense (FAISS) and sparse (BM25) rankings.
+
+        Downstream gates (e.g. ``hits[0].score < 0.20`` in app.pipeline) expect
+        ``hit.score`` to be a [0, 1] similarity-like value. Raw RRF scores are
+        unbounded and depend on rrf_k / weights, so we min-max normalize the
+        fused ranking back into [0, 1] before returning. This preserves the
+        relative ordering produced by RRF while keeping score semantics stable
+        for callers that pre-existed BM25 fusion.
+        """
         rrf: dict[str, float] = {}
         rc_map: dict[str, RetrievalHit] = {}
 
@@ -90,6 +99,14 @@ class MultiRetriever:
                 )
 
         ordered = sorted(rrf, key=lambda c: rrf[c], reverse=True)
+
+        # Normalize RRF scores to [0, 1] so downstream score gates still work.
+        if ordered:
+            top_score = rrf[ordered[0]]
+            if top_score > 0:
+                for cid in ordered:
+                    rc_map[cid].score = max(0.0, min(1.0, rrf[cid] / top_score))
+
         fused = [rc_map[cid] for cid in ordered]
         logger.info(
             "RRF fusion: %d dense + %d sparse → %d unique",
