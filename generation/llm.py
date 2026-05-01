@@ -37,11 +37,6 @@ class LLMClient:
     # when those instructions live in a separate, higher-trust message.
     _SYSTEM_PROMPT = (
         "You MUST answer ONLY using the provided context.\n\n"
-        "You are an extractive QA assistant. Given context with [S1], [S2] citations:\n"
-        "- If the answer is stated or directly derivable from the context, answer concisely with citations.\n"
-        "- Example: Context: \"[S1] ECO was founded in 2019 by Robin Edwan.\" Q: \"Who founded ECO?\" A: \"Robin Edwan [S1].\"\n"
-        "- Example: Context: \"[S1] ECO provides wastewater management services throughout the UAE.\" Q: \"What does ECO do?\" A: \"ECO provides wastewater management services throughout the UAE [S1].\"\n"
-        "- Only refuse with \"Insufficient data.\" if the context contains NO information related to the question.\n"
         "Rules:\n"
         "- Do NOT add external knowledge\n"
         "- Use the provided context to answer the question\n"

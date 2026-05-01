@@ -26,23 +26,10 @@ _SENSITIVE_PATTERNS = [
     "radioactive", "biological weapon", "chemical weapon",
 ]
 
-_INJECTION_PATTERNS = [
-    "ignore all previous", "ignore previous instructions",
-    "disregard your previous", "disregard all previous",
-    "reveal your system prompt", "show me your instructions",
-    "what are your core instructions", "your system prompt",
-    "as a developer testing", "override your behavior",
-]
-
 
 def _is_sensitive_query(query: str) -> bool:
     q = query.lower()
     return any(p in q for p in _SENSITIVE_PATTERNS)
-
-
-def _is_injection_attempt(query: str) -> bool:
-    q = query.lower()
-    return any(p in q for p in _INJECTION_PATTERNS)
 
 
 def _has_sufficient_overlap(query: str, chunks: list, embedder) -> bool:
@@ -232,26 +219,6 @@ class Pipeline:
                 answer=REFUSAL_MESSAGE,
                 grounded=True,
                 failure_type=FailureType.SENSITIVE_REJECT,
-                knowledge_gap=None,
-                latency_ms=elapsed_ms,
-                model_version=self.model_version,
-                retriever_version=self.retriever_version,
-            )
-
-        # Fail-closed injection attempts before retrieval
-        if _is_injection_attempt(query):
-            elapsed_ms = int((time.perf_counter() - t0) * 1000)
-            return PipelineResult(
-                query_id=query_id,
-                query=query,
-                normalized_query=normalized_query,
-                intent=route.intent,
-                confidence=route.confidence,
-                intent_method=route.intent_method,
-                retrieval=[],
-                answer=REFUSAL_MESSAGE,
-                grounded=True,
-                failure_type=FailureType.INJECTION_REJECT,
                 knowledge_gap=None,
                 latency_ms=elapsed_ms,
                 model_version=self.model_version,

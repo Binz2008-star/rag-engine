@@ -543,19 +543,6 @@ def main(query_fn=None) -> int:
             tr.failure_type = getattr(result, "failure_type", None)
             tr.grounded = getattr(result, "grounded", True)
             tr.passed, tr.reasons, tr.buckets = check_result(result, test, tr.elapsed, args.mode)
-
-            # Diagnostic logging for gate analysis
-            if args.debug or args.debug_failures:
-                top_score = "N/A"
-                if hasattr(result, 'retrieval') and result.retrieval:
-                    top_score = result.retrieval[0].score if result.retrieval else "N/A"
-                print(
-                    f"  [diag] failure_type={result.failure_type} "
-                    f"grounded={result.grounded} "
-                    f"top_score={top_score} "
-                    f"hits={len(result.retrieval) if hasattr(result, 'retrieval') else 'N/A'} "
-                    f"answer={result.answer[:80]!r}"
-                )
         except Exception as exc:
             tr.error = str(exc)
             if "Embedding failure" in str(exc) or "embedding" in str(exc).lower():
@@ -570,13 +557,6 @@ def main(query_fn=None) -> int:
             print(f"  ✗ ERROR ({tr.elapsed:.2f}s) — {tr.error}")
             return
         preview = tr.answer[:120] + ("..." if len(tr.answer) > 120 else "")
-
-        # Debug logging for gate analysis
-        top_score = "N/A"
-        if hasattr(tr, 'retrieval') and tr.retrieval:
-            top_score = tr.retrieval[0].score if tr.retrieval else "N/A"
-        print(f"  failure_type={tr.failure_type} grounded={tr.grounded} top_score={top_score}")
-        print(f"  answer_prefix={tr.answer[:60]!r}")
         print(f"  Answer ({tr.elapsed:.2f}s): {preview}")
         print(f"  Sources: {tr.sources}")
         if tr.passed:
