@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false
+  },
+  "include": [
+    "next-env.d.ts",
+    "src/generated/runtime-api.ts",
+    "src/generated/runtime-sdk.ts",
+    "src/shared/runtime-client/safe-fetch.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next"
+  ]
+}

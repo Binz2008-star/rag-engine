@@ -1,0 +1,329 @@
+name: Enforced Quality Gates
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# REQUIRED: This workflow must pass before any merge
+# Branch protection will reference these checks
+
+jobs:
+  # === HARD GATE 1: No Bypassable HTTP Usage ===
+  enforce-gateway-only:
+    runs-on: ubuntu-latest
+    name: "Gateway-Only HTTP Enforcement"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for forbidden HTTP patterns
+        run: |
+          echo "Checking for bypassable HTTP patterns..."
+
+          # Block raw fetch
+          FETCH_VIOLATIONS=$(grep -r "fetch(" src --include="*.ts" --include="*.js" | grep -v "gateway-client" | grep -v "safe-fetch" | grep -v "node_modules" || true)
+          if [ -n "$FETCH_VIOLATIONS" ]; then
+            echo "ERROR: Raw fetch usage detected:"
+            echo "$FETCH_VIOLATIONS"
+            exit 1
+          fi
+
+          # Block globalThis.fetch
+          GLOBALTHIS_VIOLATIONS=$(grep -r "globalThis\.fetch" src --include="*.ts" --include="*.js" || true)
+          if [ -n "$GLOBALTHIS_VIOLATIONS" ]; then
+            echo "ERROR: globalThis.fetch usage detected:"
+            echo "$GLOBALTHIS_VIOLATIONS"
+            exit 1
+          fi
+
+          # Block fetch variable assignment
+          FETCH_VAR_VIOLATIONS=$(grep -r "const.*fetch\|let.*fetch\|var.*fetch" src --include="*.ts" --include="*.js" | grep -v "gateway-client" | grep -v "safe-fetch" || true)
+          if [ -n "$FETCH_VAR_VIOLATIONS" ]; then
+            echo "ERROR: Fetch variable assignment detected:"
+            echo "$FETCH_VAR_VIOLATIONS"
+            exit 1
+          fi
+
+          # Block forbidden imports
+          IMPORT_VIOLATIONS=$(grep -r "import.*node-fetch\|import.*axios\|import.*got" src --include="*.ts" --include="*.js" || true)
+          if [ -n "$IMPORT_VIOLATIONS" ]; then
+            echo "ERROR: Forbidden HTTP import detected:"
+            echo "$IMPORT_VIOLATIONS"
+            exit 1
+          fi
+
+          echo "PASS: No bypassable HTTP patterns found"
+
+  # === HARD GATE 2: Required ESLint Rules ===
+  enforce-eslint:
+    runs-on: ubuntu-latest
+    name: "ESLint Enforcement"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint with strict rules
+        run: |
+          # ESLint must pass with zero errors
+          npx eslint src/ --max-warnings=0 --format=json
+
+          # Verify gateway enforcement rules are active
+          echo "Checking gateway enforcement rules..."
+          if ! npx eslint --print-config src/app/api/orders/route.ts | grep -q "no-restricted-global.*fetch"; then
+            echo "ERROR: Gateway enforcement rules not active"
+            exit 1
+          fi
+
+          echo "PASS: ESLint enforcement verified"
+
+  # === HARD GATE 3: Contract Sync Verification ===
+  enforce-contract-sync:
+    runs-on: ubuntu-latest
+    name: "Contract Sync Enforcement"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start dev server
+        run: |
+          npm run dev &
+          sleep 15
+
+      - name: Validate OpenAPI-Zod sync
+        run: |
+          echo "Validating contract synchronization..."
+
+          # Get current OpenAPI spec
+          curl -s -f http://localhost:3000/api/openapi > current-openapi.json || {
+            echo "ERROR: OpenAPI endpoint not accessible"
+            exit 1
+          }
+
+          # Run sync validation
+          npm run validate-openapi-sync validate || {
+            echo "ERROR: OpenAPI-Zod sync validation failed"
+            exit 1
+          }
+
+          echo "PASS: Contract sync verified"
+
+  # === HARD GATE 4: Version-Aware Contract Testing ===
+  enforce-version-aware-contracts:
+    runs-on: ubuntu-latest
+    name: "Version-Aware Contract Testing"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for version comparison
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get previous version
+        id: version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "previous-tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+            echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "previous-tag=none" >> $GITHUB_OUTPUT
+            echo "current-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for breaking changes
+        if: steps.version.outputs.previous-tag != 'none'
+        run: |
+          echo "Checking for breaking changes from ${{ steps.version.outputs.previous-tag }}..."
+
+          # Get previous version schemas
+          git checkout ${{ steps.version.outputs.previous-tag }} -- src/shared/schemas/orders.ts
+          cp src/shared/schemas/orders.ts previous-orders.ts
+
+          # Restore current version
+          git checkout HEAD -- src/shared/schemas/orders.ts
+
+          # Compare versions
+          npm run detect-contract-drift detect-breaking || {
+            echo "ERROR: Breaking changes detected without version bump"
+            exit 1
+          }
+
+          echo "PASS: No breaking changes detected"
+
+  # === HARD GATE 5: End-to-End Flow Testing ===
+  enforce-e2e-flow:
+    runs-on: ubuntu-latest
+    name: "End-to-End Flow Testing"
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup environment
+        run: |
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test" >> .env
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Start application
+        run: |
+          npm run dev &
+          sleep 15
+
+      - name: Test request tracing end-to-end
+        run: |
+          echo "Testing end-to-end request tracing..."
+
+          npm run test-request-tracing http://localhost:3000 || {
+            echo "ERROR: End-to-end tracing test failed"
+            exit 1
+          }
+
+          echo "PASS: End-to-end flow verified"
+
+  # === HARD GATE 6: Redis Rate Limiting Verification ===
+  enforce-redis-rate-limiting:
+    runs-on: ubuntu-latest
+    name: "Redis Rate Limiting Verification"
+    services:
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test Redis-only rate limiting
+        run: |
+          echo "Testing Redis-only rate limiting..."
+
+          # Create test script
+          cat > test-redis-only.js << 'EOF'
+          const Redis = require('ioredis');
+          const { validateRateLimitingSetup } = require('./src/server/lib/rate-limiting-redis-only');
+
+          try {
+            // This should throw an error if REDIS_URL is not set
+            validateRateLimitingSetup();
+
+            const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+            redis.ping().then(() => {
+              console.log('PASS: Redis rate limiting verified');
+              process.exit(0);
+            }).catch((error) => {
+              console.log('FAIL: Redis connection failed:', error.message);
+              process.exit(1);
+            });
+          } catch (error) {
+            console.log('FAIL: Rate limiting setup validation failed:', error.message);
+            process.exit(1);
+          }
+          EOF
+
+          echo "REDIS_URL=redis://localhost:6379" > .env.test
+          node test-redis-only.js
+
+  # === FINAL ENFORCEMENT SUMMARY ===
+  enforcement-summary:
+    runs-on: ubuntu-latest
+    needs: [
+      enforce-gateway-only,
+      enforce-eslint,
+      enforce-contract-sync,
+      enforce-version-aware-contracts,
+      enforce-e2e-flow,
+      enforce-redis-rate-limiting
+    ]
+    if: always()
+    name: "Enforcement Summary"
+
+    steps:
+      - name: Enforcement Results
+        run: |
+          echo "=== ENFORCEMENT RESULTS ==="
+          echo "Gateway-Only HTTP: ${{ needs.enforce-gateway-only.result }}"
+          echo "ESLint Enforcement: ${{ needs.enforce-eslint.result }}"
+          echo "Contract Sync: ${{ needs.enforce-contract-sync.result }}"
+          echo "Version-Aware Contracts: ${{ needs.enforce-version-aware-contracts.result }}"
+          echo "End-to-End Flow: ${{ needs.enforce-e2e-flow.result }}"
+          echo "Redis Rate Limiting: ${{ needs.enforce-redis-rate-limiting.result }}"
+          echo ""
+
+          # Fail if ANY required gate failed
+          if [[ "${{ needs.enforce-gateway-only.result }}" == "failure" ]]; then
+            echo "ERROR: Required enforcement gate failed: enforce-gateway-only"
+            exit 1
+          fi
+
+          if [[ "${{ needs.enforce-eslint.result }}" == "failure" ]]; then
+            echo "ERROR: Required enforcement gate failed: enforce-eslint"
+            exit 1
+          fi
+
+          if [[ "${{ needs.enforce-contract-sync.result }}" == "failure" ]]; then
+            echo "ERROR: Required enforcement gate failed: enforce-contract-sync"
+            exit 1
+          fi
+
+          if [[ "${{ needs.enforce-e2e-flow.result }}" == "failure" ]]; then
+            echo "ERROR: Required enforcement gate failed: enforce-e2e-flow"
+            exit 1
+          fi
+
+          if [[ "${{ needs.enforce-redis-rate-limiting.result }}" == "failure" ]]; then
+            echo "ERROR: Required enforcement gate failed: enforce-redis-rate-limiting"
+            exit 1
+          fi
+
+          echo "SUCCESS: All required enforcement gates passed"
+          echo "System is regression-proof and enterprise-grade"

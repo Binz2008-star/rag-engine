@@ -1,0 +1,419 @@
+name: Enterprise Enforcement Gates
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # === HARD GATE 1: No Raw Fetch Outside Gateway ===
+  enforce-gateway-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for forbidden raw fetch usage
+        run: |
+          echo "Checking for raw fetch usage outside gateway..."
+
+          # Find all fetch calls
+          FETCH_FILES=$(grep -r "fetch(" src --include="*.ts" --include="*.js" | grep -v "gateway-client" | grep -v "safe-fetch" | grep -v "node_modules" | cut -d: -f1 | sort -u)
+
+          if [ -n "$FETCH_FILES" ]; then
+            echo "ERROR: Raw fetch usage detected outside gateway:"
+            echo "$FETCH_FILES"
+            echo ""
+            echo "All HTTP calls must use GatewayClient or safeFetch wrapper."
+            exit 1
+          fi
+
+          echo "PASS: No forbidden fetch usage found"
+
+  # === HARD GATE 2: OpenAPI-Zod Sync Validation ===
+  validate-openapi-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start dev server
+        run: |
+          npm run dev &
+          sleep 10
+
+      - name: Validate OpenAPI spec matches Zod schemas
+        run: |
+          echo "Validating OpenAPI-Zod sync..."
+
+          # Get current OpenAPI spec
+          curl -s http://localhost:3000/api/openapi > current-openapi.json
+
+          # Regenerate from schemas
+          npm run generate-openapi
+
+          # Compare semantically to avoid formatting-only false failures
+          if ! node -e "const fs=require('fs'); const util=require('util'); const current=JSON.parse(fs.readFileSync('current-openapi.json','utf8')); const generated=JSON.parse(fs.readFileSync('generated-openapi.json','utf8')); if (!util.isDeepStrictEqual(current, generated)) process.exit(1)"; then
+            echo "ERROR: OpenAPI spec does not match Zod schemas"
+            echo "Run 'npm run generate-openapi' and commit the changes"
+            exit 1
+          fi
+
+          echo "PASS: OpenAPI spec is in sync with Zod schemas"
+
+  # === HARD GATE 3: Contract Tests Must Pass ===
+  enforce-contract-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup environment
+        run: |
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test" >> .env
+          echo "REDIS_URL=redis://localhost:6379" >> .env
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Start application
+        run: |
+          npm run dev &
+
+      - name: Wait for application readiness
+        run: |
+          echo "Waiting for application to be ready..."
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3000/api/health >/dev/null 2>&1; then
+              echo "Application is ready after $((i*2)) seconds"
+              break
+            fi
+            echo "Attempt $i/30: Application not ready, waiting 2 seconds..."
+            sleep 2
+          done
+          sleep 15
+
+      - name: Run contract tests
+        run: npm run test:contract
+
+      - name: Run cross-repo integration tests
+        run: npm run test:integration
+
+  # === HARD GATE 4: Redis Rate Limiting Must Be Active ===
+  enforce-redis-rate-limiting:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test Redis rate limiting
+        run: |
+          echo "Testing Redis rate limiting enforcement..."
+
+          # Create test script
+          cat > test-redis-rate-limit.js << 'EOF'
+          const Redis = require('ioredis');
+          const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+          async function testRedisConnection() {
+            try {
+              await redis.ping();
+              console.log('PASS: Redis connection successful');
+
+              // Test rate limiting functionality
+              await redis.set('test-key', 'test-value');
+              const value = await redis.get('test-key');
+
+              if (value === 'test-value') {
+                console.log('PASS: Redis operations working');
+                await redis.del('test-key');
+                process.exit(0);
+              } else {
+                console.log('FAIL: Redis operations not working');
+                process.exit(1);
+              }
+            } catch (error) {
+              console.log('FAIL: Redis connection failed:', error.message);
+              process.exit(1);
+            }
+          }
+
+          testRedisConnection();
+          EOF
+
+          node test-redis-rate-limit.js
+
+  # === HARD GATE 5: SDK Generation and Usage ===
+  enforce-sdk-generation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start dev server
+        run: |
+          npm run dev &
+          sleep 10
+
+      - name: Generate SDK
+        run: npm run generate-sdk
+
+      - name: Validate SDK types
+        run: |
+          echo "Validating generated SDK..."
+
+          # Check if SDK files exist
+          if [ ! -f "src/generated/runtime-api.ts" ]; then
+            echo "ERROR: runtime-api.ts not generated"
+            exit 1
+          fi
+
+          if [ ! -f "src/generated/runtime-sdk.ts" ]; then
+            echo "ERROR: runtime-sdk.ts not generated"
+            exit 1
+          fi
+
+          # Check if generated artifacts compile under the repo TypeScript config
+          npx tsc --noEmit -p tsconfig.sdk.json
+
+          echo "PASS: SDK generation and validation successful"
+
+  # === HARD GATE 6: Observability Tracing ===
+  enforce-observability:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup environment
+        run: |
+          cp .env.example .env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test" >> .env
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+
+      - name: Start application
+        run: |
+          npm run dev &
+
+      - name: Wait for application readiness
+        run: |
+          echo "Waiting for application to be ready..."
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3000/api/health >/dev/null 2>&1; then
+              echo "Application is ready after $((i*2)) seconds"
+              break
+            fi
+            echo "Attempt $i/30: Application not ready, waiting 2 seconds..."
+            sleep 2
+          done
+          sleep 15
+
+      - name: Test request ID tracing
+        run: |
+          echo "Testing request ID tracing..."
+
+          # Create test script
+          cat > test-request-tracing.js << 'EOF'
+          const http = require('http');
+
+          function testRequestTracing() {
+            const options = {
+              hostname: 'localhost',
+              port: 3000,
+              path: '/api/v1/orders',
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer test-token'
+              }
+            };
+
+            const req = http.request(options, (res) => {
+              let data = '';
+
+              res.on('data', (chunk) => {
+                data += chunk;
+              });
+
+              res.on('end', () => {
+                // Check if request ID is returned
+                const requestId = res.headers['x-request-id'];
+                if (requestId) {
+                  console.log('PASS: Request ID tracing working:', requestId);
+                  process.exit(0);
+                } else {
+                  console.log('FAIL: Request ID not found in headers');
+                  process.exit(1);
+                }
+              });
+            });
+
+            req.on('error', (error) => {
+              console.log('FAIL: Request failed:', error.message);
+              process.exit(1);
+            });
+
+            req.end();
+          }
+
+          testRequestTracing();
+          EOF
+
+          node test-request-tracing.js
+
+  # === HARD GATE 7: Release Discipline Enforcement ===
+  enforce-release-discipline:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for breaking changes
+        run: |
+          echo "Checking for breaking changes..."
+
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+
+          # Check if any schema files changed
+          if echo "$CHANGED_FILES" | grep -q "src/shared/schemas/"; then
+            echo "WARNING: Schema files changed - check for breaking changes"
+
+            # Check if changelog was updated
+            if ! git diff --name-only origin/main...HEAD | grep -q "CHANGELOG.md"; then
+              echo "ERROR: Schema changed but CHANGELOG.md not updated"
+              exit 1
+            fi
+
+            # Check if version was bumped
+            CURRENT_VERSION=$(node -p "require('./package.json').version")
+            PREV_VERSION=$(git show origin/main:package.json | node -p "require('/dev/stdin').version")
+
+            if [ "$CURRENT_VERSION" = "$PREV_VERSION" ]; then
+              echo "ERROR: Breaking change detected but version not bumped"
+              exit 1
+            fi
+          fi
+
+          echo "PASS: Release discipline checks passed"
+
+  # === FINAL GATE: All Must Pass ===
+  enforcement-summary:
+    runs-on: ubuntu-latest
+    needs: [
+      enforce-gateway-only,
+      validate-openapi-sync,
+      enforce-contract-tests,
+      enforce-redis-rate-limiting,
+      enforce-sdk-generation,
+      enforce-observability,
+      enforce-release-discipline
+    ]
+    if: always()
+
+    steps:
+      - name: Enforcement Summary
+        run: |
+          echo "=== ENFORCEMENT SUMMARY ==="
+          echo "Gateway-only enforcement: ${{ needs.enforce-gateway-only.result }}"
+          echo "OpenAPI sync validation: ${{ needs.validate-openapi-sync.result }}"
+          echo "Contract tests: ${{ needs.enforce-contract-tests.result }}"
+          echo "Redis rate limiting: ${{ needs.enforce-redis-rate-limiting.result }}"
+          echo "SDK generation: ${{ needs.enforce-sdk-generation.result }}"
+          echo "Observability: ${{ needs.enforce-observability.result }}"
+          echo "Release discipline: ${{ needs.enforce-release-discipline.result }}"
+          echo ""
+
+          # Fail if any required gate failed
+          if [[ "${{ needs.enforce-gateway-only.result }}" == "failure" || \
+                "${{ needs.validate-openapi-sync.result }}" == "failure" || \
+                "${{ needs.enforce-contract-tests.result }}" == "failure" || \
+                "${{ needs.enforce-redis-rate-limiting.result }}" == "failure" || \
+                "${{ needs.enforce-sdk-generation.result }}" == "failure" || \
+                "${{ needs.enforce-observability.result }}" == "failure" ]]; then
+            echo "ERROR: One or more enforcement gates failed"
+            exit 1
+          fi
+
+          echo "SUCCESS: All enforcement gates passed"

@@ -1,0 +1,3 @@
+# Force trigger GitHub Actions with latest workflow
+# This file will trigger CI to run with the corrected boundary-checks.yml
+# that properly scopes CQRS checks to actual API route files only.

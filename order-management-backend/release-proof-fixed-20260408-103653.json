@@ -1,0 +1,103 @@
+{
+  "timestamp": "2026-04-08T06:36:55.341Z",
+  "environment": "http://localhost:3000",
+  "baseUrl": "http://localhost:3000",
+  "results": [
+    {
+      "testName": "GET /api/health",
+      "method": "GET",
+      "url": "http://localhost:3000/api/health",
+      "response": {
+        "status": "ok",
+        "timestamp": "2026-04-08T06:36:55.199Z",
+        "version": "v1.0.0",
+        "database": "connected",
+        "message": "Health check passed"
+      },
+      "status": 200,
+      "responseTime": 435.387,
+      "success": true
+    },
+    {
+      "testName": "POST /api/auth/login",
+      "method": "POST",
+      "url": "http://localhost:3000/api/auth/login",
+      "request": {
+        "email": "seller1@test.com",
+        "password": "TestSeller123!"
+      },
+      "response": {
+        "error": "Invalid JSON body",
+        "code": "INVALID_JSON",
+        "requestId": "8ebe26e9-8d3a-47c0-8b4b-b13a89c34fa0"
+      },
+      "status": 400,
+      "responseTime": 8.753,
+      "success": false
+    },
+    {
+      "testName": "GET /api/seller/products",
+      "method": "GET",
+      "url": "http://localhost:3000/api/seller/products",
+      "response": {
+        "error": "No token provided",
+        "code": "INTERNAL_ERROR",
+        "requestId": "46ec0ff0-407e-48c1-ad1a-602ebffb61a2"
+      },
+      "status": 401,
+      "responseTime": 7.279,
+      "success": false
+    },
+    {
+      "testName": "POST /api/public/test-store-2/orders",
+      "method": "POST",
+      "url": "http://localhost:3000/api/public/test-store-2/orders",
+      "request": null,
+      "response": null,
+      "status": 0,
+      "responseTime": 0,
+      "success": false,
+      "error": "No product ID available"
+    },
+    {
+      "testName": "PATCH /api/seller/orders/{id}/status",
+      "method": "PATCH",
+      "url": "http://localhost:3000/api/seller/orders/null/status",
+      "request": null,
+      "response": null,
+      "status": 0,
+      "responseTime": 0,
+      "success": false,
+      "error": "No order ID or JWT token available"
+    },
+    {
+      "testName": "GET /api/seller/orders",
+      "method": "GET",
+      "url": "http://localhost:3000/api/seller/orders",
+      "request": null,
+      "response": null,
+      "status": 0,
+      "responseTime": 0,
+      "success": false,
+      "error": "No JWT token available"
+    },
+    {
+      "testName": "PATCH Invalid Status Transition",
+      "method": "PATCH",
+      "url": "http://localhost:3000/api/seller/orders/null/status",
+      "request": null,
+      "response": null,
+      "status": 0,
+      "responseTime": 0,
+      "success": false,
+      "error": "No order ID or JWT token available"
+    }
+  ],
+  "summary": {
+    "totalTests": 7,
+    "passedTests": 1,
+    "failedTests": 6,
+    "averageResponseTime": 64,
+    "success": false
+  }
+}

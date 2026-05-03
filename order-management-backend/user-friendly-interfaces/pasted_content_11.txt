@@ -1,0 +1,234 @@
+You are in strict execution mode. No discussion. No assumptions. Execute and return only required outputs.
+
+---
+
+# GLOBAL OBJECTIVE
+
+Transform this repo into a **production-grade backend system**.
+
+You have full repo access. You must:
+- detect gaps
+- fix architecture
+- enforce standards
+- add missing infrastructure
+- harden system end-to-end
+
+No partial work.
+
+---
+
+# GLOBAL RULES
+
+- No skipping steps
+- No overclaiming
+- No “non-critical ignore”
+- Everything must pass CI gates
+- If anything fails → STOP and report
+- Prefer correctness over speed
+
+---
+
+# =========================
+# PHASE 1 — CORE HARDENING
+# =========================
+
+## TASKS
+
+### 1) Order lifecycle enforcement
+- Single source of truth for order status
+- Remove ALL duplicated enums / string literals
+- Enforce type-safe usage
+
+---
+
+### 2) Mutation audit (MANDATORY)
+
+Run:
+grep -R "order.update({.*status" src/
+grep -R "orderEvent.create(" src/
+grep -R "status_changed" src/
+
+Fix rules:
+- NO direct status updates
+- NO direct event writes
+- ALL status changes → applyTransitionInTx(...)
+- ALL events → createOrderEvent(...)
+
+---
+
+### 3) GET /orders/:id
+- Must return full event timeline
+- Sorted ascending
+- No mock logic
+
+---
+
+### 4) Transition endpoint
+- Replace any PATCH/update logic
+- Implement:
+
+PATCH /api/v1/orders/:id/transition
+
+Rules:
+- validate transitions
+- use service layer
+- write event in SAME transaction
+- thin route only
+
+---
+
+### 5) Logging enforcement
+
+- Replace ALL console.log with logger
+- Add ESLint rule blocking console.log
+- Allow only console.error / warn
+
+Add CI check:
+grep -R "console.log" src/ && exit 1 || exit 0
+
+Ensure:
+- requestId generated per request
+- logger always includes requestId
+
+---
+
+### 6) Auth hardening
+
+- Remove fallback JWT secret
+- Fail if JWT_SECRET missing
+- Ensure passwordHash used (no placeholder)
+- Ensure login works with real DB data
+
+---
+
+### 7) Environment safety
+
+- Remove all hardcoded credentials
+- Ensure .env is not relied on in production
+- Validate required env vars at startup
+
+---
+
+# =========================
+# PHASE 2 — SYSTEM VALIDATION
+# =========================
+
+## RUN
+
+npm run typecheck
+npm run lint
+npm test
+
+grep -R "order.update({.*status" src/
+grep -R "orderEvent.create(" src/
+grep -R "console.log" src/
+grep -R "applyTransitionInTx" src/
+grep -R "createOrderEvent" src/
+
+---
+
+## RUNTIME TEST
+
+Verify:
+- login works
+- protected routes work
+- order fetch works
+- transition endpoint works
+
+State if seed required
+
+---
+
+## RETURN ONLY
+
+- typecheck: pass/fail
+- lint: pass/fail
+- tests: pass/fail
+- grep outputs
+- console.log exists: yes/no
+- merge blocked: yes/no
+- blockers
+- seed required: yes/no
+
+---
+
+# =========================
+# PHASE 3 — GAP DISCOVERY
+# =========================
+
+## TASK
+
+You must now investigate the repo and identify missing production requirements.
+
+Check for:
+
+### 1) Infrastructure gaps
+- rate limiting production-safe (not in-memory)
+- DB connection pooling
+- migrations deployment safety
+- seed strategy for production
+
+### 2) Observability
+- structured logging completeness
+- error handling consistency
+- missing monitoring hooks
+
+### 3) Security
+- input validation everywhere
+- auth coverage
+- multi-tenant isolation enforcement
+
+### 4) Architecture violations
+- business logic in routes
+- duplicated services/modules
+- inconsistent patterns
+
+---
+
+## OUTPUT
+
+Return ONLY:
+
+1. top 10 critical missing pieces
+2. severity (P0 / P1 / P2)
+3. exact file locations
+4. fix recommendation (short)
+
+---
+
+# =========================
+# PHASE 4 — PRODUCTION READINESS
+# =========================
+
+## EVALUATE
+
+- auth secure
+- DB stable
+- logging enforced
+- CI passing
+- no mutation bypass
+- no placeholder logic
+- no critical infra gaps
+
+---
+
+## CLASSIFY (ONE ONLY)
+
+BROKEN  
+OPERATIONAL_WITH_BLOCKERS  
+TEST-STABLE  
+RELEASE-CANDIDATE  
+
+---
+
+## RETURN ONLY
+
+1. final classification
+2. release blocked: yes/no
+3. top 5 risks
+4. top 3 next actions
+5. one-line summary
+
+---
+
+START NOW WITH PHASE 1

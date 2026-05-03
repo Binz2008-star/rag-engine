@@ -1,0 +1,99 @@
+{
+  "timestamp": "2026-04-08T06:41:30.723Z",
+  "baseUrl": "http://localhost:3000",
+  "testMatrix": {
+    "POST /api/auth/login": [
+      "valid-login",
+      "invalid-json",
+      "wrong-password"
+    ],
+    "GET /api/seller/orders": [
+      "missing-token",
+      "seller-a-read-orders",
+      "no-auth-seller-route",
+      "invalid-token"
+    ],
+    "PATCH /api/seller/orders/:id/status": [
+      "cross-seller-update",
+      "own-seller-update"
+    ]
+  },
+  "results": [
+    {
+      "testName": "valid-login",
+      "method": "POST",
+      "url": "http://localhost:3000/api/auth/login",
+      "requestHeaders": {
+        "Content-Type": "application/json"
+      },
+      "requestBody": {
+        "email": "seller1@test.com",
+        "password": "TestSeller123!"
+      },
+      "status": 200,
+      "responseBody": {
+        "user": {
+          "id": "cmnpo7nig0000h6rdzlchs1vl",
+          "email": "seller1@test.com",
+          "role": "SELLER",
+          "sellerId": "cmnpo7nue0002h6rdfo943tp0"
+        },
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtbnBvN25pZzAwMDBoNnJkemxjaHMxdmwiLCJlbWFpbCI6InNlbGxlcjFAdGVzdC5jb20iLCJyb2xlIjoiU0VMTEVSIiwic2VsbGVySWQiOiJjbW5wbzdudWUwMDAyaDZyZGZvOTQzdHAwIiwiaWF0IjoxNzc1NjMwNDg5LCJleHAiOjE3NzYyMzUyODl9.iRbenuA2pr-wzsxlXZQ77es_EBGXV_Fd0egAXL7tqRI"
+      },
+      "ok": true,
+      "expectedStatus": 200,
+      "actualBehavior": "PASS"
+    },
+    {
+      "testName": "invalid-json",
+      "method": "POST",
+      "url": "http://localhost:3000/api/auth/login",
+      "ok": false,
+      "error": "Unexpected token 'i', \"invalid json\" is not valid JSON",
+      "expectedStatus": 400,
+      "actualBehavior": "ERROR"
+    },
+    {
+      "testName": "wrong-password",
+      "method": "POST",
+      "url": "http://localhost:3000/api/auth/login",
+      "requestHeaders": {
+        "Content-Type": "application/json"
+      },
+      "requestBody": {
+        "email": "seller1@test.com",
+        "password": "wrongpassword"
+      },
+      "status": 401,
+      "responseBody": {
+        "error": "Invalid credentials",
+        "code": "INTERNAL_ERROR",
+        "requestId": "040c759b-a84d-4a50-9a6e-71f7474c4de3"
+      },
+      "ok": false,
+      "expectedStatus": 401,
+      "actualBehavior": "PASS"
+    },
+    {
+      "testName": "missing-token",
+      "method": "GET",
+      "url": "http://localhost:3000/api/seller/orders",
+      "status": 401,
+      "responseBody": {
+        "error": "No token provided",
+        "code": "INTERNAL_ERROR",
+        "requestId": "legacy-route"
+      },
+      "ok": false,
+      "expectedStatus": 401,
+      "actualBehavior": "PASS"
+    }
+  ],
+  "summary": {
+    "totalTests": 4,
+    "passed": 3,
+    "failed": 0,
+    "errors": 1,
+    "success": false
+  }
+}

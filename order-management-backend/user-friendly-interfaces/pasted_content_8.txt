@@ -1,0 +1,280 @@
+Good. This is now moving in the **right direction structurally**.
+
+But I’m going to tighten your execution — because you’re still at risk of building a **high-quality demo instead of a production system**.
+
+---
+
+# 🧠 Current State (Accurate)
+
+You’ve built:
+
+* ✅ State machine visualizer
+* ✅ Transition constraints (UI-level)
+* ✅ Failure recovery paths
+* ✅ Order detail page layout
+* ✅ System / Business lens
+* ⚠️ Mock data still present
+* ⚠️ API wiring “pattern shown” but not enforced
+
+👉 That last line is the problem.
+
+---
+
+# 🔴 Critical Gap (You must fix next)
+
+> “demo data stays for prototype”
+
+No.
+
+This is where teams stall.
+
+👉 You are **past prototype stage**.
+
+---
+
+# 🎯 Non-negotiable upgrade
+
+You must transition from:
+
+```ts
+demoOrder
+```
+
+to:
+
+```ts
+real API → contract validated → UI
+```
+
+---
+
+# 🚫 Why mock data must go now
+
+If you keep it:
+
+* You hide contract bugs
+* You hide auth issues
+* You hide state mismatch bugs
+* You will debug wrong problems later
+
+You already saw this earlier with:
+
+* wrong customer
+* wrong product
+* wrong seller scope
+
+👉 Same pattern will repeat.
+
+---
+
+# 🧱 What “production-grade” actually means here
+
+Your UI must become:
+
+> **Contract-driven, not data-driven**
+
+---
+
+# 🎯 Required Next Upgrade (Concrete)
+
+## 1. Replace demoOrder with real fetch (mandatory)
+
+```ts
+const [order, setOrder] = useState<OrderDetail | null>(null)
+```
+
+---
+
+## 2. Use your SafeFetch (you already built it)
+
+You already have:
+
+```ts
+safeFetch(url, schema)
+```
+
+👉 Use it here.
+
+```ts
+const data = await safeFetch(
+  `/api/v1/orders/${orderId}`,
+  OrderResponseSchema
+)
+
+setOrder(data.data.order)
+```
+
+---
+
+## 3. Kill silent failures
+
+Add:
+
+```ts
+if (!order) return <Skeleton />
+```
+
+---
+
+## 4. Transition must be server-driven
+
+Right now:
+
+```ts
+setOrder(...)
+```
+
+❌ wrong
+
+---
+
+### Replace with:
+
+```ts
+await safeFetch(
+  `/api/v1/orders/${order.id}/status`,
+  OrderResponseSchema,
+  {
+    method: "PATCH",
+    body: JSON.stringify({ status: next }),
+  }
+)
+```
+
+---
+
+## 5. Timeline must come from backend
+
+Right now:
+
+```ts
+events: demoOrder.events
+```
+
+❌ fake observability
+
+---
+
+👉 Replace with:
+
+```ts
+order.events
+```
+
+If backend doesn’t provide → fix backend.
+
+---
+
+## 6. State machine must NOT drift
+
+You defined:
+
+```ts
+ORDER_TRANSITIONS
+```
+
+👉 Now enforce alignment:
+
+* backend uses same map
+* contract tests validate transitions
+* UI imports same source
+
+---
+
+# 🔥 Real Risk You Still Have
+
+You’re building:
+
+> **UI logic + backend logic separately**
+
+If they drift → system breaks silently.
+
+---
+
+# ✅ Fix (architecture-level)
+
+Move this:
+
+```ts
+ORDER_TRANSITIONS
+```
+
+to:
+
+```text
+/shared/contracts/order-state-machine.ts
+```
+
+Used by:
+
+* frontend
+* backend
+* tests
+
+---
+
+# 🧠 What you are now building
+
+Not a dashboard.
+
+Not a UI.
+
+You are building:
+
+> **A distributed state machine control system with observable guarantees**
+
+---
+
+# 📊 Real Status
+
+| Layer                     | Status      |
+| ------------------------- | ----------- |
+| UI                        | ✅ strong    |
+| UX                        | ✅ strong    |
+| State machine (UI)        | ✅           |
+| API integration           | ⚠️ partial  |
+| Contract enforcement (UI) | ❌ not wired |
+| Backend alignment         | ⚠️ unknown  |
+| Observability (real)      | ❌ mock      |
+
+---
+
+# 🚀 Exact next milestone
+
+You are done when:
+
+* clicking transition → API call
+* API enforces transition
+* DB updates
+* GET returns updated state
+* UI reflects it
+* timeline updates
+
+👉 end-to-end loop closed
+
+---
+
+# 🧠 Final blunt truth
+
+You are **very close**.
+
+But right now:
+
+> You built a correct *representation* of the system
+> Not yet the *system itself*
+
+---
+
+# 🚀 If you want next step
+
+I can:
+
+1. Wire your **SafeFetch + Zod + UI fully together**
+2. Refactor your backend `PATCH /status` to match UI exactly
+3. Add **real-time updates (WebSocket / polling)**
+
+Say:
+
+> “connect full stack”
+
+and we’ll finish the loop properly.

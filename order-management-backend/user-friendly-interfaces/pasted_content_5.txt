@@ -1,0 +1,319 @@
+Good. This is the first time you’re actually **closing the loop between backend architecture and UI behavior**.
+
+What you wrote in the editor is directionally correct—but I’m going to tighten it into something **production-grade and enforceable**, not just descriptive.
+
+---
+
+# 🧠 What You Did Right
+
+You correctly shifted from:
+
+> ❌ UI = presentation
+> →
+> ✅ UI = **Control + Observability Console**
+
+That’s the correct mental model for your system.
+
+---
+
+# 🔴 What’s Still Missing (Critical Gaps)
+
+Your checklist is good—but still **too high-level**.
+
+Right now you’re saying:
+
+```ts
+// Implements ALL 6 requirements
+```
+
+No. You’re describing them—not implementing them.
+
+We need **code-level guarantees**, not intent.
+
+---
+
+# 🎯 Convert This Into Real System Contracts
+
+## 1. 🔒 State Machine Must Be CODE, Not UI Logic
+
+Right now this is missing.
+
+Create a **single source of truth**:
+
+```ts
+// src/lib/orderStateMachine.ts
+
+export const ORDER_TRANSITIONS = {
+  PENDING: ["CONFIRMED", "CANCELLED"],
+  CONFIRMED: ["PREPARING", "CANCELLED"],
+  PREPARING: ["READY_FOR_PICKUP"],
+  READY_FOR_PICKUP: ["OUT_FOR_DELIVERY"],
+  OUT_FOR_DELIVERY: ["DELIVERED", "FAILED_DELIVERY"],
+  FAILED_DELIVERY: ["OUT_FOR_DELIVERY", "CANCELLED"],
+  DELIVERED: [],
+  CANCELLED: [],
+} as const;
+
+export type OrderStatus = keyof typeof ORDER_TRANSITIONS;
+```
+
+👉 UI MUST import this.
+👉 Backend MUST enforce this.
+
+---
+
+## 2. ❌ You Didn’t Implement “Constrained Actions” Yet
+
+You wrote:
+
+> “action surface shows only valid next states”
+
+But where?
+
+### You need:
+
+```ts
+export function getAllowedTransitions(status: OrderStatus) {
+  return ORDER_TRANSITIONS[status] ?? [];
+}
+```
+
+---
+
+## 3. ❌ Missing State Machine Component
+
+You mentioned:
+
+> “Live State Machine Visualizer”
+
+But no implementation.
+
+---
+
+## ✅ Minimal Real Component (not design fluff)
+
+```tsx
+type Props = {
+  current: OrderStatus;
+  onChange: (next: OrderStatus) => void;
+};
+
+export function StateMachine({ current, onChange }: Props) {
+  const allowed = getAllowedTransitions(current);
+
+  return (
+    <div className="flex gap-2">
+      {Object.keys(ORDER_TRANSITIONS).map((state) => {
+        const isActive = state === current;
+        const isAllowed = allowed.includes(state as OrderStatus);
+
+        return (
+          <button
+            key={state}
+            disabled={!isAllowed}
+            onClick={() => onChange(state as OrderStatus)}
+            className={`
+              px-3 py-2 rounded
+              ${isActive ? "bg-indigo-600 text-white" : "bg-gray-100"}
+              ${!isAllowed ? "opacity-30 cursor-not-allowed" : ""}
+            `}
+          >
+            {state}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+```
+
+👉 This enforces:
+
+* state visibility
+* transition constraints
+* interaction control
+
+---
+
+## 4. ❌ Timeline Not Implemented (Major Gap)
+
+You wrote:
+
+> “timeline + action surface in one view”
+
+But no data structure.
+
+---
+
+## ✅ Required Data Shape
+
+Your backend must expose:
+
+```ts
+type OrderEvent = {
+  id: string;
+  type: string;
+  createdAt: string;
+  actor: "system" | "seller" | "customer";
+  metadata?: Record<string, unknown>;
+};
+```
+
+---
+
+## ✅ Minimal Timeline Component
+
+```tsx
+function Timeline({ events }: { events: OrderEvent[] }) {
+  return (
+    <div className="space-y-2">
+      {events.map((e) => (
+        <div key={e.id} className="text-sm">
+          <span className="font-mono">{e.createdAt}</span>
+          {" — "}
+          <span>{e.type}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+---
+
+## 5. ❌ System / Business Lens Not Wired
+
+You mentioned it—but didn’t implement switching.
+
+---
+
+## ✅ Required Toggle
+
+```tsx
+const [mode, setMode] = useState<"business" | "system">("business");
+```
+
+Use it to switch:
+
+* Business → simplified statuses
+* System → raw events + IDs
+
+---
+
+## 6. ❌ No Backend Enforcement Yet
+
+This is critical:
+
+> UI constraints ≠ system safety
+
+Your backend MUST reject invalid transitions.
+
+---
+
+## ✅ Required backend guard
+
+```ts
+if (!ORDER_TRANSITIONS[current].includes(next)) {
+  throw new Error("Invalid state transition");
+}
+```
+
+---
+
+# 🧠 Strategic Reality Check
+
+You are now building:
+
+> **A distributed state machine system**
+
+That means:
+
+* UI = controller
+* backend = authority
+* contract tests = enforcement
+
+---
+
+# 📊 Your Current Maturity
+
+| Layer               | Status                |
+| ------------------- | --------------------- |
+| Visual Design       | ✅                     |
+| UX Direction        | ✅                     |
+| State Modeling      | ⚠️ partial            |
+| UI Enforcement      | ❌ not implemented yet |
+| Backend Enforcement | ❌ unknown             |
+| Observability       | ❌ missing             |
+
+---
+
+# 🚀 What You Should Do Next (Exact Order)
+
+## Step 1
+
+Create:
+
+```text
+orderStateMachine.ts
+```
+
+---
+
+## Step 2
+
+Build:
+
+```text
+StateMachine component
+```
+
+---
+
+## Step 3
+
+Wire to API:
+
+```text
+PATCH /orders/:id/status
+```
+
+---
+
+## Step 4
+
+Add:
+
+```text
+Timeline (order events)
+```
+
+---
+
+## Step 5
+
+Add:
+
+```text
+Business/System toggle
+```
+
+---
+
+# 🧠 Final Truth
+
+You are now **very close to something real**.
+
+But until:
+
+* transitions are enforced in code
+* timeline is real data
+* backend rejects invalid states
+
+👉 this is still a **demo UI**, not an operations system.
+
+---
+
+If you want, next step I can:
+
+* wire this directly to your **existing API contracts**
+* or give you a **full OrderDetail page implementation (production-ready)**

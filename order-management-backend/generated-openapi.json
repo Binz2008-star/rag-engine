@@ -1,0 +1,517 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Order Management API",
+    "version": "1.0.0",
+    "description": "Production-grade order management system with contract enforcement",
+    "contact": {
+      "name": "API Support",
+      "email": "api-support@example.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.example.com",
+      "description": "Production server"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "CreateOrderSchema": {
+        "title": "Create Order Request",
+        "description": "Request payload for creating a new order",
+        "type": "object",
+        "example": {
+          "sellerId": "seller_123",
+          "customerId": "customer_456",
+          "items": [
+            {
+              "productId": "product_789",
+              "quantity": 2
+            }
+          ],
+          "paymentType": "CASH_ON_DELIVERY",
+          "notes": "Customer prefers delivery after 6 PM"
+        }
+      },
+      "UpdateOrderSchema": {
+        "title": "Update Order Request",
+        "description": "Request payload for updating an existing order",
+        "type": "object"
+      },
+      "GetOrdersQuerySchema": {
+        "title": "Get Orders Query Parameters",
+        "description": "Query parameters for listing orders",
+        "type": "object"
+      },
+      "CreatePaymentSchema": {
+        "title": "Create Payment Request",
+        "description": "Request payload for creating a payment",
+        "type": "object"
+      },
+      "UpdatePaymentStatusSchema": {
+        "title": "Update Payment Status Request",
+        "description": "Request payload for updating payment status",
+        "type": "object"
+      },
+      "RefundPaymentSchema": {
+        "title": "Refund Payment Request",
+        "description": "Request payload for refunding a payment",
+        "type": "object"
+      },
+      "CreateCustomerSchema": {
+        "title": "Create Customer Request",
+        "description": "Request payload for creating a customer",
+        "type": "object"
+      },
+      "CreateProductSchema": {
+        "title": "Create Product Request",
+        "description": "Request payload for creating a product",
+        "type": "object"
+      },
+      "OrderResponseSchema": {
+        "title": "Order Response",
+        "description": "Complete order information",
+        "type": "object"
+      },
+      "OrderListResponseSchema": {
+        "title": "Order List Response",
+        "description": "Paginated list of orders",
+        "type": "object"
+      },
+      "OrderCreateResponseSchema": {
+        "title": "Order Create Response",
+        "description": "Response after creating an order",
+        "type": "object"
+      },
+      "OrderUpdateResponseSchema": {
+        "title": "Order Update Response",
+        "description": "Response after updating an order",
+        "type": "object"
+      },
+      "ErrorSchema": {
+        "title": "Error Response",
+        "description": "Standard error response format",
+        "type": "object",
+        "example": {
+          "success": false,
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Invalid input data",
+            "details": [
+              {
+                "field": "totalMinor",
+                "message": "Must be a positive integer"
+              }
+            ],
+            "timestamp": "2023-12-01T10:00:00Z"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT authentication token"
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/orders": {
+      "get": {
+        "summary": "List Orders",
+        "description": "Retrieve a paginated list of orders for the authenticated seller",
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "CONFIRMED",
+                "PREPARING",
+                "READY",
+                "COMPLETED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "paymentStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "PAID",
+                "FAILED",
+                "REFUNDED"
+              ]
+            }
+          },
+          {
+            "name": "customerId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orders retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponseSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create Order",
+        "description": "Create a new order with the specified items and payment type",
+        "tags": [
+          "Orders"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCreateResponseSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid order data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/{id}": {
+      "get": {
+        "summary": "Get Order",
+        "description": "Retrieve detailed information about a specific order",
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Order ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "order": {
+                          "$ref": "#/components/schemas/OrderResponseSchema"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "summary": "Update Order",
+        "description": "Update an existing order with new information",
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Order ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrderSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderUpdateResponseSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid update data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/status": {
+      "put": {
+        "summary": "Update Order Status",
+        "description": "Update the status of an existing order",
+        "tags": [
+          "Orders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Order ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePaymentStatusSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Order status updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderUpdateResponseSchema"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid status transition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Orders",
+      "description": "Order management operations"
+    }
+  ]
+}

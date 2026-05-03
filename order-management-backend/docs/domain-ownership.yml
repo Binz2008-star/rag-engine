@@ -1,0 +1,277 @@
+# Domain Ownership Graph (DOG) - Executable Architecture Spec
+# Version: 1.0.0
+# Status: Production-Ready
+
+metadata:
+  name: "Domain Ownership Graph"
+  version: "1.0.0"
+  description: "System-wide domain authority and boundary enforcement"
+  enforcement_level: "CI-MANDATORY"
+
+# === AUTHORITATIVE DOMAINS ===
+
+domains:
+  # === CORE RUNTIME DOMAINS ===
+  orders:
+    owner: "order-management-backend"
+    authority: "EXCLUSIVE"
+    allowed_consumers:
+      - "sellora"  # via API only
+      - "seller-dashboard"  # via API only
+    forbidden:
+      - "omb-retrieval"  # no direct access
+    mutation_authority: "order-management-backend ONLY"
+    query_authority: "owner + allowed_consumers"
+
+  payments:
+    owner: "order-management-backend"
+    authority: "EXCLUSIVE"
+    allowed_consumers:
+      - "sellora"  # via API only
+      - "seller-dashboard"  # via API only
+    forbidden:
+      - "omb-retrieval"
+    mutation_authority: "order-management-backend ONLY"
+    query_authority: "owner + allowed_consumers"
+
+  auth:
+    owner: "order-management-backend"
+    authority: "EXCLUSIVE"
+    allowed_consumers: []  # No direct access - use API
+    forbidden:
+      - "sellora"
+      - "omb-retrieval"
+      - "seller-dashboard"
+    mutation_authority: "order-management-backend ONLY"
+    query_authority: "owner ONLY"
+
+  # === SERVICE DOMAINS ===
+  retrieval:
+    owner: "omb-retrieval"
+    authority: "DEDICATED"
+    allowed_consumers:
+      - "sellora"  # via API
+      - "order-management-backend"  # via API only
+    forbidden:
+      - "seller-dashboard"  # no direct access
+    mutation_authority: "omb-retrieval ONLY"
+    query_authority: "owner + allowed_consumers"
+
+  # === PLATFORM DOMAINS ===
+  orchestration:
+    owner: "sellora"
+    authority: "EXCLUSIVE"
+    allowed_consumers:
+      - "seller-dashboard"  # via API only
+    forbidden:
+      - "order-management-backend"
+      - "omb-retrieval"
+    mutation_authority: "sellora ONLY"
+    query_authority: "owner + allowed_consumers"
+
+  catalog_intelligence:
+    owner: "sellora"
+    authority: "EXCLUSIVE"
+    allowed_consumers:
+      - "seller-dashboard"  # via API only
+    forbidden:
+      - "order-management-backend"
+      - "omb-retrieval"
+    mutation_authority: "sellora ONLY"
+
+  # === UI DOMAINS ===
+  user_interface:
+    owner: "seller-dashboard"
+    authority: "EXCLUSIVE"
+    allowed_consumers: []  # UI is terminal layer
+    forbidden:
+      - "order-management-backend"
+      - "sellora"
+      - "omb-retrieval"
+    mutation_authority: "seller-dashboard ONLY"
+
+# === BOUNDARY ENFORCEMENT RULES ===
+
+enforcement_rules:
+  # === IMPORT BOUNDARIES ===
+  forbidden_imports:
+    # Backend boundaries
+    - pattern: "from.*order-management-backend.*server"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+      reason: "Backend internals must be accessed via API"
+
+    - pattern: "from.*omb-retrieval.*internal"
+      forbidden_in: ["order-management-backend", "sellora", "seller-dashboard"]
+      reason: "Retrieval internals must be accessed via API"
+
+    - pattern: "from.*sellora.*internal"
+      forbidden_in: ["order-management-backend", "omb-retrieval"]
+      reason: "Platform internals must be accessed via API"
+
+  # === SCHEMA AUTHORITY ===
+  forbidden_schema_duplication:
+    # Core models - backend authority only (derived from actual Prisma schema)
+    - model: "User"
+      authority: "order-management-backend"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - model: "user"  # Note: lowercase model exists in schema
+      authority: "order-management-backend"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - model: "Order"
+      authority: "order-management-backend"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - model: "PaymentAttempt"  # Note: actual model name in schema
+      authority: "order-management-backend"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - model: "session"  # Note: lowercase model in schema
+      authority: "order-management-backend"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - model: "Seller"
+      authority: "order-management-backend"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+  # === MUTATION AUTHORITY ===
+  forbidden_mutations:
+    # Order mutations - backend only
+    - pattern: "prisma.order.create"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - pattern: "prisma.order.update"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - pattern: "prisma.order.delete"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    # PaymentAttempt mutations - backend only (actual model name)
+    - pattern: "prisma.paymentAttempt.create"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - pattern: "prisma.paymentAttempt.update"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    # Auth mutations - backend only (both User and user models)
+    - pattern: "prisma.user.create"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - pattern: "prisma.session.create"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+    - pattern: "prisma.seller.create"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+
+  # === AUTH AUTHORITY ===
+  forbidden_auth_logic:
+    - pattern: "bcrypt\\.hash"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+      reason: "Password hashing must be centralized in backend"
+
+    - pattern: "jwt\\.sign"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+      reason: "Token generation must be centralized in backend"
+
+    - pattern: "verifyToken"
+      forbidden_in: ["sellora", "omb-retrieval", "seller-dashboard"]
+      reason: "Token verification must be centralized in backend"
+
+# === CI ENFORCEMENT CONFIGURATION ===
+
+ci_enforcement:
+  enabled: true
+  failure_mode: "BLOCK_PR"
+
+  checks:
+    - name: "domain_boundary_violations"
+      type: "static_analysis"
+      patterns:
+        - "forbidden_imports"
+        - "forbidden_schema_duplication"
+        - "forbidden_mutations"
+        - "forbidden_auth_logic"
+
+    - name: "ownership_authority"
+      type: "schema_validation"
+      validate:
+        - "exclusive_domain_models"
+        - "mutation_authority"
+        - "auth_centralization"
+
+    - name: "api_boundary_compliance"
+      type: "integration_test"
+      validate:
+        - "cross_domain_api_only"
+        - "no_direct_db_access"
+
+# === MIGRATION PATH ===
+
+migration_strategy:
+  current_state: "decomposition_in_progress"
+  target_state: "governed_microservices"
+
+  phases:
+    - name: "governance_enforcement"
+      description: "Implement CI enforcement of DOG"
+      status: "READY_TO_START"
+
+    - name: "retrieval_extraction"
+      description: "Complete retrieval system separation"
+      status: "BLOCKED_UNTIL_GOVERNANCE"
+
+    - name: "backend_cleanup"
+      description: "Remove non-core modules from backend"
+      status: "BLOCKED_UNTIL_EXTRACTION"
+
+    - name: "sdk_generation"
+      description: "Generate SDK based on stable contracts"
+      status: "BLOCKED_UNTIL_CLEANUP"
+
+# === EVIDENCE REQUIREMENTS ===
+
+evidence_requirements:
+  domain_claims:
+    - type: "static_analysis_output"
+      required: true
+      format: "json"
+
+    - type: "ci_failure_log"
+      required: true
+      format: "text"
+
+    - type: "boundary_violation_report"
+      required: true
+      format: "sarif"
+
+  verification:
+    - type: "cross_repo_import_scan"
+      frequency: "every_pr"
+
+    - type: "schema_authority_check"
+      frequency: "every_pr"
+
+    - type: "mutation_authority_audit"
+      frequency: "every_pr"
+
+# === COMPLIANCE MATRIX ===
+
+compliance_matrix:
+  level_1:
+    name: "structural_boundaries"
+    requirements:
+      - "no_cross_domain_imports"
+      - "no_schema_duplication"
+
+  level_2:
+    name: "authority_enforcement"
+    requirements:
+      - "exclusive_mutation_authority"
+      - "centralized_auth_logic"
+
+  level_3:
+    name: "api_only_communication"
+    requirements:
+      - "cross_domain_via_api_only"
+      - "no_direct_db_access"

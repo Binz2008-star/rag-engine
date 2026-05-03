@@ -1,0 +1,71 @@
+{
+  "health": {
+    "endpoint": "/api/health",
+    "interval": 30000,
+    "timeout": 5000
+  },
+  "errorMonitoring": {
+    "thresholds": {
+      "fiveXXRate": 0.02,
+      "orderCreationFailures": 3,
+      "statusUpdateFailures": 3,
+      "authFailuresSpike": 10,
+      "dbFailures": 1
+    },
+    "windows": {
+      "fiveXXRate": 5,
+      "orderCreationFailures": 10,
+      "statusUpdateFailures": 10,
+      "authFailuresSpike": 5
+    }
+  },
+  "latency": {
+    "endpoints": [
+      "POST /api/public/{seller}/orders",
+      "POST /api/auth/login",
+      "PATCH /api/seller/orders/:id/status"
+    ],
+    "thresholds": {
+      "p95": 1000,
+      "p99": 3000
+    }
+  },
+  "logging": {
+    "requiredFields": [
+      "requestId",
+      "route",
+      "timestamp",
+      "method",
+      "statusCode",
+      "responseTime"
+    ],
+    "mutationPaths": [
+      "POST /api/public/{seller}/orders",
+      "POST /api/auth/login",
+      "PATCH /api/seller/orders/:id/status",
+      "POST /api/seller/orders",
+      "DELETE /api/seller/orders/:id"
+    ]
+  },
+  "alerts": {
+    "channels": [
+      "email",
+      "slack",
+      "sms"
+    ],
+    "escalation": {
+      "level1": [
+        "email"
+      ],
+      "level2": [
+        "email",
+        "slack"
+      ],
+      "level3": [
+        "email",
+        "slack",
+        "sms"
+      ]
+    }
+  }
+}

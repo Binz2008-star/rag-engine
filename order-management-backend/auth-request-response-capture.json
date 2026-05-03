@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-04-08T06:35:00.000Z",
+  "endpoint": "/api/auth/login",
+  "method": "POST",
+  "url": "http://localhost:3000/api/auth/login",
+  "request": {
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "email": "seller1@test.com",
+      "password": "TestSeller123!"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "user": {
+        "id": "cmnpo7nig0000h6rdzlchs1vl",
+        "email": "seller1@test.com",
+        "role": "SELLER",
+        "sellerId": "cmnpo7nue0002h6rdfo943tp0"
+      },
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtbnBvN25pZzAwMDBoNnJkemxjaHMxdmwiLCJlbWFpbCI6InNlbGxlcjFAdGVzdC5jb20iLCJyb2xlIjoiU0VMTEVSIiwic2VsbGVySWQiOiJjbW5wbzdudWUwMDAyaDZyZGZvOTQzdHAwIiwiaWF0IjoxNzc1NjMwMTg2LCJleHAiOjE3NzYyMzQ5ODZ9.aFEh3oBxrdTnbKCo5M-OZdXt57mA-rJZJ-tDnXQhpF8"
+    },
+    "responseTime": 1.235091
+  },
+  "curl_command": "curl -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\": \"seller1@test.com\", \"password\": \"TestSeller123!\"}' -w \"\\nHTTP_STATUS:%{http_code}\\nRESPONSE_TIME:%{time_total}\" -s",
+  "validation": {
+    "content_type_header": "application/json",
+    "body_schema": "Valid JSON with email and password fields",
+    "expected_schema": {
+      "email": "string (valid email format)",
+      "password": "string (non-empty, trimmed)"
+    },
+    "actual_schema": {
+      "email": "seller1@test.com",
+      "password": "TestSeller123!"
+    }
+  }
+}

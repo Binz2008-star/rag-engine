@@ -1,0 +1,521 @@
+{
+  "timestamp": "2026-04-08T06:40:51.087Z",
+  "baseUrl": "http://localhost:3000",
+  "sellerSlug": "test-store-2",
+  "results": [
+    {
+      "name": "health",
+      "method": "GET",
+      "url": "http://localhost:3000/api/health",
+      "status": 200,
+      "responseBody": {
+        "status": "ok",
+        "timestamp": "2026-04-08T06:40:43.630Z",
+        "version": "v1.0.0",
+        "database": "connected",
+        "message": "Health check passed"
+      },
+      "ok": true
+    },
+    {
+      "name": "public-products",
+      "method": "GET",
+      "url": "http://localhost:3000/api/public/test-store-2/products",
+      "status": 200,
+      "responseBody": {
+        "seller": {
+          "id": "cmnpmif0g000j66d1lacg0mc0",
+          "brandName": "Test Store 2",
+          "slug": "test-store-2",
+          "currency": "USD"
+        },
+        "products": [
+          {
+            "id": "cmnpo0u3b001bxco882qms6dj",
+            "name": "Seller Flow Test Product",
+            "slug": "seller-flow-test",
+            "description": "Created during seller flow validation",
+            "priceMinor": 1999,
+            "currency": "USD",
+            "stockQuantity": 24,
+            "createdAt": "2026-04-08T06:26:48.023Z",
+            "updatedAt": "2026-04-08T06:27:05.174Z"
+          },
+          {
+            "id": "cmnpnxexl000cxco8iqw0d8mw",
+            "name": "New Test Product",
+            "slug": "new-test-product",
+            "description": "Created via seller API for validation",
+            "priceMinor": 1499,
+            "currency": "USD",
+            "stockQuantity": 12,
+            "createdAt": "2026-04-08T06:24:08.409Z",
+            "updatedAt": "2026-04-08T06:37:42.688Z"
+          },
+          {
+            "id": "cmnpnw97700013qw9xrxv7w2w",
+            "name": "Test Product for Validation",
+            "slug": "test-product-validation",
+            "description": "A test product for business flow validation",
+            "priceMinor": 999,
+            "currency": "USD",
+            "stockQuantity": 7,
+            "createdAt": "2026-04-08T06:23:14.324Z",
+            "updatedAt": "2026-04-08T06:26:25.577Z"
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "name": "create-order",
+      "method": "POST",
+      "url": "http://localhost:3000/api/public/test-store-2/orders",
+      "requestHeaders": {
+        "Content-Type": "application/json"
+      },
+      "requestBody": {
+        "customerName": "Release Proof Customer",
+        "customerPhone": "+15550001111",
+        "addressText": "123 Release Proof St",
+        "items": [
+          {
+            "productId": "cmnpo0u3b001bxco882qms6dj",
+            "quantity": 1
+          }
+        ],
+        "notes": "release-proof"
+      },
+      "status": 201,
+      "responseBody": {
+        "id": "cmnpoisii001zxco8nvb68dl1",
+        "publicOrderNumber": "ORD-MGWGWWWG",
+        "status": "PENDING",
+        "paymentStatus": "PENDING",
+        "subtotalMinor": 1999,
+        "deliveryFeeMinor": 0,
+        "totalMinor": 1999,
+        "currency": "USD",
+        "customer": {
+          "id": "cmnpoirx8001xxco8i9uurero",
+          "name": "Release Proof Customer",
+          "phone": "+15550001111",
+          "addressText": "123 Release Proof St"
+        },
+        "items": [
+          {
+            "id": "cmnpoist50020xco8kbgl4ecw",
+            "orderId": "cmnpoisii001zxco8nvb68dl1",
+            "productId": "cmnpo0u3b001bxco882qms6dj",
+            "productNameSnapshot": "Seller Flow Test Product",
+            "unitPriceMinor": 1999,
+            "quantity": 1,
+            "lineTotalMinor": 1999
+          }
+        ],
+        "createdAt": "2026-04-08T06:40:45.786Z"
+      },
+      "ok": true
+    },
+    {
+      "name": "login",
+      "method": "POST",
+      "url": "http://localhost:3000/api/auth/login",
+      "requestHeaders": {
+        "Content-Type": "application/json"
+      },
+      "requestBody": {
+        "email": "seller1@test.com",
+        "password": "TestSeller123!"
+      },
+      "status": 200,
+      "responseBody": {
+        "user": {
+          "id": "cmnpo7nig0000h6rdzlchs1vl",
+          "email": "seller1@test.com",
+          "role": "SELLER",
+          "sellerId": "cmnpo7nue0002h6rdfo943tp0"
+        },
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtbnBvN25pZzAwMDBoNnJkemxjaHMxdmwiLCJlbWFpbCI6InNlbGxlcjFAdGVzdC5jb20iLCJyb2xlIjoiU0VMTEVSIiwic2VsbGVySWQiOiJjbW5wbzdudWUwMDAyaDZyZGZvOTQzdHAwIiwiaWF0IjoxNzc1NjMwNDQ4LCJleHAiOjE3NzYyMzUyNDh9.otugMyvtuzW0Pnm0kYQUqOa3TyajQpf5IvRfLZwL6Ag"
+      },
+      "ok": true
+    },
+    {
+      "name": "seller-orders",
+      "method": "GET",
+      "url": "http://localhost:3000/api/seller/orders",
+      "requestHeaders": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtbnBvN25pZzAwMDBoNnJkemxjaHMxdmwiLCJlbWFpbCI6InNlbGxlcjFAdGVzdC5jb20iLCJyb2xlIjoiU0VMTEVSIiwic2VsbGVySWQiOiJjbW5wbzdudWUwMDAyaDZyZGZvOTQzdHAwIiwiaWF0IjoxNzc1NjMwNDQ4LCJleHAiOjE3NzYyMzUyNDh9.otugMyvtuzW0Pnm0kYQUqOa3TyajQpf5IvRfLZwL6Ag"
+      },
+      "status": 200,
+      "responseBody": {
+        "orders": [
+          {
+            "id": "cmnpo7y270036h6rd2mhy2591",
+            "publicOrderNumber": "TEST-TEC-008",
+            "status": "PENDING",
+            "paymentType": "CASH",
+            "paymentStatus": "FAILED",
+            "subtotalMinor": 12997,
+            "deliveryFeeMinor": 0,
+            "totalMinor": 12997,
+            "currency": "USD",
+            "source": "TEST_DATA",
+            "notes": "Sample order #8 for testing",
+            "createdAt": "2026-04-08T06:32:19.760Z",
+            "updatedAt": "2026-04-08T06:32:19.760Z",
+            "customer": {
+              "id": "cmnpo7s7i0018h6rdu50x737z",
+              "name": "Mike Wilson - tech-gadgets-plus",
+              "phone": "315553456789",
+              "addressText": "789 Pine Rd, Chicago, IL 60601"
+            },
+            "orderItems": [
+              {
+                "id": "cmnpo7y7l0038h6rde1vdfdym",
+                "productId": "cmnpo7p4u000ah6rdbok6vq3c",
+                "productNameSnapshot": "Wireless Phone Charger",
+                "unitPriceMinor": 2999,
+                "quantity": 1,
+                "lineTotalMinor": 2999
+              },
+              {
+                "id": "cmnpo7ycy003ah6rdk8h0o3rz",
+                "productId": "cmnpo7pfi000ch6rdpvwyja46",
+                "productNameSnapshot": "Bluetooth Earbuds Pro",
+                "unitPriceMinor": 7999,
+                "quantity": 1,
+                "lineTotalMinor": 7999
+              },
+              {
+                "id": "cmnpo7yiq003ch6rd3s5pwuao",
+                "productId": "cmnpo7pkv000eh6rddq7ei1md",
+                "productNameSnapshot": "Phone Case Premium",
+                "unitPriceMinor": 1999,
+                "quantity": 1,
+                "lineTotalMinor": 1999
+              }
+            ],
+            "eventCount": 0
+          },
+          {
+            "id": "cmnpo7xgr002yh6rd7vivaw46",
+            "publicOrderNumber": "TEST-TEC-007",
+            "status": "CONFIRMED",
+            "paymentType": "CASH",
+            "paymentStatus": "PAID",
+            "subtotalMinor": 7497,
+            "deliveryFeeMinor": 0,
+            "totalMinor": 7497,
+            "currency": "USD",
+            "source": "TEST_DATA",
+            "notes": "Sample order #7 for testing",
+            "createdAt": "2026-04-08T06:32:18.987Z",
+            "updatedAt": "2026-04-08T06:32:18.987Z",
+            "customer": {
+              "id": "cmnpo7ryp0016h6rdfsawmq82",
+              "name": "Sarah Johnson - tech-gadgets-plus",
+              "phone": "215552345678",
+              "addressText": "456 Oak Ave, Los Angeles, CA 90001"
+            },
+            "orderItems": [
+              {
+                "id": "cmnpo7xm40030h6rdjrfrvvt2",
+                "productId": "cmnpo7pkv000eh6rddq7ei1md",
+                "productNameSnapshot": "Phone Case Premium",
+                "unitPriceMinor": 1999,
+                "quantity": 1,
+                "lineTotalMinor": 1999
+              },
+              {
+                "id": "cmnpo7xrh0032h6rd6tlx6t8u",
+                "productId": "cmnpo7p4u000ah6rdbok6vq3c",
+                "productNameSnapshot": "Wireless Phone Charger",
+                "unitPriceMinor": 2999,
+                "quantity": 1,
+                "lineTotalMinor": 2999
+              },
+              {
+                "id": "cmnpo7xwv0034h6rd8hrvo5j7",
+                "productId": "cmnpo7pqm000gh6rdmqpxb8r1",
+                "productNameSnapshot": "USB-C Cable Set",
+                "unitPriceMinor": 2499,
+                "quantity": 1,
+                "lineTotalMinor": 2499
+              }
+            ],
+            "eventCount": 0
+          },
+          {
+            "id": "cmnpo7x5c002uh6rddln4lwhh",
+            "publicOrderNumber": "TEST-TEC-006",
+            "status": "PENDING",
+            "paymentType": "CASH",
+            "paymentStatus": "PENDING",
+            "subtotalMinor": 7999,
+            "deliveryFeeMinor": 0,
+            "totalMinor": 7999,
+            "currency": "USD",
+            "source": "TEST_DATA",
+            "notes": "Sample order #6 for testing",
+            "createdAt": "2026-04-08T06:32:18.577Z",
+            "updatedAt": "2026-04-08T06:32:18.577Z",
+            "customer": {
+              "id": "cmnpo7rlg0014h6rdzmq3gcya",
+              "name": "John Smith - tech-gadgets-plus",
+              "phone": "115551234567",
+              "addressText": "123 Main St, New York, NY 10001"
+            },
+            "orderItems": [
+              {
+                "id": "cmnpo7xbe002wh6rddxrtc04x",
+                "productId": "cmnpo7pfi000ch6rdpvwyja46",
+                "productNameSnapshot": "Bluetooth Earbuds Pro",
+                "unitPriceMinor": 7999,
+                "quantity": 1,
+                "lineTotalMinor": 7999
+              }
+            ],
+            "eventCount": 0
+          },
+          {
+            "id": "cmnpo7wp9002oh6rdp7m8zarc",
+            "publicOrderNumber": "TEST-TEC-005",
+            "status": "OUT_FOR_DELIVERY",
+            "paymentType": "CASH",
+            "paymentStatus": "FAILED",
+            "subtotalMinor": 12998,
+            "deliveryFeeMinor": 0,
+            "totalMinor": 12998,
+            "currency": "USD",
+            "source": "TEST_DATA",
+            "notes": "Sample order #5 for testing",
+            "createdAt": "2026-04-08T06:32:17.997Z",
+            "updatedAt": "2026-04-08T06:32:17.997Z",
+            "customer": {
+              "id": "cmnpo7si8001ch6rdvnjcmofu",
+              "name": "David Lee - tech-gadgets-plus",
+              "phone": "515555678901",
+              "addressText": "654 Maple Dr, Phoenix, AZ 85001"
+            },
+            "orderItems": [
+              {
+                "id": "cmnpo7wum002qh6rd9gvlh067",
+                "productId": "cmnpo7pvy000ih6rdzzrn2jcc",
+                "productNameSnapshot": "Portable Power Bank",
+                "unitPriceMinor": 4999,
+                "quantity": 1,
+                "lineTotalMinor": 4999
+              },
+              {
+                "id": "cmnpo7x00002sh6rd1y5mr42y",
+                "productId": "cmnpo7pfi000ch6rdpvwyja46",
+                "productNameSnapshot": "Bluetooth Earbuds Pro",
+                "unitPriceMinor": 7999,
+                "quantity": 1,
+                "lineTotalMinor": 7999
+              }
+            ],
+            "eventCount": 0
+          },
+          {
+            "id": "cmnpo7vzs002gh6rdqcb233j4",
+            "publicOrderNumber": "TEST-TEC-004",
+            "status": "PENDING",
+            "paymentType": "CASH",
+            "paymentStatus": "FAILED",
+            "subtotalMinor": 13497,
+            "deliveryFeeMinor": 0,
+            "totalMinor": 13497,
+            "currency": "USD",
+            "source": "TEST_DATA",
+            "notes": "Sample order #4 for testing",
+            "createdAt": "2026-04-08T06:32:17.081Z",
+            "updatedAt": "2026-04-08T06:32:17.081Z",
+            "customer": {
+              "id": "cmnpo7scu001ah6rdy4q3z8im",
+              "name": "Emily Brown - tech-gadgets-plus",
+              "phone": "415554567890",
+              "addressText": "321 Elm St, Houston, TX 77001"
+            },
+            "orderItems": [
+              {
+                "id": "cmnpo7w7a002ih6rd2qxuyqzd",
+                "productId": "cmnpo7p4u000ah6rdbok6vq3c",
+                "productNameSnapshot": "Wireless Phone Charger",
+                "unitPriceMinor": 2999,
+                "quantity": 1,
+                "lineTotalMinor": 2999
+              },
+              {
+                "id": "cmnpo7wei002kh6rdjr0pw1hp",
+                "productId": "cmnpo7pqm000gh6rdmqpxb8r1",
+                "productNameSnapshot": "USB-C Cable Set",
+                "unitPriceMinor": 2499,
+                "quantity": 1,
+                "lineTotalMinor": 2499
+              },
+              {
+                "id": "cmnpo7wjv002mh6rd4xy1wr2t",
+                "productId": "cmnpo7pfi000ch6rdpvwyja46",
+                "productNameSnapshot": "Bluetooth Earbuds Pro",
+                "unitPriceMinor": 7999,
+                "quantity": 1,
+                "lineTotalMinor": 7999
+              }
+            ],
+            "eventCount": 0
+          },
+          {
+            "id": "cmnpo7vjo002ah6rddm8xvr0d",
+            "publicOrderNumber": "TEST-TEC-003",
+            "status": "DELIVERED",
+            "paymentType": "CASH_ON_DELIVERY",
+            "paymentStatus": "PENDING",
+            "subtotalMinor": 10998,
+            "deliveryFeeMinor": 0,
+            "totalMinor": 10998,
+            "currency": "USD",
+            "source": "TEST_DATA",
+            "notes": "Sample order #3 for testing",
+            "createdAt": "2026-04-08T06:32:16.500Z",
+            "updatedAt": "2026-04-08T06:32:16.500Z",
+            "customer": {
+              "id": "cmnpo7s7i0018h6rdu50x737z",
+              "name": "Mike Wilson - tech-gadgets-plus",
+              "phone": "315553456789",
+              "addressText": "789 Pine Rd, Chicago, IL 60601"
+            },
+            "orderItems": [
+              {
+                "id": "cmnpo7vp1002ch6rdrimdz7dx",
+                "productId": "cmnpo7p4u000ah6rdbok6vq3c",
+                "productNameSnapshot": "Wireless Phone Charger",
+                "unitPriceMinor": 2999,
+                "quantity": 1,
+                "lineTotalMinor": 2999
+              },
+              {
+                "id": "cmnpo7vud002eh6rdfs2geax7",
+                "productId": "cmnpo7pfi000ch6rdpvwyja46",
+                "productNameSnapshot": "Bluetooth Earbuds Pro",
+                "unitPriceMinor": 7999,
+                "quantity": 1,
+                "lineTotalMinor": 7999
+              }
+            ],
+            "eventCount": 0
+          },
+          {
+            "id": "cmnpo7uy90022h6rdyd1tv0ml",
+            "publicOrderNumber": "TEST-TEC-002",
+            "status": "PACKED",
+            "paymentType": "CASH_ON_DELIVERY",
+            "paymentStatus": "FAILED",
+            "subtotalMinor": 12997,
+            "deliveryFeeMinor": 0,
+            "totalMinor": 12997,
+            "currency": "USD",
+            "source": "TEST_DATA",
+            "notes": "Sample order #2 for testing",
+            "createdAt": "2026-04-08T06:32:15.729Z",
+            "updatedAt": "2026-04-08T06:32:15.729Z",
+            "customer": {
+              "id": "cmnpo7ryp0016h6rdfsawmq82",
+              "name": "Sarah Johnson - tech-gadgets-plus",
+              "phone": "215552345678",
+              "addressText": "456 Oak Ave, Los Angeles, CA 90001"
+            },
+            "orderItems": [
+              {
+                "id": "cmnpo7v3m0024h6rdlho67cb5",
+                "productId": "cmnpo7p4u000ah6rdbok6vq3c",
+                "productNameSnapshot": "Wireless Phone Charger",
+                "unitPriceMinor": 2999,
+                "quantity": 1,
+                "lineTotalMinor": 2999
+              },
+              {
+                "id": "cmnpo7v8z0026h6rdigetxcwp",
+                "productId": "cmnpo7pfi000ch6rdpvwyja46",
+                "productNameSnapshot": "Bluetooth Earbuds Pro",
+                "unitPriceMinor": 7999,
+                "quantity": 1,
+                "lineTotalMinor": 7999
+              },
+              {
+                "id": "cmnpo7veb0028h6rdm51aka6t",
+                "productId": "cmnpo7pkv000eh6rddq7ei1md",
+                "productNameSnapshot": "Phone Case Premium",
+                "unitPriceMinor": 1999,
+                "quantity": 1,
+                "lineTotalMinor": 1999
+              }
+            ],
+            "eventCount": 0
+          },
+          {
+            "id": "cmnpo7ucj001yh6rd8ddom01e",
+            "publicOrderNumber": "TEST-TEC-001",
+            "status": "PACKED",
+            "paymentType": "CASH",
+            "paymentStatus": "PAID",
+            "subtotalMinor": 1999,
+            "deliveryFeeMinor": 0,
+            "totalMinor": 1999,
+            "currency": "USD",
+            "source": "TEST_DATA",
+            "notes": "Sample order #1 for testing",
+            "createdAt": "2026-04-08T06:32:14.947Z",
+            "updatedAt": "2026-04-08T06:32:14.947Z",
+            "customer": {
+              "id": "cmnpo7rlg0014h6rdzmq3gcya",
+              "name": "John Smith - tech-gadgets-plus",
+              "phone": "115551234567",
+              "addressText": "123 Main St, New York, NY 10001"
+            },
+            "orderItems": [
+              {
+                "id": "cmnpo7un80020h6rd6vj1u1qw",
+                "productId": "cmnpo7pkv000eh6rddq7ei1md",
+                "productNameSnapshot": "Phone Case Premium",
+                "unitPriceMinor": 1999,
+                "quantity": 1,
+                "lineTotalMinor": 1999
+              }
+            ],
+            "eventCount": 0
+          }
+        ],
+        "pagination": {
+          "page": 1,
+          "limit": 20,
+          "total": 8,
+          "totalPages": 1,
+          "hasNext": false,
+          "hasPrev": false
+        }
+      },
+      "ok": true
+    },
+    {
+      "name": "update-status",
+      "method": "PATCH",
+      "url": "http://localhost:3000/api/seller/orders/cmnpoisii001zxco8nvb68dl1/status",
+      "requestHeaders": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtbnBvN25pZzAwMDBoNnJkemxjaHMxdmwiLCJlbWFpbCI6InNlbGxlcjFAdGVzdC5jb20iLCJyb2xlIjoiU0VMTEVSIiwic2VsbGVySWQiOiJjbW5wbzdudWUwMDAyaDZyZGZvOTQzdHAwIiwiaWF0IjoxNzc1NjMwNDQ4LCJleHAiOjE3NzYyMzUyNDh9.otugMyvtuzW0Pnm0kYQUqOa3TyajQpf5IvRfLZwL6Ag"
+      },
+      "requestBody": {
+        "status": "CONFIRMED"
+      },
+      "status": 404,
+      "responseBody": {
+        "error": "Order not found",
+        "code": "INTERNAL_ERROR",
+        "requestId": "legacy-route"
+      },
+      "ok": false
+    }
+  ]
+}

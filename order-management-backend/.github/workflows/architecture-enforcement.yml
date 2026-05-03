@@ -1,0 +1,231 @@
+name: Architecture Enforcement
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+
+jobs:
+  domain-governance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      # === EVIDENCE COLLECTION ===
+      - name: Collect Architecture Evidence
+        id: evidence
+        run: |
+          echo "=== DOMAIN OWNERSHIP EVIDENCE ==="
+
+          # Evidence 1: Forbidden imports scan
+          echo "## Forbidden Imports Evidence" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Check for cross-domain imports (API routes importing server internals)
+          if grep -r "from.*\.\./\.\./server" src/app/ > /dev/null 2>&1; then
+            echo "VIOLATION: Cross-domain imports detected" >> $GITHUB_STEP_SUMMARY
+            grep -r "from.*\.\./\.\./server" src/app/ >> $GITHUB_STEP_SUMMARY
+            echo "::error::Cross-domain imports detected - violates domain ownership"
+            exit 1
+          else
+            echo "PASS: No cross-domain imports found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Evidence 2: Schema duplication check
+          echo "## Schema Authority Evidence" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Check for actual Prisma model duplication
+          user_models=$(grep -r "^model User" prisma/ src/ | wc -l)
+          if [ "$user_models" -gt 1 ]; then
+            echo "VIOLATION: User model duplicated ($user_models instances)" >> $GITHUB_STEP_SUMMARY
+            grep -r "^model User" prisma/ src/ >> $GITHUB_STEP_SUMMARY
+            echo "::error::User model duplication detected - violates schema authority"
+            exit 1
+          else
+            echo "PASS: User model authority confirmed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for PaymentAttempt model duplication
+          payment_models=$(grep -r "^model PaymentAttempt" prisma/ src/ | wc -l)
+          if [ "$payment_models" -gt 1 ]; then
+            echo "VIOLATION: PaymentAttempt model duplicated ($payment_models instances)" >> $GITHUB_STEP_SUMMARY
+            grep -r "^model PaymentAttempt" prisma/ src/ >> $GITHUB_STEP_SUMMARY
+            echo "::error::PaymentAttempt model duplication detected - violates schema authority"
+            exit 1
+          else
+            echo "PASS: PaymentAttempt model authority confirmed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for session model duplication (lowercase as in schema)
+          session_models=$(grep -r "^model session" prisma/ src/ | wc -l)
+          if [ "$session_models" -gt 1 ]; then
+            echo "VIOLATION: session model duplicated ($session_models instances)" >> $GITHUB_STEP_SUMMARY
+            grep -r "^model session" prisma/ src/ >> $GITHUB_STEP_SUMMARY
+            echo "::error::session model duplication detected - violates schema authority"
+            exit 1
+          else
+            echo "PASS: session model authority confirmed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Evidence 3: Mutation authority check
+          echo "## Mutation Authority Evidence" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Check for direct Prisma mutations outside backend
+          if grep -r "prisma\.\(order\|payment\|session\|user\)\.\(create\|update\|delete\)" src/ > /dev/null 2>&1; then
+            echo "VIOLATION: Direct Prisma mutations detected" >> $GITHUB_STEP_SUMMARY
+            grep -r "prisma\.\(order\|payment\|session\|user\)\.\(create\|update\|delete\)" src/ >> $GITHUB_STEP_SUMMARY
+            echo "::error::Direct Prisma mutations detected - violates mutation authority"
+            exit 1
+          else
+            echo "PASS: Mutation authority confirmed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Evidence 4: Auth authority check
+          echo "## Auth Authority Evidence" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Check for auth logic outside backend (should only be in server/lib/auth.ts)
+          if grep -r "bcrypt\.hash\|jwt\.sign" src/app/ > /dev/null 2>&1; then
+            echo "VIOLATION: Auth logic detected in API routes" >> $GITHUB_STEP_SUMMARY
+            grep -r "bcrypt\.hash\|jwt\.sign" src/app/ >> $GITHUB_STEP_SUMMARY
+            echo "::error::Auth logic outside backend detected - violates auth authority"
+            exit 1
+          else
+            echo "PASS: Auth authority confirmed (auth logic only in server layer)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Evidence 5: Boundary compliance
+          echo "## Boundary Compliance Evidence" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Check API-only communication patterns
+          api_violations=0
+
+          # Check for direct database access patterns
+          if grep -r "DATABASE_URL.*prisma" src/app/api/ > /dev/null 2>&1; then
+            echo "VIOLATION: Direct DB access in API routes" >> $GITHUB_STEP_SUMMARY
+            grep -r "DATABASE_URL.*prisma" src/app/api/ >> $GITHUB_STEP_SUMMARY
+            api_violations=$((api_violations + 1))
+          fi
+
+          if [ $api_violations -eq 0 ]; then
+            echo "PASS: API boundary compliance confirmed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "FAIL: $api_violations boundary violations detected" >> $GITHUB_STEP_SUMMARY
+            echo "::error::Boundary compliance violations detected"
+            exit 1
+          fi
+
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+          # Generate JSON evidence artifact
+          echo '{"timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","run_id":"'${{ github.run_id }}'","repo":"'${{ github.repository }}'","checks":{' > evidence.json
+          echo '"cross_domain_imports":"PASS",' >> evidence.json
+          echo '"schema_authority":"PASS",' >> evidence.json
+          echo '"mutation_authority":"PASS",' >> evidence.json
+          echo '"auth_authority":"PASS",' >> evidence.json
+          echo '"boundary_compliance":"PASS"' >> evidence.json
+          echo '}}' >> evidence.json
+
+          echo "evidence_collected=true" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+
+      - name: Upload Evidence Artifact
+        if: steps.evidence.outputs.evidence_collected == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-evidence-${{ github.run_number }}
+          path: |
+            evidence.json
+            ${{ github.workspace }}/docs/domain-ownership.yml
+          retention-days: 30
+
+      - name: Domain Ownership Validation
+        run: |
+          echo "=== DOMAIN OWNERSHIP VALIDATION ==="
+
+          # Validate domain ownership graph
+          if [ -f "docs/domain-ownership.yml" ]; then
+            echo "PASS: Domain ownership graph exists"
+          else
+            echo "::error::Domain ownership graph missing"
+            exit 1
+          fi
+
+          # Validate enforcement rules are present
+          if grep -q "enforcement_rules:" docs/domain-ownership.yml; then
+            echo "PASS: Enforcement rules defined"
+          else
+            echo "::error::Enforcement rules missing"
+            exit 1
+          fi
+
+          # Validate CI configuration
+          if grep -q "ci_enforcement:" docs/domain-ownership.yml; then
+            echo "PASS: CI enforcement configured"
+          else
+            echo "::error::CI enforcement not configured"
+            exit 1
+          fi
+
+      - name: Generate Architecture Report
+        if: always()
+        run: |
+          echo "# Architecture Enforcement Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Evidence Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Forbidden imports: $([ "${{ job.status }}" = "success" ] && echo "PASS" || echo "FAIL")" >> $GITHUB_STEP_SUMMARY
+          echo "- Schema authority: $([ "${{ job.status }}" = "success" ] && echo "PASS" || echo "FAIL")" >> $GITHUB_STEP_SUMMARY
+          echo "- Mutation authority: $([ "${{ job.status }}" = "success" ] && echo "PASS" || echo "FAIL")" >> $GITHUB_STEP_SUMMARY
+          echo "- Auth authority: $([ "${{ job.status }}" = "success" ] && echo "PASS" || echo "FAIL")" >> $GITHUB_STEP_SUMMARY
+          echo "- Boundary compliance: $([ "${{ job.status }}" = "success" ] && echo "PASS" || echo "FAIL")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Governance Status" >> $GITHUB_STEP_SUMMARY
+          echo "**Domain Ownership:** ENFORCED" >> $GITHUB_STEP_SUMMARY
+          echo "**Boundary Authority:** ACTIVE" >> $GITHUB_STEP_SUMMARY
+          echo "**CI Evidence:** COLLECTED" >> $GITHUB_STEP_SUMMARY
+
+      - name: Evidence Summary
+        if: always()
+        run: |
+          echo "=== ARCHITECTURE ENFORCEMENT SUMMARY ==="
+          echo "Status: ${{ job.status }}"
+          echo "Evidence Collected: ${{ steps.evidence.outputs.evidence_collected || 'false' }}"
+          echo "Timestamp: ${{ steps.evidence.outputs.timestamp || 'N/A' }}"
+          echo ""
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "RESULT: All domain ownership rules enforced"
+            echo "IMPACT: System governance verified"
+          else
+            echo "RESULT: Domain ownership violations detected"
+            echo "IMPACT: PR blocked until compliance"
+          fi

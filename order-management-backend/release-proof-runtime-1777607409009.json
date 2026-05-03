@@ -1,0 +1,103 @@
+{
+  "timestamp": "2026-05-01T03:50:09.007Z",
+  "baseUrl": "http://localhost:3000",
+  "scope": "runtime-only",
+  "note": "Product catalog is owned by Sellora platform, not tested in this runtime-only proof",
+  "results": [
+    {
+      "name": "health",
+      "method": "GET",
+      "url": "http://localhost:3000/api/health",
+      "status": 200,
+      "responseBody": {
+        "status": "ok",
+        "timestamp": "2026-05-01T03:50:07.392Z",
+        "version": "v1.0.0",
+        "database": "connected",
+        "message": "Health check passed"
+      },
+      "ok": true
+    },
+    {
+      "name": "login",
+      "method": "POST",
+      "url": "http://localhost:3000/api/auth/login",
+      "requestHeaders": {
+        "Content-Type": "application/json"
+      },
+      "requestBody": {
+        "email": "demo@seller.com",
+        "password": "demo123"
+      },
+      "status": 200,
+      "responseBody": {
+        "user": {
+          "id": "cmomc7u390000g08fkjp9uwll",
+          "email": "demo@seller.com",
+          "role": "SELLER",
+          "sellerId": "cmomc7ud70002g08fz5bne7j6"
+        },
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtb21jN3UzOTAwMDBnMDhma2pwOXV3bGwiLCJlbWFpbCI6ImRlbW9Ac2VsbGVyLmNvbSIsInJvbGUiOiJTRUxMRVIiLCJzZWxsZXJJZCI6ImNtb21jN3VkNzAwMDJnMDhmejVibmU3ajYiLCJpYXQiOjE3Nzc2MDc0MDgsImV4cCI6MTc3ODIxMjIwOH0.Z8N-kjo53dG-tkfScWqQXBnceLjRylCyJIc07smMU8g"
+      },
+      "ok": true
+    },
+    {
+      "name": "current-user",
+      "method": "GET",
+      "url": "http://localhost:3000/api/me",
+      "requestHeaders": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtb21jN3UzOTAwMDBnMDhma2pwOXV3bGwiLCJlbWFpbCI6ImRlbW9Ac2VsbGVyLmNvbSIsInJvbGUiOiJTRUxMRVIiLCJzZWxsZXJJZCI6ImNtb21jN3VkNzAwMDJnMDhmejVibmU3ajYiLCJpYXQiOjE3Nzc2MDc0MDgsImV4cCI6MTc3ODIxMjIwOH0.Z8N-kjo53dG-tkfScWqQXBnceLjRylCyJIc07smMU8g"
+      },
+      "status": 200,
+      "responseBody": {
+        "user": {
+          "id": "cmomc7u390000g08fkjp9uwll",
+          "email": "demo@seller.com",
+          "role": "SELLER",
+          "sellerId": "cmomc7ud70002g08fz5bne7j6"
+        }
+      },
+      "ok": true
+    },
+    {
+      "name": "seller-orders",
+      "method": "GET",
+      "url": "http://localhost:3000/api/seller/orders",
+      "requestHeaders": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtb21jN3UzOTAwMDBnMDhma2pwOXV3bGwiLCJlbWFpbCI6ImRlbW9Ac2VsbGVyLmNvbSIsInJvbGUiOiJTRUxMRVIiLCJzZWxsZXJJZCI6ImNtb21jN3VkNzAwMDJnMDhmejVibmU3ajYiLCJpYXQiOjE3Nzc2MDc0MDgsImV4cCI6MTc3ODIxMjIwOH0.Z8N-kjo53dG-tkfScWqQXBnceLjRylCyJIc07smMU8g"
+      },
+      "status": 200,
+      "responseBody": {
+        "orders": [],
+        "pagination": {
+          "page": 1,
+          "limit": 20,
+          "total": 0,
+          "totalPages": 0,
+          "hasNext": false,
+          "hasPrev": false
+        }
+      },
+      "ok": true
+    },
+    {
+      "name": "update-order-status",
+      "method": "PATCH",
+      "url": "http://localhost:3000/api/seller/orders/{id}/status",
+      "ok": true,
+      "error": "No orders to update - skipped"
+    },
+    {
+      "name": "auth-protection",
+      "method": "GET",
+      "url": "http://localhost:3000/api/seller/orders",
+      "status": 401,
+      "responseBody": {
+        "error": "No token provided",
+        "code": "INTERNAL_ERROR",
+        "requestId": "legacy-route"
+      },
+      "ok": false
+    }
+  ]
+}

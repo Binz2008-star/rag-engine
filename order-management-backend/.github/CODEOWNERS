@@ -1,0 +1,20 @@
+# Runtime Core Ownership
+
+# Architecture Documentation
+/docs/ARCHITECTURE_AUTHORITY.md @Binz2008-star
+/docs/RUNTIME_API_CONTRACT.md @Binz2008-star
+
+# Core Runtime Code
+/src/ @Binz2008-star
+/prisma/ @Binz2008-star
+
+# Boundary Enforcement
+.github/workflows/boundary-checks.yml @Binz2008-star
+/scripts/check-boundaries.sh @Binz2008-star
+
+# Tests
+/src/tests/ @Binz2008-star
+
+# Configuration
+/package.json @Binz2008-star
+/.env.example @Binz2008-star

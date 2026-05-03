@@ -1,0 +1,352 @@
+name: Architecture Enforcement (Hardened)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  architecture-enforcement:
+    runs-on: ubuntu-latest
+    name: L1 Architecture Enforcement (Hardened)
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Hardened Architecture Enforcement
+        run: |
+          echo "=== Hardened L1 Architecture Enforcement ==="
+          
+          # Initialize enforcement state
+          EVIDENCE_FILE="architecture-evidence.json"
+          VIOLATION_COUNT=0
+          ENFORCEMENT_START=$(date +%s)
+          
+          # === SECTION 1: Cross-Domain Boundary Enforcement ===
+          echo "## Section 1: Cross-Domain Boundaries"
+          CROSS_DOMAIN_VIOLATIONS=0
+          
+          # Pattern 1: Direct server imports in API routes
+          SERVER_IMPORT_PATTERNS=(
+            "from\s+['\"]\.\.\/\.\.\/server"
+            "import.*from\s+['\"]\.\.\/\.\.\/server"
+            "require\s*\(\s*['\"]\.\.\/\.\.\/server"
+          )
+          
+          for pattern in "${SERVER_IMPORT_PATTERNS[@]}"; do
+            if grep -r -E "$pattern" src/app/ > /dev/null 2>&1; then
+              echo "VIOLATION: Server import pattern: $pattern"
+              grep -r -n -E "$pattern" src/app/
+              echo "::error::Cross-domain import detected - API routes importing server layer"
+              CROSS_DOMAIN_VIOLATIONS=$((CROSS_DOMAIN_VIOLATIONS + 1))
+              VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+            fi
+          done
+          
+          # Pattern 2: Server lib imports that bypass boundaries
+          LIB_IMPORT_PATTERNS=(
+            "from\s+['\"]\.\.\/\.\.\/server\/lib"
+            "import.*from\s+['\"]\.\.\/\.\.\/server\/lib"
+            "require\s*\(\s*['\"]\.\.\/\.\.\/server\/lib"
+          )
+          
+          for pattern in "${LIB_IMPORT_PATTERNS[@]}"; do
+            if grep -r -E "$pattern" src/app/ > /dev/null 2>&1; then
+              echo "VIOLATION: Server lib import pattern: $pattern"
+              grep -r -n -E "$pattern" src/app/
+              echo "::error::Server lib import detected - bypasses domain boundaries"
+              CROSS_DOMAIN_VIOLATIONS=$((CROSS_DOMAIN_VIOLATIONS + 1))
+              VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+            fi
+          done
+          
+          # Pattern 3: Relative path violations
+          RELATIVE_VIOLATIONS=$(find src/app/ -name "*.ts" -o -name "*.tsx" | xargs grep -l "\.\./\.\./\.\." | wc -l || echo 0)
+          if [ "$RELATIVE_VIOLATIONS" -gt 0 ]; then
+            echo "VIOLATION: Deep relative paths found"
+            find src/app/ -name "*.ts" -o -name "*.tsx" | xargs grep -l "\.\./\.\./\.\."
+            echo "::error::Deep relative paths detected - potential boundary violation"
+            CROSS_DOMAIN_VIOLATIONS=$((CROSS_DOMAIN_VIOLATIONS + 1))
+            VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+          fi
+          
+          if [ $CROSS_DOMAIN_VIOLATIONS -eq 0 ]; then
+            echo "PASS: Cross-domain boundaries intact"
+            CROSS_DOMAIN_STATUS="PASS"
+          else
+            echo "FAIL: $CROSS_DOMAIN_VIOLATIONS cross-domain violations"
+            CROSS_DOMAIN_STATUS="FAIL"
+          fi
+          
+          # === SECTION 2: Schema Authority Enforcement ===
+          echo "## Section 2: Schema Authority"
+          SCHEMA_VIOLATIONS=0
+          
+          # Check for Prisma model duplicates
+          PRISMA_MODELS=("User" "PaymentAttempt" "Seller" "session")
+          
+          for model in "${PRISMA_MODELS[@]}"; do
+            model_instances=$(grep -r "^model $model" prisma/ src/ 2>/dev/null | wc -l || echo 0)
+            if [ "$model_instances" -gt 1 ]; then
+              echo "VIOLATION: $model model duplicated ($model_instances instances)"
+              grep -r -n "^model $model" prisma/ src/
+              echo "::error::$model model duplication - violates schema authority"
+              SCHEMA_VIOLATIONS=$((SCHEMA_VIOLATIONS + 1))
+              VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+            fi
+          done
+          
+          # Check for unauthorized schema files
+          UNAUTHORIZED_SCHEMAS=$(find src/ -name "*.prisma" -o -name "*schema*.ts" | grep -v node_modules | wc -l || echo 0)
+          if [ "$UNAUTHORIZED_SCHEMAS" -gt 0 ]; then
+            echo "VIOLATION: Unauthorized schema files"
+            find src/ -name "*.prisma" -o -name "*schema*.ts" | grep -v node_modules
+            echo "::error::Schema files outside prisma/ - violates schema authority"
+            SCHEMA_VIOLATIONS=$((SCHEMA_VIOLATIONS + 1))
+            VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+          fi
+          
+          # Check for database connection strings in source
+          if grep -r -E "(DATABASE_URL|postgres|mysql|mongodb)" src/ --exclude-dir=node_modules > /dev/null 2>&1; then
+            echo "VIOLATION: Database connection strings in source code"
+            grep -r -n -E "(DATABASE_URL|postgres|mysql|mongodb)" src/ --exclude-dir=node_modules
+            echo "::error::Database connections in source - violates schema authority"
+            SCHEMA_VIOLATIONS=$((SCHEMA_VIOLATIONS + 1))
+            VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+          fi
+          
+          if [ $SCHEMA_VIOLATIONS -eq 0 ]; then
+            echo "PASS: Schema authority enforced"
+            SCHEMA_AUTHORITY_STATUS="PASS"
+          else
+            echo "FAIL: $SCHEMA_VIOLATIONS schema authority violations"
+            SCHEMA_AUTHORITY_STATUS="FAIL"
+          fi
+          
+          # === SECTION 3: Authentication Authority Enforcement ===
+          echo "## Section 3: Authentication Authority"
+          AUTH_VIOLATIONS=0
+          
+          # Auth patterns that must stay in server layer
+          RESTRICTED_AUTH_PATTERNS=(
+            "bcrypt\.hash"
+            "bcrypt\.compare"
+            "jwt\.sign"
+            "jwt\.verify"
+            "createHash"
+            "pbkdf2"
+            "scrypt"
+            "argon2"
+          )
+          
+          for pattern in "${RESTRICTED_AUTH_PATTERNS[@]}"; do
+            if grep -r -E "$pattern" src/app/ > /dev/null 2>&1; then
+              echo "VIOLATION: Restricted auth pattern: $pattern"
+              grep -r -n -E "$pattern" src/app/
+              echo "::error::Auth logic in API routes - pattern: $pattern"
+              AUTH_VIOLATIONS=$((AUTH_VIOLATIONS + 1))
+              VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+            fi
+          done
+          
+          # Password handling violations
+          PASSWORD_PATTERNS=(
+            "(password|Password).*hash"
+            "hash.*password"
+            "salt.*password"
+            "password.*salt"
+          )
+          
+          for pattern in "${PASSWORD_PATTERNS[@]}"; do
+            if grep -r -E "$pattern" src/app/ > /dev/null 2>&1; then
+              echo "VIOLATION: Password handling pattern: $pattern"
+              grep -r -n -E "$pattern" src/app/
+              echo "::error::Password handling in API routes - pattern: $pattern"
+              AUTH_VIOLATIONS=$((AUTH_VIOLATIONS + 1))
+              VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+            fi
+          done
+          
+          # Session management violations
+          if grep -r -E "(session|Session).*store|store.*session" src/app/ > /dev/null 2>&1; then
+            echo "VIOLATION: Session management in API routes"
+            grep -r -n -E "(session|Session).*store|store.*session" src/app/
+            echo "::error::Session management in API routes - violates auth authority"
+            AUTH_VIOLATIONS=$((AUTH_VIOLATIONS + 1))
+            VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+          fi
+          
+          if [ $AUTH_VIOLATIONS -eq 0 ]; then
+            echo "PASS: Authentication authority enforced"
+            AUTH_AUTHORITY_STATUS="PASS"
+          else
+            echo "FAIL: $AUTH_VIOLATIONS authentication authority violations"
+            AUTH_AUTHORITY_STATUS="FAIL"
+          fi
+          
+          # === SECTION 4: Rate Limiting Authority Enforcement ===
+          echo "## Section 4: Rate Limiting Authority"
+          RATE_LIMIT_VIOLATIONS=0
+          
+          # In-memory rate limiting patterns
+          MEMORY_RATE_LIMIT_PATTERNS=(
+            "new Map.*rate.*limit"
+            "rate.*limit.*Map"
+            "Map.*rate.*limit"
+            "rate.*limit.*new Map"
+          )
+          
+          for pattern in "${MEMORY_RATE_LIMIT_PATTERNS[@]}"; do
+            if grep -r -E "$pattern" src/ > /dev/null 2>&1; then
+              echo "VIOLATION: In-memory rate limiting pattern: $pattern"
+              grep -r -n -E "$pattern" src/
+              echo "::error::In-memory rate limiting - pattern: $pattern"
+              RATE_LIMIT_VIOLATIONS=$((RATE_LIMIT_VIOLATIONS + 1))
+              VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+            fi
+          done
+          
+          # Check for Redis configuration in API routes (should be in server only)
+          if grep -r -E "REDIS_URL|redis.*createClient|createClient.*redis" src/app/ > /dev/null 2>&1; then
+            echo "VIOLATION: Redis configuration in API routes"
+            grep -r -n -E "REDIS_URL|redis.*createClient|createClient.*redis" src/app/
+            echo "::error::Redis config in API routes - violates rate limiting authority"
+            RATE_LIMIT_VIOLATIONS=$((RATE_LIMIT_VIOLATIONS + 1))
+            VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+          fi
+          
+          if [ $RATE_LIMIT_VIOLATIONS -eq 0 ]; then
+            echo "PASS: Rate limiting authority enforced"
+            RATE_LIMIT_AUTHORITY_STATUS="PASS"
+          else
+            echo "FAIL: $RATE_LIMIT_VIOLATIONS rate limiting authority violations"
+            RATE_LIMIT_AUTHORITY_STATUS="FAIL"
+          fi
+          
+          # === SECTION 5: Environment Variable Authority ===
+          echo "## Section 5: Environment Variable Authority"
+          ENV_VIOLATIONS=0
+          
+          # Check for hardcoded secrets
+          SECRET_PATTERNS=(
+            "password.*=.*['\"][^'\"]{8,}['\"]"
+            "secret.*=.*['\"][^'\"]{8,}['\"]"
+            "key.*=.*['\"][^'\"]{16,}['\"]"
+            "token.*=.*['\"][^'\"]{20,}['\"]"
+          )
+          
+          for pattern in "${SECRET_PATTERNS[@]}"; do
+            if grep -r -E "$pattern" src/ --exclude-dir=node_modules > /dev/null 2>&1; then
+              echo "VIOLATION: Potential hardcoded secret pattern: $pattern"
+              grep -r -n -E "$pattern" src/ --exclude-dir=node_modules
+              echo "::error::Hardcoded secret detected - pattern: $pattern"
+              ENV_VIOLATIONS=$((ENV_VIOLATIONS + 1))
+              VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+            fi
+          done
+          
+          # Check for process.env usage in API routes (should use env.ts)
+          if grep -r -E "process\.env\." src/app/ > /dev/null 2>&1; then
+            echo "VIOLATION: Direct process.env usage in API routes"
+            grep -r -n -E "process\.env\." src/app/
+            echo "::error::Direct process.env usage - violates environment authority"
+            ENV_VIOLATIONS=$((ENV_VIOLATIONS + 1))
+            VIOLATION_COUNT=$((VIOLATION_COUNT + 1))
+          fi
+          
+          if [ $ENV_VIOLATIONS -eq 0 ]; then
+            echo "PASS: Environment variable authority enforced"
+            ENV_AUTHORITY_STATUS="PASS"
+          else
+            echo "FAIL: $ENV_VIOLATIONS environment variable authority violations"
+            ENV_AUTHORITY_STATUS="FAIL"
+          fi
+          
+          # === EVIDENCE GENERATION ===
+          echo "## Evidence Generation"
+          ENFORCEMENT_END=$(date +%s)
+          ENFORCEMENT_DURATION=$((ENFORCEMENT_END - ENFORCEMENT_START))
+          
+          cat > "$EVIDENCE_FILE" << EOF
+          {
+            "metadata": {
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "run_id": "${{ github.run_id }}",
+              "repo": "${{ github.repository }}",
+              "branch": "${{ github.ref_name }}",
+              "layer": "L1",
+              "enforcement_version": "hardened-v2.0",
+              "duration_seconds": $ENFORCEMENT_DURATION
+            },
+            "enforcement_checks": {
+              "cross_domain_boundaries": {
+                "status": "$CROSS_DOMAIN_STATUS",
+                "violations": $CROSS_DOMAIN_VIOLATIONS,
+                "description": "API routes importing server layer or bypassing boundaries"
+              },
+              "schema_authority": {
+                "status": "$SCHEMA_AUTHORITY_STATUS",
+                "violations": $SCHEMA_VIOLATIONS,
+                "description": "Schema duplication, unauthorized files, or database connections"
+              },
+              "authentication_authority": {
+                "status": "$AUTH_AUTHORITY_STATUS",
+                "violations": $AUTH_VIOLATIONS,
+                "description": "Auth logic, password handling, or session management in API routes"
+              },
+              "rate_limiting_authority": {
+                "status": "$RATE_LIMIT_AUTHORITY_STATUS",
+                "violations": $RATE_LIMIT_VIOLATIONS,
+                "description": "In-memory rate limiting or Redis configuration in API routes"
+              },
+              "environment_authority": {
+                "status": "$ENV_AUTHORITY_STATUS",
+                "violations": $ENV_VIOLATIONS,
+                "description": "Hardcoded secrets or direct process.env usage"
+              }
+            },
+            "summary": {
+              "total_violations": $VIOLATION_COUNT,
+              "enforcement_result": "$([ $VIOLATION_COUNT -eq 0 ] && echo 'PASS' || echo 'FAIL')",
+              "compliance_level": "$([ $VIOLATION_COUNT -eq 0 ] && echo 'L1_COMPLETE' || echo 'L1_VIOLATIONS')",
+              "governance_status": "$([ $VIOLATION_COUNT -eq 0 ] && echo 'COMPLIANT' || echo 'NON_COMPLIANT')"
+            }
+          }
+          EOF
+          
+          echo "Evidence report: $EVIDENCE_FILE"
+          echo "Enforcement duration: ${ENFORCEMENT_DURATION}s"
+          echo "Total violations: $VIOLATION_COUNT"
+          
+          # Upload evidence as artifact
+          echo "Uploading evidence artifact..."
+          
+          # Final enforcement decision
+          if [ $VIOLATION_COUNT -gt 0 ]; then
+            echo "::error::Hardened L1 Architecture Enforcement FAILED"
+            echo "Violations detected: $VIOLATION_COUNT"
+            echo "Review evidence report: $EVIDENCE_FILE"
+            exit 1
+          else
+            echo "Hardened L1 Architecture Enforcement: PASSED"
+            echo "All boundary checks passed - governance compliant"
+          fi
+          
+      - name: Upload architecture evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: architecture-evidence
+          path: architecture-evidence.json
+          retention-days: 30

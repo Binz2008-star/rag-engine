@@ -1,0 +1,275 @@
+Good. Now we move from **UI prototype → real system integration**.
+
+No fluff. Here’s exactly what you do next.
+
+---
+
+# 🎯 Step 1 — Wire to Real API (Replace Mock State)
+
+Right now you have:
+
+```ts
+const [order, setOrder] = useState<OrderDetail>(demoOrder);
+```
+
+❌ This is fake
+✅ Replace with real fetch
+
+---
+
+## Add data loading
+
+```ts
+useEffect(() => {
+  async function load() {
+    const res = await fetch(`/api/v1/orders/${orderId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const json = await res.json();
+    setOrder(json.data.order);
+  }
+
+  load();
+}, [orderId]);
+```
+
+---
+
+# 🎯 Step 2 — Wire Transition to Backend
+
+Right now:
+
+```ts
+setOrder(...)
+```
+
+❌ Local mutation
+✅ Must go through API
+
+---
+
+## Replace `handleTransition`
+
+```ts
+async function handleTransition(next: OrderStatus) {
+  if (!allowedTransitions.includes(next)) return;
+
+  const res = await fetch(`/api/v1/orders/${order.id}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ status: next }),
+  });
+
+  const json = await res.json();
+
+  if (!res.ok) {
+    console.error(json);
+    return;
+  }
+
+  setOrder(json.data.order);
+}
+```
+
+---
+
+# 🔴 Step 3 — Backend MUST enforce state machine
+
+If this is missing, your system is unsafe.
+
+---
+
+## Required backend guard
+
+```ts
+if (!ORDER_TRANSITIONS[currentStatus].includes(nextStatus)) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        code: "INVALID_TRANSITION",
+        message: `Cannot move from ${currentStatus} to ${nextStatus}`,
+        timestamp: new Date().toISOString(),
+      },
+    },
+    { status: 400 }
+  );
+}
+```
+
+---
+
+# 🎯 Step 4 — Fix Contract Alignment (Critical)
+
+Your UI assumes:
+
+```ts
+json.data.order
+```
+
+👉 Your backend must ALWAYS return:
+
+```json
+{
+  "success": true,
+  "data": {
+    "order": { ... }
+  }
+}
+```
+
+If not → your UI will silently break.
+
+---
+
+# 🎯 Step 5 — Add Loading + Error States (Missing)
+
+Right now your UI assumes everything works.
+
+That’s not production.
+
+---
+
+## Add state
+
+```ts
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+```
+
+---
+
+## Wrap fetch
+
+```ts
+try {
+  setLoading(true);
+  const res = await fetch(...);
+
+  if (!res.ok) throw new Error("Failed to load");
+
+  const json = await res.json();
+  setOrder(json.data.order);
+} catch (e) {
+  setError("Failed to load order");
+} finally {
+  setLoading(false);
+}
+```
+
+---
+
+## Render guards
+
+```tsx
+if (loading) return <div>Loading...</div>;
+if (error) return <div>{error}</div>;
+```
+
+---
+
+# 🎯 Step 6 — Real Events (Not Fake)
+
+Right now:
+
+```ts
+events: demoOrder.events
+```
+
+❌ Mock
+✅ Must come from backend
+
+---
+
+## Backend requirement
+
+Your GET `/orders/:id` must include:
+
+```json
+{
+  "order": {
+    ...
+    "events": [...]
+  }
+}
+```
+
+---
+
+# 🎯 Step 7 — Remove All Demo Data
+
+Delete:
+
+```ts
+demoOrder
+```
+
+If you leave it:
+
+* you will debug wrong things later
+* you will hide API issues
+
+---
+
+# 🧠 Final System Architecture (What you now have)
+
+```
+UI (Control Layer)
+  ↓
+State Machine (Shared Contract)
+  ↓
+API (Enforced Transitions)
+  ↓
+Database (Source of Truth)
+  ↓
+Events (Observability Layer)
+```
+
+---
+
+# 📊 Where you are now
+
+| Layer               | Status         |
+| ------------------- | -------------- |
+| UI                  | ✅ strong       |
+| State Machine       | ✅ defined      |
+| API Wiring          | ⚠️ next step   |
+| Backend Enforcement | ⚠️ must verify |
+| Observability       | ⚠️ partial     |
+
+---
+
+# 🚀 Next milestone (clear target)
+
+When this works:
+
+* click transition → API call → DB update → UI refresh → timeline updates
+
+👉 Then you have a **real operational system**
+
+---
+
+# 🧠 Blunt truth
+
+You just crossed from:
+
+> “frontend UI”
+
+into:
+
+> **stateful distributed system with enforcement**
+
+That’s a different class of software.
+
+---
+
+If you want next step, I can:
+
+* refactor your backend `PATCH /status` endpoint to match this exactly
+* or integrate this UI with your existing contract test system so it becomes **self-validating**

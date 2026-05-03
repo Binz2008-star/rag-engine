@@ -1,0 +1,160 @@
+name: PR Preview Database Validation
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+  push:
+    branches:
+      - chore/runtime-boundary-enforcement
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    name: Setup
+    outputs:
+      branch: ${{ steps.branch_name.outputs.current_branch }}
+      preview_branch_name: ${{ steps.preview_name.outputs.name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get branch name
+        id: branch_name
+        uses: tj-actions/branch-names@v8
+      - name: Compute safe preview branch name
+        id: preview_name
+        shell: bash
+        run: |
+          RAW="${{ steps.branch_name.outputs.current_branch }}"
+          SAFE=$(echo "$RAW" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed 's#[^a-z0-9-]#-#g' \
+            | sed 's#--*#-#g' \
+            | sed 's#^-##; s#-$##' \
+            | cut -c1-40)
+          echo "name=preview-pr-${{ github.event.number }}-${SAFE}" >> "$GITHUB_OUTPUT"
+
+  create_neon_branch:
+    name: Create Neon Branch
+    outputs:
+      db_url: ${{ steps.neon.outputs.db_url }}
+      db_url_with_pooler: ${{ steps.neon.outputs.db_url_with_pooler }}
+    needs: setup
+    timeout-minutes: 20
+    if: |
+      github.event_name == 'pull_request' && (
+      github.event.action == 'synchronize'
+      || github.event.action == 'opened'
+      || github.event.action == 'reopened') ||
+      github.event_name == 'push' && github.ref == 'refs/heads/chore/runtime-boundary-enforcement'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Get branch expiration date as an env variable (2 weeks from now)
+        id: get_expiration_date
+        run: |
+          EXPIRES_AT=$(date -u --date '+14 days' +'%Y-%m-%dT%H:%M:%SZ')
+          echo "EXPIRES_AT=$EXPIRES_AT" >> "$GITHUB_OUTPUT"
+      - name: Create Neon Branch
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ needs.setup.outputs.preview_branch_name }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          expires_at: ${{ steps.get_expiration_date.outputs.EXPIRES_AT }}
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: npm ci
+      - name: Resolve DATABASE_URL
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DB_URL="${{ steps.neon.outputs.db_url_with_pooler }}"
+
+          if [ -z "$DB_URL" ]; then
+            DB_URL="${{ steps.neon.outputs.db_url }}"
+          fi
+
+          test -n "$DB_URL" || {
+            echo "No valid DATABASE_URL from Neon"
+            exit 1
+          }
+
+          case "$DB_URL" in
+            postgres://*|postgresql://*)
+              echo "DATABASE_URL protocol is valid"
+              ;;
+            *)
+              echo "Invalid DATABASE_URL protocol"
+              exit 1
+              ;;
+          esac
+
+          echo "DATABASE_URL=$DB_URL" >> "$GITHUB_ENV"
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+      - name: Run Migrations
+        run: npm run db:deploy
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+      - name: Run Seed
+        run: npm run seed
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+      - name: Run Tests
+        run: npm test
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+      - name: Post Schema Diff Comment to PR
+        if: github.event_name == 'pull_request'
+        uses: neondatabase/schema-diff-action@v1
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          compare_branch: ${{ needs.setup.outputs.preview_branch_name }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+  delete_neon_branch:
+    name: Delete Neon Branch
+    needs: setup
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' ||
+      github.event_name == 'push' && github.ref == 'refs/heads/chore/runtime-boundary-enforcement'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install neonctl
+        run: |
+          curl -fsSL https://repo.neon.tech/install.sh | bash
+          echo "$HOME/.neon/bin" >> $GITHUB_PATH
+      - name: Delete Neon Branch if it exists
+        if: always()
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BRANCH_NAME: ${{ needs.setup.outputs.preview_branch_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if neonctl branches list --project-id "$PROJECT_ID" | grep -Fq "$BRANCH_NAME"; then
+            neonctl branches delete "$BRANCH_NAME" --project-id "$PROJECT_ID"
+            echo "Deleted $BRANCH_NAME"
+          else
+            echo "Branch $BRANCH_NAME does not exist. Skipping delete."
+          fi

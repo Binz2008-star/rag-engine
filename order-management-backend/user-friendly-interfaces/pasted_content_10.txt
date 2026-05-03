@@ -1,0 +1,226 @@
+Here’s a **tight, no-nonsense `.md` you can drop directly to Manus**:
+
+---
+
+````md
+# Order System Status — Contract Alignment + UI Integration
+
+## Current State (Accurate)
+
+We’ve reached a **stable contract-compliant backend for orders**:
+
+- ✅ 9/9 contract tests passing
+- ✅ GET `/orders/:id` fixed (Next.js params async handling)
+- ✅ JSON-only error responses (no HTML leakage)
+- ✅ Consistent response shape (`json.data.order`)
+- ✅ Validation + error handling aligned with schema
+
+This is a **solid checkpoint**, not full production readiness.
+
+---
+
+## Critical Fix Applied
+
+### Root Cause
+Next.js App Router params handling
+
+### Fix
+```ts
+{ params }: { params: Promise<{ id: string }> }
+const { id } = await params
+````
+
+### Impact
+
+* Eliminated false 404 on valid orders
+* Restored correct seller-scoped retrieval
+* Unblocked contract test suite
+
+---
+
+## Frontend (Dashboard / Order Detail)
+
+We are transitioning from:
+
+> ❌ Presentation UI
+> →
+> ✅ Control + Observability Console
+
+### Implemented
+
+* State machine visualizer (aligned with backend)
+* Constrained transitions (UI-level)
+* Failure recovery paths
+* Business / System lens
+* Timeline (structure ready)
+* API wiring pattern established
+
+### Still Pending (Critical)
+
+* Replace ALL mock data with real API calls
+* Use contract-validated fetch (`safeFetch + schema`)
+* Wire transition → PATCH `/orders/:id/status`
+* Ensure `order.events` comes from backend (not mocked)
+
+---
+
+## Architectural Requirement (Non-Negotiable)
+
+### Single Source of Truth
+
+State machine must be shared:
+
+```
+/shared/contracts/order-state-machine.ts
+```
+
+Used by:
+
+* backend (enforcement)
+* frontend (UI constraints)
+* tests (validation)
+
+---
+
+## Backend Requirements (Must Hold)
+
+### 1. Transition Enforcement
+
+```ts
+if (!ORDER_TRANSITIONS[current].includes(next)) {
+  return 400 INVALID_TRANSITION
+}
+```
+
+### 2. Response Contract
+
+```json
+{
+  "success": true,
+  "data": {
+    "order": { ... }
+  }
+}
+```
+
+### 3. Error Contract
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "...",
+    "message": "...",
+    "timestamp": "..."
+  }
+}
+```
+
+No exceptions. No HTML.
+
+---
+
+## What Is DONE
+
+* Contract layer for orders is reliable
+* Core API behavior aligned with tests
+* UI direction correctly matches domain model
+
+---
+
+## What Is NOT DONE
+
+* ❌ TypeScript clean
+* ❌ ESLint clean
+* ❌ AI/runtime modules unstable
+* ❌ Full repo stability not verified
+* ❌ UI still partially mock-driven
+
+---
+
+## Immediate Next Steps (Strict Order)
+
+### Phase 1 — Stabilize Backend
+
+1. Fix TypeScript errors (start with runtime-client)
+2. Clean ESLint
+3. Re-run full test suite
+
+---
+
+### Phase 2 — Complete UI Integration
+
+1. Remove `demoOrder` completely
+2. Load order via API (contract validated)
+3. Wire transitions → PATCH endpoint
+4. Render real timeline (`order.events`)
+5. Add loading + error states everywhere
+
+---
+
+### Phase 3 — System Completion
+
+1. Add real-time updates (polling or WS)
+2. Ensure audit/events are persisted
+3. Validate state machine across all layers
+
+---
+
+## Git Strategy
+
+### Current branch
+
+```
+fix/order-contract-alignment
+```
+
+### Commits
+
+1. Backend (contract fixes)
+2. Dashboard (control + observability UI)
+
+### Rules
+
+* ✅ Commit now
+* ❌ Do NOT merge to main yet
+* Merge only after typecheck + lint clean
+
+---
+
+## Final Assessment
+
+You now have:
+
+> ✅ A **contract-correct order system**
+> ⚠️ A **partially integrated operational UI**
+> ❌ Not yet a **production-ready repository**
+
+---
+
+## Key Risk
+
+UI and backend can drift.
+
+If state machine, contracts, or response shapes diverge:
+→ system will silently break.
+
+---
+
+## Bottom Line
+
+We are no longer designing features.
+
+We are enforcing:
+
+> **A distributed, contract-driven state machine system with observability**
+
+Next step is **tightening**, not expanding.
+
+```
+
+---
+
+If you want, I can also generate:
+- a **merge checklist (.md)**  
+- or a **PR description ready for GitHub**
+```

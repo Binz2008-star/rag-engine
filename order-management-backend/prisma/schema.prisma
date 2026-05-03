@@ -1,0 +1,411 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String        @id @default(cuid())
+  role             String        @default("STAFF")
+  email            String        @unique
+  phone            String?
+  fullName         String        @map("full_name")
+  passwordHash     String        @map("password_hash")
+  isActive         Boolean       @default(true) @map("is_active")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+  staffMemberships SellerStaff[]
+  ownedSeller      Seller?       @relation("SellerOwner")
+
+  @@index([email])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Seller {
+  id               String            @id @default(cuid())
+  ownerUserId      String            @unique @map("owner_user_id")
+  brandName        String            @map("brand_name")
+  slug             String            @unique
+  whatsappNumber   String?           @map("whatsapp_number")
+  currency         String            @default("USD")
+  status           String            @default("ACTIVE")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  aiBenchmarkCases AiBenchmarkCase[]
+  aiDocumentChunks AiDocumentChunk[]
+  aiDocuments      AiDocument[]
+  aiIndexJobs      AiIndexJob[]
+  aiQueryLogs      AiQueryLog[]
+  customers        Customer[]
+  notificationJobs NotificationJob[]
+  orders           Order[]
+  aiPolicy         SellerAiPolicy?
+  staff            SellerStaff[]
+  owner            User              @relation("SellerOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId])
+  @@index([status])
+  @@index([slug])
+  @@index([createdAt])
+  @@map("sellers")
+}
+
+model SellerStaff {
+  id              String   @id @default(cuid())
+  sellerId        String   @map("seller_id")
+  userId          String   @map("user_id")
+  permissionsJson String   @map("permissions_json")
+  createdAt       DateTime @default(now()) @map("created_at")
+  seller          Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerId, userId])
+  @@map("seller_staff")
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  sellerId    String   @map("seller_id")
+  name        String
+  phone       String
+  addressText String?  @map("address_text")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  orders      Order[]
+
+  @@unique([sellerId, phone])
+  @@index([sellerId, phone])
+  @@index([sellerId, name])
+  @@index([phone])
+  @@map("customers")
+}
+
+model Order {
+  id                String            @id @default(cuid())
+  sellerId          String            @map("seller_id")
+  customerId        String            @map("customer_id")
+  publicOrderNumber String            @unique @map("public_order_number")
+  status            String            @default("PENDING")
+  paymentType       String            @default("CASH_ON_DELIVERY") @map("payment_type")
+  paymentStatus     String            @default("PENDING") @map("payment_status")
+  subtotalMinor     Int               @map("subtotal_minor")
+  deliveryFeeMinor  Int               @default(0) @map("delivery_fee_minor")
+  totalMinor        Int               @map("total_minor")
+  currency          String
+  source            String            @default("public_api")
+  notes             String?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  notificationJobs  NotificationJob[]
+  events            OrderEvent[]
+  orderItems        OrderItem[]
+  customer          Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  seller            Seller            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  paymentAttempts   PaymentAttempt[]
+
+  @@index([sellerId, createdAt])
+  @@index([sellerId, status, createdAt])
+  @@index([sellerId, customerId])
+  @@index([publicOrderNumber])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                  String @id @default(cuid())
+  orderId             String @map("order_id")
+  productId           String @map("product_id")
+  productNameSnapshot String @map("product_name_snapshot")
+  unitPriceMinor      Int    @map("unit_price_minor")
+  quantity            Int
+  lineTotalMinor      Int    @map("line_total_minor")
+  order               Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model OrderEvent {
+  id          String   @id @default(cuid())
+  orderId     String   @map("order_id")
+  actorUserId String?  @map("actor_user_id")
+  eventType   String   @map("event_type")
+  payloadJson String?  @map("payload_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([eventType])
+  @@index([actorUserId])
+  @@index([createdAt])
+  @@map("order_events")
+}
+
+model NotificationJob {
+  id          String    @id @default(cuid())
+  sellerId    String    @map("seller_id")
+  orderId     String?   @map("order_id")
+  channel     String
+  templateKey String    @map("template_key")
+  status      String    @default("PENDING")
+  retryCount  Int       @default(0) @map("retry_count")
+  scheduledAt DateTime  @default(now()) @map("scheduled_at")
+  sentAt      DateTime? @map("sent_at")
+  errorText   String?   @map("error_text")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  order       Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seller      Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt])
+  @@index([sellerId, status])
+  @@index([channel, status])
+  @@index([retryCount])
+  @@map("notification_jobs")
+}
+
+model PaymentAttempt {
+  id                String   @id @default(cuid())
+  orderId           String   @map("order_id")
+  provider          String
+  providerReference String?  @map("provider_reference")
+  amountMinor       Int      @map("amount_minor")
+  currency          String
+  status            String
+  paymentType       String?  @map("payment_type")
+  failureReason     String?  @map("failure_reason")
+  metadataJson      String?  @map("metadata_json")
+  rawPayloadJson    String?  @map("raw_payload_json")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerReference])
+  @@index([orderId])
+  @@index([orderId, status])
+  @@index([status])
+  @@index([provider, status])
+  @@map("payment_attempts")
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String
+  eventId     String    @map("event_id")
+  eventType   String    @map("event_type")
+  payloadJson String    @map("payload_json")
+  processedAt DateTime? @map("processed_at")
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([provider, eventId])
+  @@index([provider, eventId])
+  @@map("webhook_events")
+}
+
+model account {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()"))
+  accountId             String
+  providerId            String
+  userid                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(6)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(6)
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime  @default(now()) @db.Timestamptz(6)
+  user                  user      @relation(fields: [userid], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model session {
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  expiresAt DateTime @db.Timestamptz(6)
+  token     String   @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+  ipAddress String?
+  userAgent String?
+  userid    String
+  user      user     @relation(fields: [userid], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model user {
+  id            String    @id @default(dbgenerated("gen_random_uuid()"))
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @db.Timestamptz(6)
+  account       account[]
+  session       session[]
+}
+
+model verification {
+  id         String   @id @default(dbgenerated("gen_random_uuid()"))
+  identifier String
+  value      String
+  expiresAt  DateTime @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model SellerAiPolicy {
+  id                          String   @id @default(cuid())
+  sellerId                    String   @unique @map("seller_id")
+  retrievalEnabled            Boolean  @default(false) @map("retrieval_enabled")
+  intentRoutingEnabled        Boolean  @default(false) @map("intent_routing_enabled")
+  catalogNormalizationEnabled Boolean  @default(false) @map("catalog_normalization_enabled")
+  rerankEnabled               Boolean  @default(true) @map("rerank_enabled")
+  benchmarkGatePassed         Boolean  @default(false) @map("benchmark_gate_passed")
+  maxChunksPerQuery           Int      @default(8) @map("max_chunks_per_query")
+  minScoreThreshold           Float    @default(0.0) @map("min_score_threshold")
+  allowedDomainsJson          String?  @map("allowed_domains_json")
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+  seller                      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@map("seller_ai_policies")
+}
+
+model AiDocument {
+  id           String            @id @default(cuid())
+  sellerId     String            @map("seller_id")
+  domain       String
+  sourceType   String            @map("source_type")
+  sourceId     String?           @map("source_id")
+  title        String
+  bodyText     String            @map("body_text")
+  languageCode String?           @map("language_code")
+  checksum     String
+  isActive     Boolean           @default(true) @map("is_active")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  chunks       AiDocumentChunk[]
+  seller       Seller            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, domain, isActive])
+  @@index([sellerId, sourceType, sourceId])
+  @@index([sellerId, checksum])
+  @@index([createdAt])
+  @@map("ai_documents")
+}
+
+model AiDocumentChunk {
+  id           String                   @id @default(cuid())
+  documentId   String                   @map("document_id")
+  sellerId     String                   @map("seller_id")
+  chunkIndex   Int                      @map("chunk_index")
+  content      String
+  tokenCount   Int                      @default(0) @map("token_count")
+  metadataJson String?                  @map("metadata_json")
+  createdAt    DateTime                 @default(now()) @map("created_at")
+  embedding    Unsupported("vector")?
+  fts          Unsupported("tsvector")?
+  document     AiDocument               @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  seller       Seller                   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  queryResults AiQueryResult[]
+
+  @@unique([documentId, chunkIndex])
+  @@index([sellerId, createdAt])
+  @@index([sellerId, documentId])
+  @@index([embedding])
+  @@index([fts], type: Gin)
+  @@map("ai_document_chunks")
+}
+
+model AiIndexJob {
+  id           String   @id @default(cuid())
+  sellerId     String   @map("seller_id")
+  jobType      String   @map("job_type")
+  status       String
+  payloadJson  String?  @map("payload_json")
+  attemptCount Int      @default(0) @map("attempt_count")
+  lastError    String?  @map("last_error")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  seller       Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, status, createdAt])
+  @@index([jobType, status])
+  @@map("ai_index_jobs")
+}
+
+model AiQueryLog {
+  id                  String          @id @default(cuid())
+  sellerId            String          @map("seller_id")
+  feature             String
+  queryText           String          @map("query_text")
+  normalizedQueryText String?         @map("normalized_query_text")
+  topK                Int             @map("top_k")
+  latencyMs           Int             @default(0) @map("latency_ms")
+  resultCount         Int             @default(0) @map("result_count")
+  traceId             String?         @map("trace_id")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  seller              Seller          @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  results             AiQueryResult[]
+
+  @@index([sellerId, feature, createdAt])
+  @@index([traceId])
+  @@map("ai_query_logs")
+}
+
+model AiQueryResult {
+  id             String          @id @default(cuid())
+  queryLogId     String          @map("query_log_id")
+  chunkId        String          @map("chunk_id")
+  retrievalScore Float           @map("retrieval_score")
+  rerankScore    Float?          @map("rerank_score")
+  rank           Int
+  sourceRefJson  String?         @map("source_ref_json")
+  chunk          AiDocumentChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  queryLog       AiQueryLog      @relation(fields: [queryLogId], references: [id], onDelete: Cascade)
+
+  @@unique([queryLogId, rank])
+  @@index([queryLogId])
+  @@index([chunkId])
+  @@map("ai_query_results")
+}
+
+model AiBenchmarkCase {
+  id                 String   @id @default(cuid())
+  sellerId           String?  @map("seller_id")
+  suite              String
+  queryText          String   @map("query_text")
+  expectedSourceType String?  @map("expected_source_type")
+  expectedSourceId   String?  @map("expected_source_id")
+  languageCode       String?  @map("language_code")
+  metadataJson       String?  @map("metadata_json")
+  createdAt          DateTime @default(now()) @map("created_at")
+  seller             Seller?  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([suite, sellerId])
+  @@index([languageCode])
+  @@map("ai_benchmark_cases")
+}
+
+model AiBenchmarkRun {
+  id              String   @id @default(cuid())
+  suite           String
+  modelConfigJson String   @map("model_config_json")
+  metricsJson     String?  @map("metrics_json")
+  status          String
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([suite, createdAt])
+  @@index([status])
+  @@map("ai_benchmark_runs")
+}

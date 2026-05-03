@@ -1,0 +1,181 @@
+name: Boundary Checks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  boundary-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for forbidden platform logic
+        run: |
+          echo "Checking for forbidden platform domain leakage in runtime..."
+
+          # Forbidden patterns that indicate platform logic
+          FORBIDDEN_PATTERNS=(
+            "catalog.*create"
+            "catalog.*manage"
+            "sourcing.*import"
+            "opportunit.*score"
+            "workflow.*execute"
+            "enrichment.*process"
+            "ai.*enrich"
+            "localization.*translate"
+            "whatsapp.*send"
+          )
+
+          VIOLATIONS_FOUND=false
+
+          for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+            echo "Checking pattern: $pattern"
+            if grep -r "$pattern" src/ --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx"; then
+              echo "VIOLATION: Found forbidden pattern '$pattern'"
+              VIOLATIONS_FOUND=true
+            fi
+          done
+
+          # Check for platform database tables
+          if grep -r "model.*Product" prisma/; then
+            echo "VIOLATION: Product model found in runtime schema"
+            echo "Products belong in platform, not runtime"
+            VIOLATIONS_FOUND=true
+          fi
+
+          if grep -r "model.*Opportunity" prisma/; then
+            echo "VIOLATION: Opportunity model found in runtime schema"
+            echo "Opportunities belong in platform, not runtime"
+            VIOLATIONS_FOUND=true
+          fi
+
+          if [ "$VIOLATIONS_FOUND" = true ]; then
+            echo "FAILED: Boundary violations detected"
+            echo "Review REPO_CONTRACT.md and DATA_OWNERSHIP_RULES.md"
+            exit 1
+          else
+            echo "PASSED: No boundary violations found"
+          fi
+
+      - name: Verify runtime authority
+        run: |
+          echo "Checking runtime domain ownership..."
+
+          # Should have runtime logic
+          if ! find src/ -name "*.ts" -o -name "*.js" | xargs grep -l "order" | head -1; then
+            echo "WARNING: No order logic found - verify this is intended"
+          fi
+
+          if ! find src/ -name "*.ts" -o -name "*.js" | xargs grep -l "payment" | head -1; then
+            echo "WARNING: No payment logic found - verify this is intended"
+          fi
+
+          # Should have runtime tables
+          if ! grep -r "model.*Order" prisma/; then
+            echo "VIOLATION: Order model missing from runtime schema"
+            echo "Orders belong in runtime"
+            exit 1
+          else
+            echo "PASSED: Runtime ownership verified"
+          fi
+
+          if ! grep -r "model.*Payment" prisma/; then
+            echo "VIOLATION: Payment model missing from runtime schema"
+            echo "Payments belong in runtime"
+            exit 1
+          else
+            echo "PASSED: Runtime ownership verified"
+          fi
+
+      - name: Check API endpoint authority
+        run: |
+          echo "Checking API endpoint authority..."
+
+          # Runtime should expose command endpoints
+          REQUIRED_COMMAND_ENDPOINTS=(
+            "POST.*orders"
+            "PATCH.*orders.*status"
+            "POST.*payments"
+            "POST.*inventory.*reserve"
+            "POST.*auth.*login"
+          )
+
+          for endpoint in "${REQUIRED_COMMAND_ENDPOINTS[@]}"; do
+            if ! grep -r "$endpoint" src/ --include="*.ts" --include="*.js"; then
+              echo "WARNING: Command endpoint '$endpoint' not found"
+              echo "Verify this endpoint is implemented"
+            fi
+          done
+
+          # Runtime should NOT expose platform endpoints
+          PLATFORM_ENDPOINTS=(
+            "POST.*catalog.*products"
+            "POST.*sourcing.*import"
+            "GET.*opportunities"
+            "POST.*workflow.*execute"
+          )
+
+          for endpoint in "${PLATFORM_ENDPOINTS[@]}"; do
+            if grep -r "$endpoint" src/ --include="*.ts" --include="*.js"; then
+              echo "VIOLATION: Platform endpoint '$endpoint' found in runtime"
+              echo "Platform endpoints belong in sellora"
+              exit 1
+            fi
+          done
+
+          echo "PASSED: API authority correct"
+
+      - name: Verify command/query separation
+        run: |
+          echo "Checking command/query API separation..."
+
+          # Only check actual API route files
+          ROUTE_FILES=$(find src/app/api -name "route.ts")
+
+          if [ -z "$ROUTE_FILES" ]; then
+            echo "WARNING: No route files found in src/app/api/"
+          fi
+
+          for file in $ROUTE_FILES; do
+            # Check what HTTP methods are exported
+            HAS_GET=$(grep -q "export async function GET" "$file" && echo "true" || echo "false")
+            HAS_POST=$(grep -q "export async function POST" "$file" && echo "true" || echo "false")
+            HAS_PATCH=$(grep -q "export async function PATCH" "$file" && echo "true" || echo "false")
+            HAS_DELETE=$(grep -q "export async function DELETE" "$file" && echo "true" || echo "false")
+
+            # Command endpoints (POST, PATCH, DELETE) should have audit logging
+            if [ "$HAS_POST" = "true" ] || [ "$HAS_PATCH" = "true" ] || [ "$HAS_DELETE" = "true" ]; then
+              if ! grep -q "audit\|event\|log" "$file"; then
+                echo "WARNING: Command endpoint without audit logging: $file"
+              fi
+
+              # Should have transaction handling
+              if ! grep -q "transaction\|prisma.*\$transaction" "$file"; then
+                echo "WARNING: Command endpoint without transaction: $file"
+              fi
+            fi
+
+            # Query endpoints (GET) should NOT have mutations
+            if [ "$HAS_GET" = "true" ]; then
+              if grep -qE "\.create\(|\.createMany\(|\.update\(|\.updateMany\(|\.delete\(|\.deleteMany\(|\.upsert\(|\.remove\(" "$file"; then
+                echo "VIOLATION: Query endpoint with mutations: $file"
+                exit 1
+              fi
+            fi
+
+            # Check for mixed responsibilities (GET + mutations in same file)
+            if [ "$HAS_GET" = "true" ] && ([ "$HAS_POST" = "true" ] || [ "$HAS_PATCH" = "true" ] || [ "$HAS_DELETE" = "true" ]); then
+              if grep -qE "\.create\(|\.createMany\(|\.update\(|\.updateMany\(|\.delete\(|\.deleteMany\(|\.upsert\(|\.remove\(" "$file"; then
+                echo "VIOLATION: Mixed command/query responsibilities in: $file"
+                echo "GET handler found with mutations in same file as command handlers"
+                exit 1
+              fi
+            fi
+          done
+
+          echo "PASSED: Command/query separation verified"
